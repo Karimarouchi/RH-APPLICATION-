@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connexion - Module RH</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .login-container {
+      background: white;
+      max-width: 450px;
+      width: 100%;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+      animation: slideIn 0.5s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .login-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 40px 30px;
+      text-align: center;
+    }
+
+    .login-header h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
+
+    .login-header p {
+      opacity: 0.9;
+      font-size: 16px;
+    }
+
+    .login-icon {
+      font-size: 60px;
+      margin-bottom: 15px;
+    }
+
+    .login-form {
+      padding: 40px 30px;
+    }
+
+    .form-group {
+      margin-bottom: 25px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #374151;
+      font-size: 14px;
+    }
+
+    .input-wrapper {
+      position: relative;
+    }
+
+    .input-icon {
+      position: absolute;
+      left: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 18px;
+      color: #9ca3af;
+    }
+
+    .toggle-password {
+      position: absolute;
+      right: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      font-size: 18px;
+      user-select: none;
+    }
+
+    input {
+      width: 100%;
+      padding: 14px 45px 14px 45px;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: 15px;
+      transition: all 0.3s;
+      font-family: inherit;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    input.error {
+      border-color: #ef4444;
+    }
+
+    .error-message {
+      display: block;
+      color: #ef4444;
+      font-size: 12px;
+      margin-top: 5px;
+      min-height: 18px;
+    }
+
+    .btn-login {
+      width: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 16px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-login:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-login:active {
+      transform: translateY(0);
+    }
+
+    .btn-login:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .alert {
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+      animation: fadeIn 0.3s;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .alert-success {
+      background: #ecfdf5;
+      border: 2px solid #10b981;
+      color: #065f46;
+    }
+
+    .alert-error {
+      background: #fef2f2;
+      border: 2px solid #ef4444;
+      color: #991b1b;
+    }
+
+    .alert-info {
+      background: #eff6ff;
+      border: 2px solid #3b82f6;
+      color: #1e40af;
+    }
+
+    .remember-forgot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 15px;
+      font-size: 14px;
+    }
+
+    .remember-me {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .remember-me input[type="checkbox"] {
+      width: auto;
+      padding: 0;
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .forgot-password {
+      color: #667eea;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .forgot-password:hover {
+      text-decoration: underline;
+    }
+
+    .demo-credentials {
+      background: #f9fafb;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      border-left: 4px solid #3b82f6;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .demo-credentials:hover {
+      background: #f3f4f6;
+      transform: translateX(5px);
+    }
+
+    .demo-credentials h4 {
+      color: #1e40af;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    .demo-credentials p {
+      color: #4b5563;
+      font-size: 13px;
+      margin: 5px 0;
+    }
+
+    .demo-hint {
+      color: #9ca3af;
+      font-style: italic;
+      font-size: 12px !important;
+      margin-top: 8px !important;
+    }
+
+    .loading-spinner {
+      display: none;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .footer {
+      text-align: center;
+      padding: 20px;
+      color: #6b7280;
+      font-size: 13px;
+      background: #f9fafb;
+    }
+
+    .debug-info {
+      margin-top: 20px;
+      padding: 15px;
+      background: #1f2937;
+      border-radius: 8px;
+      color: #10b981;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .debug-info h5 {
+      color: #60a5fa;
+      margin-bottom: 10px;
+    }
+
+    .debug-info pre {
+      font-size: 11px;
+      line-height: 1.5;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .login-container {
+        border-radius: 15px;
+      }
+      
+      .login-header {
+        padding: 30px 20px;
+      }
+      
+      .login-form {
+        padding: 30px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-header">
+      <div class="login-icon">🔐</div>
+      <h1>Connexion</h1>
+      <p>Module RH - Gestion des congés</p>
+    </div>
+
+    <div class="login-form">
+      <!-- Alerte de démo -->
+      <div class="demo-credentials" id="demoCredentials">
+        <h4>🧪 Identifiants de test :</h4>
+        <p><strong>Email :</strong> karim.benali@company.com</p>
+        <p><strong>Mot de passe :</strong> test123</p>
+        <p class="demo-hint">💡 Cliquez ici pour remplir automatiquement</p>
+      </div>
+
+      <!-- Messages d'alerte -->
+      <div id="alertSuccess" class="alert alert-success">
+        ✅ Connexion réussie ! Redirection...
+      </div>
+
+      <div id="alertError" class="alert alert-error">
+        ❌ Email ou mot de passe incorrect
+      </div>
+
+      <div id="alertInfo" class="alert alert-info">
+        ℹ️ Compte non trouvé. Vérifiez votre email.
+      </div>
+
+      <!-- Formulaire -->
+      <form id="loginForm" novalidate>
+        <div class="form-group">
+          <label for="email">Email professionnel</label>
+          <div class="input-wrapper">
+            <span class="input-icon">📧</span>
+            <input 
+              type="email" 
+              id="email" 
+              name="email" 
+              required 
+              placeholder="votre.email@company.com"
+              autocomplete="email"
+            >
+          </div>
+          <span class="error-message" id="emailError"></span>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Mot de passe</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🔒</span>
+            <input 
+              type="password" 
+              id="password" 
+              name="password" 
+              required 
+              placeholder="••••••••"
+              autocomplete="current-password"
+            >
+            <span class="toggle-password" id="togglePassword">👁️</span>
+          </div>
+          <span class="error-message" id="passwordError"></span>
+        </div>
+
+        <div class="remember-forgot">
+          <label class="remember-me">
+            <input type="checkbox" name="remember" id="rememberMe">
+            <span>Se souvenir de moi</span>
+          </label>
+          <a href="#" class="forgot-password" id="forgotPassword">Mot de passe oublié ?</a>
+        </div>
+
+        <button type="submit" class="btn-login" id="btnLogin">
+          <span id="btnText">Se connecter</span>
+          <div class="loading-spinner" id="loadingSpinner"></div>
+        </button>
+      </form>
+
+      <!-- Debug info (à retirer en production) -->
+      <div class="debug-info" id="debugInfo" style="display: none;">
+        <h5>🔧 Debug Info:</h5>
+        <pre id="debugContent"></pre>
+      </div>
+    </div>
+
+    <div class="footer">
+      Système RH v1.0 - Powered by n8n
+    </div>
+  </div>
+
+  <script>
+    // ============================================
+    // CONFIGURATION N8N
+    // ============================================
+    const CONFIG = {
+      // 🔧 REMPLACE PAR TON URL N8N RÉELLE
+      N8N_WEBHOOK_URL: 'https://karimarouchi.app.n8n.cloud/webhook-test/login-test',
+      
+      // Options
+      DEBUG_MODE: true, // Active les logs de débogage
+      REDIRECT_URL: 'formulaire-conges.html',
+      REDIRECT_DELAY: 1500, // Délai avant redirection (ms)
+      REQUEST_TIMEOUT: 10000 // Timeout de la requête (ms)
+    };
+
+    // ============================================
+    // CLASSE PRINCIPALE DE GESTION DU LOGIN
+    // ============================================
+    class LoginManager {
+      constructor() {
+        this.form = document.getElementById('loginForm');
+        this.btnLogin = document.getElementById('btnLogin');
+        this.btnText = document.getElementById('btnText');
+        this.loadingSpinner = document.getElementById('loadingSpinner');
+        
+        // Champs
+        this.emailInput = document.getElementById('email');
+        this.passwordInput = document.getElementById('password');
+        this.rememberMe = document.getElementById('rememberMe');
+        
+        // Alertes
+        this.alertSuccess = document.getElementById('alertSuccess');
+        this.alertError = document.getElementById('alertError');
+        this.alertInfo = document.getElementById('alertInfo');
+        
+        // Debug
+        this.debugInfo = document.getElementById('debugInfo');
+        this.debugContent = document.getElementById('debugContent');
+        
+        this.init();
+      }
+
+      // ============================================
+      // INITIALISATION
+      // ============================================
+      init() {
+        this.log('🚀 Initialisation du système de login');
+        
+        // Vérifier si déjà connecté
+        this.checkExistingSession();
+        
+        // Événements
+        this.attachEventListeners();
+        
+        // Charger les credentials sauvegardés
+        this.loadRememberedCredentials();
+        
+        this.log('✅ Initialisation terminée');
+      }
+
+      // ============================================
+      // GESTION DES ÉVÉNEMENTS
+      // ============================================
+      attachEventListeners() {
+        // Soumission du formulaire
+        this.form.addEventListener('submit', (e) => this.handleSubmit(e));
+        
+        // Auto-remplissage démo
+        document.getElementById('demoCredentials')?.addEventListener('click', () => {
+          this.fillDemoCredentials();
+        });
+        
+        // Toggle password visibility
+        document.getElementById('togglePassword')?.addEventListener('click', () => {
+          this.togglePasswordVisibility();
+        });
+        
+        // Mot de passe oublié
+        document.getElementById('forgotPassword')?.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.handleForgotPassword();
+        });
+        
+        // Validation en temps réel
+        this.emailInput.addEventListener('blur', () => this.validateEmail());
+        this.passwordInput.addEventListener('blur', () => this.validatePassword());
+        
+        // Nettoyer les erreurs lors de la saisie
+        this.emailInput.addEventListener('input', () => this.clearError('email'));
+        this.passwordInput.addEventListener('input', () => this.clearError('password'));
+      }
+
+      // ============================================
+      // VALIDATION DU FORMULAIRE
+      // ============================================
+      validateEmail() {
+        const email = this.emailInput.value.trim();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        
+        if (!email) {
+          this.showFieldError('email', 'L\'email est requis');
+          return false;
+        }
+        
+        if (!emailRegex.test(email)) {
+          this.showFieldError('email', 'Format d\'email invalide');
+          return false;
+        }
+        
+        this.clearError('email');
+        return true;
+      }
+
+      validatePassword() {
+        const password = this.passwordInput.value;
+        
+        if (!password) {
+          this.showFieldError('password', 'Le mot de passe est requis');
+          return false;
+        }
+        
+        if (password.length < 3) {
+          this.showFieldError('password', 'Le mot de passe doit contenir au moins 3 caractères');
+          return false;
+        }
+        
+        this.clearError('password');
+        return true;
+      }
+
+      validateForm() {
+        const emailValid = this.validateEmail();
+        const passwordValid = this.validatePassword();
+        return emailValid && passwordValid;
+      }
+
+      showFieldError(field, message) {
+        const input = field === 'email' ? this.emailInput : this.passwordInput;
+        const errorSpan = document.getElementById(`${field}Error`);
+        
+        input.classList.add('error');
+        errorSpan.textContent = message;
+      }
+
+      clearError(field) {
+        const input = field === 'email' ? this.emailInput : this.passwordInput;
+        const errorSpan = document.getElementById(`${field}Error`);
+        
+        input.classList.remove('error');
+        errorSpan.textContent = '';
+      }
+
+      // ============================================
+      // SOUMISSION DU FORMULAIRE
+      // ============================================
+      async handleSubmit(e) {
+        e.preventDefault();
+        
+        this.log('📤 Tentative de connexion...');
+        this.hideAllAlerts();
+        
+        // Validation
+        if (!this.validateForm()) {
+          this.log('❌ Validation échouée');
+          return;
+        }
+        
+        this.setLoading(true);
+        
+        const credentials = {
+          email: this.emailInput.value.trim(),
+          password: this.passwordInput.value
+        };
+        
+        this.log('🔐 Credentials:', { email: credentials.email, password: '***' });
+        
+        try {
+          const result = await this.login(credentials);
+          
+          if (result.success) {
+            this.handleLoginSuccess(result);
+          } else {
+            this.handleLoginFailure(result);
+          }
+        } catch (error) {
+          this.handleLoginError(error);
+        } finally {
+          this.setLoading(false);
+        }
+      }
+
+      // ============================================
+      // APPEL API N8N
+      // ============================================
+      async login(credentials) {
+        this.log('🌐 Envoi de la requête à n8n...');
+        this.log('URL:', CONFIG.N8N_WEBHOOK_URL);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), CONFIG.REQUEST_TIMEOUT);
+        
+        try {
+          const requestBody = {
+            email: credentials.email,
+            password: credentials.password,
+            timestamp: new Date().toISOString()
+          };
+          
+          this.log('📦 Corps de la requête:', requestBody);
+          
+          const response = await fetch(CONFIG.N8N_WEBHOOK_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(requestBody),
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          
+          this.log('📨 Statut de la réponse:', response.status);
+          this.log('📨 Headers:', Object.fromEntries(response.headers.entries()));
+          
+          // Lire la réponse
+          const responseText = await response.text();
+          this.log('📄 Réponse brute:', responseText);
+          
+          let data;
+          try {
+            data = JSON.parse(responseText);
+          } catch (parseError) {
+            this.log('⚠️ Erreur de parsing JSON:', parseError);
+            throw new Error('Réponse invalide du serveur');
+          }
+          
+          this.log('📊 Données parsées:', data);
+          
+          if (!response.ok) {
+            throw new Error(data.message || 'Erreur de connexion');
+          }
+          
+          return data;
+          
+        } catch (error) {
+          clearTimeout(timeoutId);
+          
+          if (error.name === 'AbortError') {
+            throw new Error('Timeout: Le serveur met trop de temps à répondre');
+          }
+          
+          throw error;
+        }
+      }
+
+      // ============================================
+      // GESTION DES RÉSULTATS
+      // ============================================
+      handleLoginSuccess(data) {
+        this.log('✅ Connexion réussie!', data);
+        
+        this.showAlert('success');
+        
+        // Sauvegarder la session
+        this.saveSession(data);
+        
+        // Sauvegarder les credentials si "Se souvenir"
+        if (this.rememberMe.checked) {
+          this.saveRememberedCredentials(data.email);
+        }
+        
+        // Redirection
+        setTimeout(() => {
+          this.log('🔄 Redirection vers:', CONFIG.REDIRECT_URL);
+          window.location.href = CONFIG.REDIRECT_URL;
+        }, CONFIG.REDIRECT_DELAY);
+      }
+
+      handleLoginFailure(data) {
+        this.log('❌ Échec de connexion:', data);
+        
+        if (data.message === 'USER_NOT_FOUND') {
+          this.alertInfo.textContent = 'ℹ️ Aucun compte trouvé avec cet email';
+          this.showAlert('info');
+        } else if (data.message === 'INVALID_PASSWORD') {
+          this.alertError.textContent = '❌ Mot de passe incorrect';
+          this.showAlert('error');
+        } else {
+          this.alertError.textContent = `❌ ${data.message || 'Erreur de connexion'}`;
+          this.showAlert('error');
+        }
+      }
+
+      handleLoginError(error) {
+        this.log('💥 Erreur critique:', error);
+        
+        let errorMessage = '❌ Erreur de connexion';
+        
+        if (error.message.includes('Failed to fetch')) {
+          errorMessage = '❌ Impossible de joindre le serveur. Vérifiez votre connexion.';
+        } else if (error.message.includes('Timeout')) {
+          errorMessage = '❌ Le serveur met trop de temps à répondre';
+        } else if (error.message) {
+          errorMessage = `❌ ${error.message}`;
+        }
+        
+        this.alertError.textContent = errorMessage;
+        this.showAlert('error');
+      }
+
+      // ============================================
+      // GESTION DE LA SESSION
+      // ============================================
+      saveSession(data) {
+        const sessionData = {
+          email: data.email,
+          nom: data.nom || '',
+          prenom: data.prenom || '',
+          poste: data.poste || '',
+          role: data.role || 'user',
+          loginTime: new Date().toISOString()
+        };
+        
+        localStorage.setItem('userSession', JSON.stringify(sessionData));
+        localStorage.setItem('userAuth', 'true');
+        localStorage.setItem('userEmail', data.email);
+        localStorage.setItem('userName', `${data.prenom} ${data.nom}`.trim());
+        
+        this.log('💾 Session sauvegardée:', sessionData);
+      }
+
+      checkExistingSession() {
+        const isAuth = localStorage.getItem('userAuth') === 'true';
+        
+        if (isAuth) {
+          this.log('🔐 Session existante détectée');
+          this.alertInfo.textContent = 'ℹ️ Vous êtes déjà connecté. Redirection...';
+          this.showAlert('info');
+          
+          setTimeout(() => {
+            window.location.href = CONFIG.REDIRECT_URL;
+          }, 1000);
+        }
+      }
+
+      // ============================================
+      // SE SOUVENIR DES IDENTIFIANTS
+      // ============================================
+      saveRememberedCredentials(email) {
+        localStorage.setItem('rememberedEmail', email);
+        this.log('💾 Email sauvegardé pour reconnexion');
+      }
+
+      loadRememberedCredentials() {
+        const rememberedEmail = localStorage.getItem('rememberedEmail');
+        
+        if (rememberedEmail) {
+          this.emailInput.value = rememberedEmail;
+          this.rememberMe.checked = true;
+          this.log('📧 Email chargé:', rememberedEmail);
+        }
+      }
+
+      // ============================================
+      // UTILITAIRES UI
+      // ============================================
+      hideAllAlerts() {
+        this.alertSuccess.style.display = 'none';
+        this.alertError.style.display = 'none';
+        this.alertInfo.style.display = 'none';
+      }
+
+      showAlert(type) {
+        this.hideAllAlerts();
+        const alerts = {
+          'success': this.alertSuccess,
+          'error': this.alertError,
+          'info': this.alertInfo
+        };
+        alerts[type].style.display = 'block';
+      }
+
+      setLoading(isLoading) {
+        this.btnLogin.disabled = isLoading;
+        
+        if (isLoading) {
+          this.btnText.style.display = 'none';
+          this.loadingSpinner.style.display = 'block';
+        } else {
+          this.btnText.style.display = 'block';
+          this.loadingSpinner.style.display = 'none';
+        }
+      }
+
+      fillDemoCredentials() {
+        this.emailInput.value = 'karim.benali@company.com';
+        this.passwordInput.value = 'test123';
+        this.clearError('email');
+        this.clearError('password');
+        this.log('🧪 Identifiants de test remplis');
+      }
+
+      togglePasswordVisibility() {
+        const type = this.passwordInput.type === 'password' ? 'text' : 'password';
+        this.passwordInput.type = type;
+        
+        const icon = type === 'password' ? '👁️' : '🙈';
+        document.getElementById('togglePassword').textContent = icon;
+      }
+
+      handleForgotPassword() {
+        alert('🔑 Fonctionnalité "Mot de passe oublié" à venir!\n\nPour le moment, contactez votre administrateur RH.');
+      }
+
+      // ============================================
+      // DEBUG
+      // ============================================
+      log(message, data = null) {
+        if (!CONFIG.DEBUG_MODE) return;
+        
+        const timestamp = new Date().toLocaleTimeString();
+        const logMessage = `[${timestamp}] ${message}`;
+        
+        console.log(logMessage, data || '');
+        
+        // Afficher dans l'interface
+        if (this.debugInfo && this.debugContent) {
+          this.debugInfo.style.display = 'block';
+          const debugLine = data 
+            ? `${logMessage}\n${JSON.stringify(data, null, 2)}\n\n`
+            : `${logMessage}\n\n`;
+          
+          this.debugContent.textContent += debugLine;
+          
+          // Auto-scroll
+          this.debugContent.scrollTop = this.debugContent.scrollHeight;
+        }
+      }
+    }
+
+    // ============================================
+    // DÉMARRAGE DE L'APPLICATION
+    // ============================================
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('🎯 Application de login RH démarrée');
+      console.log('🔧 Mode debug:', CONFIG.DEBUG_MODE);
+      console.log('🌐 Webhook URL:', CONFIG.N8N_WEBHOOK_URL);
+      
+      // Initialiser le gestionnaire de login
+      window.loginManager = new LoginManager();
+    });
+
+    // ============================================
+    // GESTION DES ERREURS GLOBALES
+    // ============================================
+    window.addEventListener('error', (event) => {
+      console.error('💥 Erreur globale:', event.error);
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      console.error('💥 Promise rejetée:', event.reason);
+    });
+  </script>
+</body>
+</html>
