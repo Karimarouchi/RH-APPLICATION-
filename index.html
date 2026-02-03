@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connexion - Module RH</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{
+      font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
+      background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      min-height:100vh;display:flex;align-items:center;justify-content:center;
+      padding:20px;color:#111827;
+    }
+    .login-container{
+      background:#fff;max-width:450px;width:100%;
+      border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);
+      overflow:hidden;animation:slideIn .5s ease-out;
+    }
+    @keyframes slideIn{from{opacity:0;transform:translateY(-30px)}to{opacity:1;transform:translateY(0)}}
+    .login-header{
+      background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      color:#fff;padding:40px 30px;text-align:center;
+    }
+    .login-header h1{font-size:32px;margin-bottom:10px}
+    .login-header p{opacity:.9;font-size:16px}
+    .login-icon{font-size:60px;margin-bottom:15px}
+    .login-form{padding:40px 30px}
+    .form-group{margin-bottom:22px}
+    label{display:block;margin-bottom:8px;font-weight:600;color:#374151;font-size:14px}
+    .input-wrapper{position:relative}
+    .input-icon{
+      position:absolute;left:15px;top:50%;transform:translateY(-50%);
+      font-size:18px;color:#9ca3af;
+    }
+    .toggle-password{
+      position:absolute;right:15px;top:50%;transform:translateY(-50%);
+      cursor:pointer;font-size:18px;user-select:none;
+    }
+    input{
+      width:100%;padding:14px 45px 14px 45px;border:2px solid #e5e7eb;
+      border-radius:10px;font-size:15px;transition:all .3s;font-family:inherit;
+    }
+    input:focus{outline:none;border-color:#667eea;box-shadow:0 0 0 3px rgba(102,126,234,.1)}
+    input.error{border-color:#ef4444}
+    .error-message{display:block;color:#ef4444;font-size:12px;margin-top:5px;min-height:18px}
+
+    .alert{
+      padding:15px;border-radius:8px;margin-bottom:18px;font-size:14px;display:none;
+      animation:fadeIn .3s;
+    }
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    .alert-success{background:#ecfdf5;border:2px solid #10b981;color:#065f46}
+    .alert-error{background:#fef2f2;border:2px solid #ef4444;color:#991b1b}
+    .alert-info{background:#eff6ff;border:2px solid #3b82f6;color:#1e40af}
+
+    .remember-forgot{
+      display:flex;justify-content:space-between;align-items:center;
+      margin-top:10px;font-size:14px;
+    }
+    .remember-me{display:flex;align-items:center;gap:8px;cursor:pointer}
+    .remember-me input[type="checkbox"]{width:auto;padding:0;margin:0;cursor:pointer}
+    .forgot-password{color:#667eea;text-decoration:none;font-weight:600}
+    .forgot-password:hover{text-decoration:underline}
+
+    .btn-login{
+      width:100%;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      color:#fff;padding:16px;border:none;border-radius:10px;font-size:16px;
+      font-weight:bold;cursor:pointer;transition:all .3s;margin-top:14px;
+      display:flex;align-items:center;justify-content:center;
+    }
+    .btn-login:hover{transform:translateY(-2px);box-shadow:0 10px 25px rgba(102,126,234,.3)}
+    .btn-login:active{transform:translateY(0)}
+    .btn-login:disabled{opacity:.6;cursor:not-allowed;transform:none}
+
+    .loading-spinner{
+      display:none;width:20px;height:20px;border:3px solid rgba(255,255,255,.3);
+      border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    .demo-credentials{
+      background:#f9fafb;padding:15px;border-radius:8px;margin-bottom:18px;
+      border-left:4px solid #3b82f6;cursor:pointer;transition:all .3s;
+    }
+    .demo-credentials:hover{background:#f3f4f6;transform:translateX(5px)}
+    .demo-credentials h4{color:#1e40af;margin-bottom:10px;font-size:14px}
+    .demo-credentials p{color:#4b5563;font-size:13px;margin:5px 0}
+    .demo-hint{color:#9ca3af;font-style:italic;font-size:12px!important;margin-top:8px!important}
+
+    .footer{text-align:center;padding:20px;color:#6b7280;font-size:13px;background:#f9fafb}
+
+    .debug-info{
+      margin-top:20px;padding:15px;background:#111827;border-radius:8px;
+      color:#10b981;max-height:260px;overflow-y:auto;display:none;
+    }
+    .debug-info h5{color:#60a5fa;margin-bottom:10px}
+    .debug-info pre{font-size:11px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word}
+
+    @media (max-width:480px){
+      .login-container{border-radius:15px}
+      .login-header{padding:30px 20px}
+      .login-form{padding:30px 20px}
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-header">
+      <div class="login-icon">🔐</div>
+      <h1>Connexion</h1>
+      <p>Module RH - Gestion des congés</p>
+    </div>
+
+    <div class="login-form">
+      <div class="demo-credentials" id="demoCredentials">
+        <h4>🧪 Identifiants de test :</h4>
+        <p><strong>Email :</strong> karim.benali@company.com</p>
+        <p><strong>Mot de passe :</strong> test123</p>
+        <p class="demo-hint">💡 Cliquez ici pour remplir automatiquement</p>
+      </div>
+
+      <div id="alertSuccess" class="alert alert-success">✅ Connexion réussie ! Redirection...</div>
+      <div id="alertError" class="alert alert-error">❌ Email ou mot de passe incorrect</div>
+      <div id="alertInfo" class="alert alert-info">ℹ️ Compte non trouvé. Vérifiez votre email.</div>
+
+      <form id="loginForm" novalidate>
+        <div class="form-group">
+          <label for="email">Email professionnel</label>
+          <div class="input-wrapper">
+            <span class="input-icon">📧</span>
+            <input type="email" id="email" name="email" required placeholder="votre.email@company.com" autocomplete="email">
+          </div>
+          <span class="error-message" id="emailError"></span>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Mot de passe</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="password" name="password" required placeholder="••••••••" autocomplete="current-password">
+            <span class="toggle-password" id="togglePassword">👁️</span>
+          </div>
+          <span class="error-message" id="passwordError"></span>
+        </div>
+
+        <div class="remember-forgot">
+          <label class="remember-me">
+            <input type="checkbox" name="remember" id="rememberMe">
+            <span>Se souvenir de moi</span>
+          </label>
+          <a href="#" class="forgot-password" id="forgotPassword">Mot de passe oublié ?</a>
+        </div>
+
+        <button type="submit" class="btn-login" id="btnLogin">
+          <span id="btnText">Se connecter</span>
+          <div class="loading-spinner" id="loadingSpinner"></div>
+        </button>
+      </form>
+
+      <div class="debug-info" id="debugInfo">
+        <h5>🔧 Debug</h5>
+        <pre id="debugContent"></pre>
+      </div>
+    </div>
+
+    <div class="footer">Système RH v1.0 - Powered by n8n</div>
+  </div>
+
+  <script>
+    // =============================
+    // CONFIG
+    // =============================
+    const CONFIG = {
+      // ✅ Ton endpoint n8n (login)
+      N8N_WEBHOOK_URL: 'https://karimarouchi.app.n8n.cloud/webhook-test/login-test',
+      DEBUG_MODE: true,
+      REDIRECT_URL: 'formulaire-conges.html',
+      REDIRECT_DELAY: 1200,
+      REQUEST_TIMEOUT: 10000
+    };
+
+    class LoginManager {
+      constructor() {
+        this.form = document.getElementById('loginForm');
+        this.btnLogin = document.getElementById('btnLogin');
+        this.btnText = document.getElementById('btnText');
+        this.loadingSpinner = document.getElementById('loadingSpinner');
+
+        this.emailInput = document.getElementById('email');
+        this.passwordInput = document.getElementById('password');
+        this.rememberMe = document.getElementById('rememberMe');
+
+        this.alertSuccess = document.getElementById('alertSuccess');
+        this.alertError = document.getElementById('alertError');
+        this.alertInfo = document.getElementById('alertInfo');
+
+        this.debugInfo = document.getElementById('debugInfo');
+        this.debugContent = document.getElementById('debugContent');
+
+        this.init();
+      }
+
+      init() {
+        this.log('🚀 Init login');
+        this.checkExistingSession();
+        this.attachEventListeners();
+        this.loadRememberedEmail();
+      }
+
+      attachEventListeners() {
+        this.form.addEventListener('submit', (e) => this.handleSubmit(e));
+
+        document.getElementById('demoCredentials')?.addEventListener('click', () => {
+          this.emailInput.value = 'karim.benali@company.com';
+          this.passwordInput.value = 'test123';
+          this.clearError('email');
+          this.clearError('password');
+        });
+
+        document.getElementById('togglePassword')?.addEventListener('click', () => {
+          const type = this.passwordInput.type === 'password' ? 'text' : 'password';
+          this.passwordInput.type = type;
+          document.getElementById('togglePassword').textContent = type === 'password' ? '👁️' : '🙈';
+        });
+
+        document.getElementById('forgotPassword')?.addEventListener('click', (e) => {
+          e.preventDefault();
+          alert('🔑 Fonctionnalité "Mot de passe oublié" à venir.\nPour le moment, contactez votre administrateur RH.');
+        });
+
+        this.emailInput.addEventListener('input', () => this.clearError('email'));
+        this.passwordInput.addEventListener('input', () => this.clearError('password'));
+      }
+
+      validateEmail() {
+        const email = this.emailInput.value.trim();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!email) return this.showFieldError('email', 'L\'email est requis'), false;
+        if (!emailRegex.test(email)) return this.showFieldError('email', 'Format d\'email invalide'), false;
+        this.clearError('email'); return true;
+      }
+
+      validatePassword() {
+        const password = this.passwordInput.value;
+        if (!password) return this.showFieldError('password', 'Le mot de passe est requis'), false;
+        if (password.length < 3) return this.showFieldError('password', 'Au moins 3 caractères'), false;
+        this.clearError('password'); return true;
+      }
+
+      validateForm() { return this.validateEmail() && this.validatePassword(); }
+
+      showFieldError(field, message) {
+        const input = field === 'email' ? this.emailInput : this.passwordInput;
+        const errorSpan = document.getElementById(`${field}Error`);
+        input.classList.add('error');
+        errorSpan.textContent = message;
+      }
+
+      clearError(field) {
+        const input = field === 'email' ? this.emailInput : this.passwordInput;
+        const errorSpan = document.getElementById(`${field}Error`);
+        input.classList.remove('error');
+        errorSpan.textContent = '';
+      }
+
+      hideAllAlerts() {
+        this.alertSuccess.style.display = 'none';
+        this.alertError.style.display = 'none';
+        this.alertInfo.style.display = 'none';
+      }
+
+      showAlert(type, textOverride = null) {
+        this.hideAllAlerts();
+        const map = { success: this.alertSuccess, error: this.alertError, info: this.alertInfo };
+        if (textOverride) map[type].textContent = textOverride;
+        map[type].style.display = 'block';
+      }
+
+      setLoading(isLoading) {
+        this.btnLogin.disabled = isLoading;
+        this.btnText.style.display = isLoading ? 'none' : 'block';
+        this.loadingSpinner.style.display = isLoading ? 'block' : 'none';
+      }
+
+      async handleSubmit(e) {
+        e.preventDefault();
+        this.hideAllAlerts();
+
+        if (!this.validateForm()) return;
+
+        this.setLoading(true);
+
+        const email = this.emailInput.value.trim();
+        const password = this.passwordInput.value;
+
+        try {
+          const data = await this.login({ email, password });
+
+          // ✅ ATTENDU: { success:true, token:"...", user:{...} }
+          if (data && data.success && data.token) {
+            this.handleLoginSuccess(data);
+          } else {
+            this.handleLoginFailure(data);
+          }
+        } catch (err) {
+          this.handleLoginError(err);
+        } finally {
+          this.setLoading(false);
+        }
+      }
+
+      async login(credentials) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), CONFIG.REQUEST_TIMEOUT);
+
+        const body = {
+          email: credentials.email,
+          password: credentials.password,
+          ts: new Date().toISOString()
+        };
+
+        this.log('🌐 POST', { url: CONFIG.N8N_WEBHOOK_URL, body: { ...body, password: '***' } });
+
+        try {
+          const res = await fetch(CONFIG.N8N_WEBHOOK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(body),
+            signal: controller.signal
+          });
+
+          const text = await res.text();
+          let data = {};
+          try { data = JSON.parse(text); } catch (_) { /* ignore */ }
+
+          this.log('📨 Response', { status: res.status, data });
+
+          if (!res.ok) {
+            // n8n renvoie souvent 401 en cas de fail
+            return { success: false, message: data.message || 'INVALID_LOGIN' };
+          }
+
+          return data;
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      }
+
+      handleLoginSuccess(data) {
+        this.log('✅ Login OK', data);
+
+        // 🔐 STOCKER LE JWT
+        localStorage.setItem('jwt', data.token);
+
+        // 👤 STOCKER USER (optionnel)
+        if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+
+        // Remember email
+        if (this.rememberMe.checked) localStorage.setItem('rememberedEmail', this.emailInput.value.trim());
+        else localStorage.removeItem('rememberedEmail');
+
+        this.showAlert('success');
+
+        setTimeout(() => {
+          window.location.href = CONFIG.REDIRECT_URL;
+        }, CONFIG.REDIRECT_DELAY);
+      }
+
+      handleLoginFailure(data) {
+        this.log('❌ Login FAIL', data);
+        const msg = (data && data.message) ? data.message : 'INVALID_LOGIN';
+
+        if (msg === 'USER_NOT_FOUND') {
+          this.showAlert('info', 'ℹ️ Aucun compte trouvé avec cet email');
+        } else if (msg === 'INVALID_PASSWORD') {
+          this.showAlert('error', '❌ Mot de passe incorrect');
+        } else {
+          this.showAlert('error', '❌ Email ou mot de passe incorrect');
+        }
+      }
+
+      handleLoginError(err) {
+        this.log('💥 Error', { message: err?.message || String(err) });
+
+        if ((err?.name || '') === 'AbortError') {
+          this.showAlert('error', '❌ Timeout: le serveur met trop de temps à répondre');
+          return;
+        }
+        if ((err?.message || '').includes('Failed to fetch')) {
+          this.showAlert('error', '❌ Impossible de joindre n8n (réseau/CORS/URL)');
+          return;
+        }
+        this.showAlert('error', `❌ ${err?.message || 'Erreur de connexion'}`);
+      }
+
+      checkExistingSession() {
+        const token = localStorage.getItem('jwt');
+        if (token) {
+          this.showAlert('info', 'ℹ️ Vous êtes déjà connecté. Redirection...');
+          setTimeout(() => window.location.href = CONFIG.REDIRECT_URL, 900);
+        }
+      }
+
+      loadRememberedEmail() {
+        const remembered = localStorage.getItem('rememberedEmail');
+        if (remembered) {
+          this.emailInput.value = remembered;
+          this.rememberMe.checked = true;
+        }
+      }
+
+      log(message, data = null) {
+        if (!CONFIG.DEBUG_MODE) return;
+        const ts = new Date().toLocaleTimeString();
+        const line = `[${ts}] ${message}`;
+
+        console.log(line, data || '');
+        this.debugInfo.style.display = 'block';
+        this.debugContent.textContent += data
+          ? `${line}\n${JSON.stringify(data, null, 2)}\n\n`
+          : `${line}\n\n`;
+        this.debugContent.scrollTop = this.debugContent.scrollHeight;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      window.loginManager = new LoginManager();
+    });
+  </script>
+</body>
+</html>
