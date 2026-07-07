@@ -2,7 +2,7 @@ package com.antigone.rh.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-
+import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -73,6 +73,11 @@ public class Employe {
 
     private String lienDrive;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean archived = false;
+
+    private LocalDateTime archivedAt;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "manager_id")
     @ToString.Exclude

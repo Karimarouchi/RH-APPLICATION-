@@ -108,6 +108,7 @@ const panelGroupsTemplate: Array<{ title: string; items: NavItemDef[]; modes: Ar
         children: [
           { label: 'Liste des employes', path: '/employes' },
           { label: 'Organigramme', path: '/organigramme' },
+	  { label: 'Archives', path: '/employes/archives' },
         ],
       },
       {

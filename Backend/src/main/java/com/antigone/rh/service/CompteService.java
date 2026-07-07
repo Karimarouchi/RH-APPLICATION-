@@ -175,14 +175,31 @@ public class CompteService {
 
         return toDTO(compteRepository.save(compte));
     }
-
-    public CompteDTO toggleEnabled(Long id) {
+public CompteDTO toggleEnabled(Long id) {
         Compte compte = compteRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Compte non trouvé"));
         compte.setEnabled(!compte.getEnabled());
+        
+        if (!compte.getEnabled()) {
+            Employe employe = compte.getEmploye();
+            if (employe != null && !Boolean.TRUE.equals(employe.getArchived())) {
+                employe.setArchived(true);
+                employe.setArchivedAt(LocalDateTime.now());
+                employeRepository.save(employe);
+                log.info("Employé {} automatiquement archivé car son compte a été désactivé.", employe.getNom());
+            }
+        } else {
+            Employe employe = compte.getEmploye();
+            if (employe != null && Boolean.TRUE.equals(employe.getArchived())) {
+                employe.setArchived(false);
+                employe.setArchivedAt(null);
+                employeRepository.save(employe);
+                log.info("Employé {} automatiquement restauré car son compte a été activé.", employe.getNom());
+            }
+        }
+        
         return toDTO(compteRepository.save(compte));
     }
-
     // ─── Change Password ─────────────────────────────────────────
     public void changePassword(Long compteId, ChangePasswordRequest request) {
         Compte compte = compteRepository.findById(compteId)

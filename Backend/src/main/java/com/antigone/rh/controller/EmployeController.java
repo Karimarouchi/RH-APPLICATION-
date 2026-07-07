@@ -74,8 +74,25 @@ public class EmployeController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
-        employeService.delete(id);
-        return ResponseEntity.ok(ApiResponse.ok("Employé supprimé", null));
+        employeService.archive(id);
+        return ResponseEntity.ok(ApiResponse.ok("Employé archivé", null));
+    }
+
+    @PutMapping("/{id}/archive")
+    public ResponseEntity<ApiResponse<Void>> archive(@PathVariable Long id) {
+        employeService.archive(id);
+        return ResponseEntity.ok(ApiResponse.ok("Employé archivé", null));
+    }
+
+    @PutMapping("/{id}/unarchive")
+    public ResponseEntity<ApiResponse<Void>> unarchive(@PathVariable Long id) {
+        employeService.unarchive(id);
+        return ResponseEntity.ok(ApiResponse.ok("Employé restauré", null));
+    }
+
+    @GetMapping("/archived")
+    public ResponseEntity<ApiResponse<List<EmployeDTO>>> getArchived() {
+        return ResponseEntity.ok(ApiResponse.ok(employeService.findAllArchived()));
     }
 
     @PatchMapping("/{id}/solde-conge")

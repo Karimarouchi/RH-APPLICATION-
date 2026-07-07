@@ -27,7 +27,7 @@ import RapportsInactivitePage from './pages/RapportsInactivitePage';
 import HistoriqueAgentPage from './pages/HistoriqueAgentPage';
 import DashboardRHPage from './pages/DashboardRHPage';
 import DepartementsPage from './pages/DepartementsPage';
-
+import ArchivesPage from './pages/ArchivesPage';
 import { NotificationProvider } from './context/NotificationContext';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -69,6 +69,7 @@ const App: React.FC = () => {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="employes" element={<PermissionRoute permission="VIEW_EMPLOYES"><EmployesPage /></PermissionRoute>} />
+          <Route path="employes/archives" element={<PermissionRoute permission="VIEW_EMPLOYES"><ArchivesPage /></PermissionRoute>} />
           <Route path="organigramme" element={<PermissionRoute permission="VIEW_EMPLOYES"><OrganigrammePage /></PermissionRoute>} />
           <Route path="demandes" element={<PermissionRoute permission="VIEW_DEMANDES"><DemandesPage /></PermissionRoute>} />
           <Route path="demandes/new" element={<PermissionRoute permission="VIEW_DEMANDES"><NewDemandePage /></PermissionRoute>} />

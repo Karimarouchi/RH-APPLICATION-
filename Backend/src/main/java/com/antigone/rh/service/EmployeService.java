@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.Period;
 import java.util.Arrays;
@@ -81,7 +82,7 @@ public class EmployeService {
             DayOfWeek.SUNDAY, "DIMANCHE");
 
     public List<EmployeDTO> findAll() {
-        return employeRepository.findAll().stream()
+        return employeRepository.findAllByArchivedFalse().stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -504,21 +505,18 @@ public class EmployeService {
     }
 
     // =========================================
-    // SOLDE CONGÉ — CALCUL BASÉ SUR L'ANNÉE CIVILE (1er janv. → 31 déc.)
+    // SOLDE CONGÉ — CALCUL BASÉ SUR L'ANCIENNETÉ
     // =========================================
 
     /**
-     * Calcule le solde de congé d'un employé sur la base de l'ANNÉE CIVILE.
+     * Compute solde congé info dynamically from dateEmbauche.
      *
-     * Règles :
-     * - L'année de congé = 1er janvier → 31 décembre de l'année en cours.
-     * - Chaque 1er janvier, le scheduler {@link com.antigone.rh.scheduler.CongeResetScheduler}
-     *   réinitialise le solde : report (max MAX_REPORT_CONGE = 5j) + droit annuel.
-     * - Pour la consultation en cours d'année, on lit le solde stocké (déjà réinitialisé)
-     *   et on soustrait les congés consommés/en attente de l'année civile courante.
-     * - Droit annuel selon l'ancienneté :
-     *     · 1ère année : SOLDE_CONGE_AN1 = 18 jours (1.5j/mois proratisé)
-     *     · Années suivantes : SOLDE_CONGE_AN2_PLUS = 24 jours (2j/mois)
+     * Rules:
+     * - 1ère année : 18 jours/an (1.5 jours/mois)
+     * - À partir de la 2ème année : 24 jours/an (2 jours/mois)
+     * - Le solde est proratisé selon les mois travaillés dans l'année de congé en
+     * cours
+     * - L'année de congé va d'anniversaire d'embauche à anniversaire d'embauche
      */
     public SoldeCongeInfo getSoldeCongeInfo(Long employeId) {
         Employe employe = employeRepository.findById(employeId)
@@ -535,44 +533,50 @@ public class EmployeService {
         LocalDate today = LocalDate.now();
         LocalDate dateEmbauche = employe.getDateEmbauche();
 
-        // ── Ancienneté ────────────────────────────────────────────────────────────────
+        // Compute seniority
         Period anciennete = Period.between(dateEmbauche, today);
         int ancienneteAnnees = anciennete.getYears();
         int ancienneteMois = anciennete.getYears() * 12 + anciennete.getMonths();
 
-        // ── Paramètres depuis les référentiels ───────────────────────────────────────
+        // Get rates from referentiels
         double droitAn1 = getRefValue("SOLDE_CONGE_AN1", 18.0);
         double droitAn2Plus = getRefValue("SOLDE_CONGE_AN2_PLUS", 24.0);
         double tauxAn1 = getRefValue("TAUX_MENSUEL_AN1", 1.5);
         double tauxAn2Plus = getRefValue("TAUX_MENSUEL_AN2_PLUS", 2.0);
-        double maxReport = getRefValue("MAX_REPORT_CONGE", 5.0);
 
-        // ── Bornes de l'année civile en cours ────────────────────────────────────────
-        LocalDate debutAnneeConge = LocalDate.of(today.getYear(), 1, 1);
-        LocalDate finAnneeConge = LocalDate.of(today.getYear(), 12, 31);
-
-        // Si l'employé a été embauché cette année, l'année de congé démarre à son embauche
-        if (dateEmbauche.isAfter(debutAnneeConge)) {
+        // Determine current congé year boundaries (anniversary-based)
+        LocalDate debutAnneeConge;
+        LocalDate finAnneeConge;
+        if (ancienneteAnnees < 1) {
             debutAnneeConge = dateEmbauche;
+            finAnneeConge = dateEmbauche.plusYears(1).minusDays(1);
+        } else {
+            debutAnneeConge = dateEmbauche.plusYears(ancienneteAnnees);
+            finAnneeConge = debutAnneeConge.plusYears(1).minusDays(1);
         }
 
-        // ── Taux applicable pour l'année en cours ────────────────────────────────────
+        // Determine rate and annual right
         boolean isFirstYear = ancienneteAnnees < 1;
         double droitAnnuel = isFirstYear ? droitAn1 : droitAn2Plus;
         double tauxMensuel = isFirstYear ? tauxAn1 : tauxAn2Plus;
 
-        // ── Mois travaillés dans l'année civile en cours ──────────────────────────────
+        // Months worked in current congé year
         int moisTravailles;
         if (today.isBefore(debutAnneeConge)) {
             moisTravailles = 0;
         } else {
             Period p = Period.between(debutAnneeConge, today);
             moisTravailles = p.getYears() * 12 + p.getMonths();
-            if (p.getDays() >= 15) moisTravailles++;
+            // Count partial month if >= 15 calendar days
+            if (p.getDays() >= 15) {
+                moisTravailles++;
+            }
         }
         moisTravailles = Math.min(moisTravailles, 12);
 
-        // ── Déduction des mois de congé sans solde (art. 7.2.1) ─────────────────────
+        // ── Règlement 7.2.1 : "pour chaque mois travaillé" ──
+        // Si un salarié a un congé sans solde couvrant la totalité des jours
+        // ouvrables d'un mois, ce mois ne compte pas pour l'acquisition.
         List<Conge> congeSansSoldeApprouves = congeRepository.findOverlappingByTypeCongeAndStatut(
                 employeId, TypeConge.CONGE_SANS_SOLDE, StatutDemande.APPROUVEE,
                 debutAnneeConge, today.isBefore(finAnneeConge) ? today : finAnneeConge);
@@ -581,11 +585,14 @@ public class EmployeService {
         for (int m = 0; m < moisTravailles; m++) {
             LocalDate moisDebut = debutAnneeConge.plusMonths(m);
             LocalDate moisFin = debutAnneeConge.plusMonths(m + 1).minusDays(1);
-            if (moisFin.isAfter(today)) moisFin = today;
+            if (moisFin.isAfter(today))
+                moisFin = today;
 
             int joursOuvMois = countWorkingDaysInPeriod(moisDebut, moisFin);
-            if (joursOuvMois == 0) continue;
+            if (joursOuvMois == 0)
+                continue;
 
+            // Count congé sans solde working days overlapping this month
             int joursCssDansMois = 0;
             for (Conge css : congeSansSoldeApprouves) {
                 LocalDate overlapStart = css.getDateDebut().isBefore(moisDebut) ? moisDebut : css.getDateDebut();
@@ -594,14 +601,56 @@ public class EmployeService {
                     joursCssDansMois += countWorkingDaysInPeriod(overlapStart, overlapEnd);
                 }
             }
-            if (joursCssDansMois >= joursOuvMois) moisNonTravailles++;
+
+            if (joursCssDansMois >= joursOuvMois) {
+                moisNonTravailles++;
+            }
         }
         moisTravailles = Math.max(0, moisTravailles - moisNonTravailles);
 
-        // ── Jours acquis (proratisés) dans l'année civile ─────────────────────────────
+        // Days acquired this year
         double joursAcquis = Math.min(moisTravailles * tauxMensuel, droitAnnuel);
 
-        // ── Congés payés consommés dans l'année civile en cours ───────────────────────
+        // ── Carry-over from previous year (max MAX_REPORT_CONGE) ──
+        double joursReportes = 0;
+        double maxReport = getRefValue("MAX_REPORT_CONGE", 5.0);
+        if (ancienneteAnnees >= 1) {
+            // Previous congé year boundaries
+            LocalDate debutAnneePrecedente = dateEmbauche.plusYears(ancienneteAnnees - 1);
+            LocalDate finAnneePrecedente = debutAnneePrecedente.plusYears(1).minusDays(1);
+
+            // Rate for previous year
+            boolean prevIsFirstYear = (ancienneteAnnees - 1) < 1;
+            double prevDroit = prevIsFirstYear ? droitAn1 : droitAn2Plus;
+            double prevTaux = prevIsFirstYear ? tauxAn1 : tauxAn2Plus;
+
+            // For the first year, compute actual months worked (may be < 12)
+            int prevMoisTravailles;
+            if (prevIsFirstYear) {
+                Period pp = Period.between(debutAnneePrecedente, finAnneePrecedente.plusDays(1));
+                prevMoisTravailles = Math.min(pp.getYears() * 12 + pp.getMonths() + (pp.getDays() >= 15 ? 1 : 0), 12);
+            } else {
+                prevMoisTravailles = 12;
+            }
+            double prevAcquis = Math.min(prevMoisTravailles * prevTaux, prevDroit);
+
+            // Consumed in previous year
+            List<Conge> prevApprouves = congeRepository.findByEmployeIdAndTypeCongeAndStatutAndDateDebutBetween(
+                    employeId, TypeConge.CONGE_PAYE, StatutDemande.APPROUVEE,
+                    debutAnneePrecedente, finAnneePrecedente);
+            double prevConsommes = prevApprouves.stream()
+                    .mapToDouble(c -> c.getNombreJours() != null ? c.getNombreJours() : 0)
+                    .sum();
+
+            double reliquat = Math.max(0, prevAcquis - prevConsommes);
+            joursReportes = Math.min(reliquat, maxReport);
+        }
+
+        // Total available = acquired this year + carry-over - consumed this year
+        joursAcquis += joursReportes;
+
+        // Consumed congés payés (APPROUVEE) this congé year — use nombreJours (jours
+        // effectifs)
         List<Conge> approuves = congeRepository.findByEmployeIdAndTypeCongeAndStatutAndDateDebutBetween(
                 employeId, TypeConge.CONGE_PAYE, StatutDemande.APPROUVEE,
                 debutAnneeConge, finAnneeConge);
@@ -609,7 +658,8 @@ public class EmployeService {
                 .mapToDouble(c -> c.getNombreJours() != null ? c.getNombreJours() : 0)
                 .sum();
 
-        // ── Congés en attente dans l'année civile en cours ───────────────────────────
+        // Pending congés payés (EN_ATTENTE) this congé year — use nombreJours (jours
+        // effectifs)
         List<Conge> enAttente = congeRepository.findByEmployeIdAndTypeCongeAndStatutAndDateDebutBetween(
                 employeId, TypeConge.CONGE_PAYE, StatutDemande.EN_ATTENTE,
                 debutAnneeConge, finAnneeConge);
@@ -617,40 +667,21 @@ public class EmployeService {
                 .mapToDouble(c -> c.getNombreJours() != null ? c.getNombreJours() : 0)
                 .sum();
 
-        // ── Solde final ───────────────────────────────────────────────────────────────
-        // soldeConge stocké = base de l'année civile courante :
-        //   · À la création : initialisé aux jours acquis proratisés (sans report)
-        //   · Chaque 1er janv. : mis à jour par CongeResetScheduler (report + droit annuel)
-        // On ne le re-synchronise PAS en cours d'année pour conserver la base intacte.
         double soldeDisponible;
         double soldePrevisionnel;
-        double joursReportes = 0;
 
         if (employe.getSoldeCongeInitial() != null) {
-            // Solde géré manuellement
+            // Solde géré manuellement — on utilise la valeur stockée
             soldeDisponible = employe.getSoldeConge() != null ? employe.getSoldeConge() : 0;
             soldePrevisionnel = Math.max(0, soldeDisponible - joursEnAttente);
         } else {
-            double soldeBase = employe.getSoldeConge() != null ? employe.getSoldeConge() : 0.0;
+            soldeDisponible = Math.max(0, joursAcquis - joursConsommes);
+            soldePrevisionnel = Math.max(0, joursAcquis - joursConsommes - joursEnAttente);
 
-            // Initialisation des nouveaux employés (soldeConge = 0 et aucun congé)
-            // On calcule les jours acquis proratisés depuis le 1er janv. (ou date d'embauche).
-            // Pas de report fictif : on ne connaît pas l'historique externe de l'employé.
-            // Le report sera calculé correctement par CongeResetScheduler au 1er janv. suivant.
-            if (soldeBase == 0.0 && joursConsommes == 0 && joursEnAttente == 0) {
-                soldeBase = joursAcquis;
-                employe.setSoldeConge(soldeBase);
-                employeRepository.save(employe);
-            }
-
-            // Report visible = fraction de soldeBase au-delà du droit annuel pur
-            // (positionné par le scheduler : soldeBase = report + droitAnnuel)
-            joursReportes = Math.max(0, soldeBase - droitAnnuel);
-
-            soldeDisponible = Math.max(0, soldeBase - joursConsommes);
-            soldePrevisionnel = Math.max(0, soldeBase - joursConsommes - joursEnAttente);
+            // Also update the stored soldeConge to keep it in sync
+            employe.setSoldeConge(soldeDisponible);
+            employeRepository.save(employe);
         }
-
 
         return SoldeCongeInfo.builder()
                 .employeId(employe.getId())
@@ -735,7 +766,7 @@ public class EmployeService {
     // =========================================
 
     public EmployeStatsDTO getStatistics() {
-        List<Employe> all = employeRepository.findAll();
+        List<Employe> all = employeRepository.findAllByArchivedFalse();
         LocalDate now = LocalDate.now();
 
         long total = all.size();
@@ -810,7 +841,7 @@ public class EmployeService {
     public List<EmployeDTO> advancedSearch(String departement, String typeContrat, String genre,
             String poste, String dateEmbaucheFrom, String dateEmbaucheTo,
             Double salaireMin, Double salaireMax, Long managerId, String q) {
-        List<Employe> all = employeRepository.findAll();
+        List<Employe> all = employeRepository.findAllByArchivedFalse();
         return all.stream()
                 .filter(e -> departement == null || departement.isEmpty() || departement.equals(e.getDepartement()))
                 .filter(e -> typeContrat == null || typeContrat.isEmpty() || typeContrat.equals(e.getTypeContrat()))
@@ -847,7 +878,7 @@ public class EmployeService {
     }
 
     public byte[] exportToCsv() {
-        List<Employe> all = employeRepository.findAll();
+        List<Employe> all = employeRepository.findAllByArchivedFalse();
         StringBuilder sb = new StringBuilder();
         // BOM for Excel UTF-8
         sb.append('\uFEFF');
@@ -888,7 +919,7 @@ public class EmployeService {
 
     public List<Map<String, Object>> getOrganigramme() {
         // Build tree from root employees (no manager)
-        List<Employe> roots = employeRepository.findByManagerIsNull();
+        List<Employe> roots = employeRepository.findByManagerIsNullAndArchivedFalse();
         return roots.stream()
                 .map(this::buildOrgNode)
                 .collect(Collectors.toList());
@@ -904,6 +935,7 @@ public class EmployeService {
         node.put("imageUrl", employe.getImageUrl());
         node.put("email", employe.getEmail());
         List<Map<String, Object>> children = employe.getSubordonnes().stream()
+                .filter(sub -> !Boolean.TRUE.equals(sub.getArchived()))
                 .map(this::buildOrgNode)
                 .collect(Collectors.toList());
         node.put("children", children);
@@ -937,6 +969,8 @@ public class EmployeService {
                         : null)
                 .imageUrl(employe.getImageUrl())
                 .lienDrive(employe.getLienDrive())
+                .archived(employe.getArchived())
+                .archivedAt(employe.getArchivedAt())
                 .build();
     }
 
@@ -962,6 +996,47 @@ public class EmployeService {
                 .ribBancaire(dto.getRibBancaire())
                 .imageUrl(dto.getImageUrl())
                 .lienDrive(dto.getLienDrive())
+                .archived(dto.getArchived() != null ? dto.getArchived() : false)
+                .archivedAt(dto.getArchivedAt())
                 .build();
+    }
+
+    public void archive(Long id) {
+        Employe employe = employeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Employé non trouvé avec l'id: " + id));
+        employe.setArchived(true);
+        employe.setArchivedAt(LocalDateTime.now());
+        
+        if (employe.getCompte() != null) {
+            employe.getCompte().setEnabled(false);
+        }
+        
+        employeRepository.save(employe);
+        
+        String nomComplet = employe.getNom() + " " + employe.getPrenom();
+        notifyAdmins("Employé archivé", "L'employé " + nomComplet + " (" + employe.getMatricule() + ") a été archivé.");
+        if (employe.getManager() != null) {
+            notificationService.create(employe.getManager(), "Subordonné archivé", "L'employé " + nomComplet + " a été archivé.", null);
+        }
+    }
+
+    public void unarchive(Long id) {
+        Employe employe = employeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Employé non trouvé avec l'id: " + id));
+        employe.setArchived(false);
+        employe.setArchivedAt(null);
+	if (employe.getCompte() != null && !Boolean.TRUE.equals(employe.getCompte().getEnabled())) {
+            employe.getCompte().setEnabled(true);
+        }
+        employeRepository.save(employe);
+        
+        String nomComplet = employe.getNom() + " " + employe.getPrenom();
+        notifyAdmins("Employé restauré", "L'employé " + nomComplet + " (" + employe.getMatricule() + ") a été restauré de l'archive.");
+    }
+
+    public List<EmployeDTO> findAllArchived() {
+        return employeRepository.findAllByArchivedTrue().stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
     }
 }

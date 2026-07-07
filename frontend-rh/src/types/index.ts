@@ -112,6 +112,8 @@ export interface Employe {
   managerNom: string | null;
   imageUrl: string | null;
   lienDrive: string | null;
+  archived?: boolean;
+  archivedAt?: string | null;
 }
 
 export interface PermissionDTO {

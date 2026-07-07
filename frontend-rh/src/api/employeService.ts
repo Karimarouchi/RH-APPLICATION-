@@ -10,6 +10,9 @@ export const employeService = {
   create: (data: Partial<Employe>) => api.post<ApiResponse<Employe>>('/employes', data),
   update: (id: number, data: Partial<Employe>) => api.put<ApiResponse<Employe>>(`/employes/${id}`, data),
   delete: (id: number) => api.delete<ApiResponse<void>>(`/employes/${id}`),
+  archive: (id: number) => api.put<ApiResponse<void>>(`/employes/${id}/archive`),
+  unarchive: (id: number) => api.put<ApiResponse<void>>(`/employes/${id}/unarchive`),
+  getArchived: () => api.get<ApiResponse<Employe[]>>('/employes/archived'),
   updateSoldeConge: (id: number, solde: number) => api.patch<ApiResponse<void>>(`/employes/${id}/solde-conge?solde=${solde}`),
   updateLienDrive: (id: number, lienDrive: string | null) => api.patch<ApiResponse<Employe>>(`/employes/${id}/lien-drive`, { lienDrive }),
   uploadImage: (id: number, file: File) => {

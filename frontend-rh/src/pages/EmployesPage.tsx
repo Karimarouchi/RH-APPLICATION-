@@ -1,7 +1,7 @@
 // ...existing code...
 
 import React, { useState, useEffect, useRef } from 'react';
-import { HiOutlinePlus, HiOutlineSearch, HiOutlinePencil, HiOutlineTrash, HiOutlinePhotograph, HiOutlineEye, HiOutlineDownload, HiOutlineFilter, HiOutlineChartBar, HiOutlineX, HiOutlineAcademicCap, HiOutlineDocumentText, HiOutlineUpload, HiOutlineExternalLink, HiOutlineCheck, HiOutlineChevronDown, HiOutlineChevronLeft, HiOutlineChevronRight, HiOutlineCalendar, HiOutlineViewGrid, HiOutlineTable } from 'react-icons/hi';
+import { HiOutlinePlus, HiOutlineSearch, HiOutlinePencil, HiOutlineTrash, HiOutlinePhotograph, HiOutlineEye, HiOutlineDownload, HiOutlineFilter, HiOutlineChartBar, HiOutlineX, HiOutlineAcademicCap, HiOutlineDocumentText, HiOutlineUpload, HiOutlineExternalLink, HiOutlineCheck, HiOutlineChevronDown, HiOutlineChevronLeft, HiOutlineChevronRight, HiOutlineCalendar, HiOutlineViewGrid, HiOutlineTable, HiOutlineArchive } from 'react-icons/hi';
 import { motion } from 'framer-motion';
 
 // ─── Custom styled select ───────────────────────────────────────────────────
@@ -512,17 +512,17 @@ const EmployesPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    confirm('Êtes-vous sûr de vouloir supprimer cet employé ?', async () => {
+  const handleArchive = async (id: number) => {
+    confirm('Êtes-vous sûr de vouloir archiver cet employé ?', async () => {
       try {
-        await employeService.delete(id);
+        await employeService.archive(id);
         loadAll();
       } catch (err: any) {
-        const msg = err?.response?.data?.message || 'Impossible de supprimer cet employé.';
+        const msg = err?.response?.data?.message || 'Impossible d\'archiver cet employé.';
         alert(msg);
-        console.error('Erreur suppression:', err);
+        console.error('Erreur archivage:', err);
       }
-    }, 'Supprimer l\'employé');
+    }, 'Archiver l\'employé');
   };
 
   const resetForm = () => {
@@ -756,8 +756,8 @@ const EmployesPage: React.FC = () => {
           <button onClick={() => handleEdit(item)} className="p-1.5 rounded-lg hover:bg-brand-50 text-brand-500 transition-colors">
             <HiOutlinePencil size={16} />
           </button>
-          <button onClick={() => handleDelete(item.id)} className="p-1.5 rounded-lg hover:bg-error-50 text-error-500 transition-colors">
-            <HiOutlineTrash size={16} />
+          <button onClick={() => handleArchive(item.id)} className="p-1.5 rounded-lg hover:bg-warning-50 text-warning-600 transition-colors" title="Archiver l'employé">
+            <HiOutlineArchive size={16} />
           </button>
         </div>
       ),
@@ -1061,11 +1061,12 @@ const EmployesPage: React.FC = () => {
                       <HiOutlinePencil size={15} />
                     </button>
                     <button
-                      onClick={() => handleDelete(emp.id)}
-                      className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-red-500 transition-all duration-300 group-hover:scale-110 group-hover:-translate-y-1"
+                      onClick={() => handleArchive(emp.id)}
+                      className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-warning-600 transition-all duration-300 group-hover:scale-110 group-hover:-translate-y-1"
                       style={{ transitionDelay: '150ms' }}
+                      title="Archiver l'employé"
                     >
-                      <HiOutlineTrash size={15} />
+                      <HiOutlineArchive size={15} />
                     </button>
                   </div>
                 </div>
@@ -1363,7 +1364,7 @@ const EmployesPage: React.FC = () => {
                 className="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600"
               />
               <span className="text-theme-sm font-medium text-gray-700 dark:text-gray-300">
-               affecter des rôles
+                Créer un compte utilisateur et lui affecter des rôles
               </span>
             </label>
             {createCompte && (
@@ -1753,7 +1754,7 @@ const EmployesPage: React.FC = () => {
       isOpen={confirmState.isOpen}
       title={confirmState.title}
       message={confirmState.message}
-      confirmLabel="Supprimer"
+      confirmLabel="Archiver"
       onConfirm={handleConfirm}
       onCancel={handleCancel}
     />

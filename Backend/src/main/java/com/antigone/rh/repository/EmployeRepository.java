@@ -20,7 +20,11 @@ public interface EmployeRepository extends JpaRepository<Employe, Long> {
     boolean existsByCin(String cin);
     List<Employe> findByManagerId(Long managerId);
     List<Employe> findByManagerIsNull();
+    List<Employe> findAllByArchivedFalse();
+    List<Employe> findAllByArchivedTrue();
 
+    @Query("SELECT e FROM Employe e WHERE e.manager IS NULL AND e.archived = false")
+    List<Employe> findByManagerIsNullAndArchivedFalse();
     @Query("SELECT e FROM Employe e JOIN e.compte c JOIN c.roles r WHERE UPPER(r.nom) = UPPER(:roleName)")
     List<Employe> findByRoleName(@Param("roleName") String roleName);
 
