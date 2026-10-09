@@ -29,7 +29,7 @@ services:
 
     # Bind to localhost only - not exposed to internet
     ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
 
   # Spring Boot Backend
   backend:
@@ -114,7 +114,7 @@ services:
       - rh-network
     ports:
       # Host nginx (TLS) proxies project.* and rh.* to this port
-      - "127.0.0.1:${FRONTEND_PORT:-8081}:80"
+      - "127.0.0.1:${FRONTEND_PORT:-8083}:80"
 
 volumes:
   postgres_data:
