@@ -203,6 +203,8 @@ export interface LoginResponse {
   imageUrl: string | null;
   token?: string;
   tokenExpiresAt?: string;
+  /** Guides de premiere connexion deja vus (rh, projets) */
+  toursVus?: string[];
   /** Set to true when a client (not an employee) is logged in */
   isClient?: boolean;
   /** ID of the logged-in client (only present when isClient === true) */

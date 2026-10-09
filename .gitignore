@@ -90,3 +90,4 @@ docker-compose.override.yml
 *.temp
 *.bak
 *~
+secrets-test/

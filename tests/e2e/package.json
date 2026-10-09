@@ -1,0 +1,8 @@
+{
+  "name": "antigone-tests-ui",
+  "private": true,
+  "type": "module",
+  "description": "Parcours automatique de l'interface (navigateur) : releve les erreurs d'appel API et les erreurs JavaScript",
+  "scripts": { "test": "node ui.mjs" },
+  "dependencies": { "playwright": "^1.50.0" }
+}

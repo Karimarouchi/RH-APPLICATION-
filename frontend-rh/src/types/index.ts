@@ -205,6 +205,8 @@ export interface LoginResponse {
   imageUrl: string | null;
   token?: string;
   tokenExpiresAt?: string;
+  /** Guides de premiere connexion deja vus ("rh", "projets") */
+  toursVus?: string[];
 }
 
 export interface DemandeRequest {

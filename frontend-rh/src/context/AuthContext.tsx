@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { LoginResponse } from '../types';
-import { clearAuthSnapshot, getAuthSnapshot, saveAuthSnapshot } from '../utils/authStorage';
+import { clearAuthSnapshot, getAuthSnapshot, saveAuthSnapshot, updateAuthUser } from '../utils/authStorage';
 
 interface AuthContextType {
   user: LoginResponse | null;
   login: (userData: LoginResponse) => void;
+  updateUser: (patch: Partial<LoginResponse>) => void;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -56,8 +57,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     saveAuthSnapshot(userData);
   }, []);
 
+  const updateUser = useCallback((patch: Partial<LoginResponse>) => {
+    setUser((current) => {
+      if (!current) return current;
+      const next = { ...current, ...patch };
+      updateAuthUser(next);
+      return next;
+    });
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, login, updateUser, logout, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

@@ -175,6 +175,15 @@ export const relayAuthSnapshotForSwitch = (): void => {
   writeRelaySnapshot(getLatestSnapshot());
 };
 
+/** Met a jour les donnees de l'utilisateur sans toucher a l'heure de connexion (la session n'est pas prolongee). */
+export const updateAuthUser = (user: LoginResponse): void => {
+  try {
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+  } catch {
+    /* stockage indisponible */
+  }
+};
+
 export const clearAuthSnapshot = (): void => {
   clearLocalStorageSnapshot();
   clearRelaySnapshot();

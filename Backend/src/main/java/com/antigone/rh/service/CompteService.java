@@ -98,7 +98,28 @@ public class CompteService {
                 .imageUrl(employe.getImageUrl())
                 .token(token)
                 .tokenExpiresAt(tokenExpiresAt)
+                .toursVus(parseTours(compte.getToursVus()))
                 .build();
+    }
+
+    private static List<String> parseTours(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return List.of();
+        }
+        return java.util.Arrays.stream(raw.split(",")).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
+    }
+
+    /** Memorise qu'un guide de premiere connexion a ete vu (app = "rh" ou "projets"). */
+    public void markTourSeen(Long compteId, String app) {
+        if (!"rh".equals(app) && !"projets".equals(app)) {
+            throw new RuntimeException("Application inconnue");
+        }
+        Compte compte = compteRepository.findById(compteId)
+                .orElseThrow(() -> new RuntimeException("Compte non trouvé"));
+        java.util.LinkedHashSet<String> tours = new java.util.LinkedHashSet<>(parseTours(compte.getToursVus()));
+        tours.add(app);
+        compte.setToursVus(String.join(",", tours));
+        compteRepository.save(compte);
     }
 
     // ─── CRUD Comptes ────────────────────────────────────────────

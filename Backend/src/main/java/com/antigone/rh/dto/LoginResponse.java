@@ -26,4 +26,5 @@ public class LoginResponse {
     private String imageUrl;
     private String token;
     private String tokenExpiresAt;
+    private java.util.List<String> toursVus;
 }

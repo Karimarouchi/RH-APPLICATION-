@@ -33,6 +33,10 @@ public class Compte {
 
     private LocalDateTime lastLogin;
 
+    /** Guides de premiere connexion deja vus, ex: "rh,projets" (null = aucun). */
+    @Column(length = 100)
+    private String toursVus;
+
     private LocalDateTime createdAt;
 
     private String resetToken;

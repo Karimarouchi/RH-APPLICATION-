@@ -44,6 +44,17 @@ public class AuthController {
         }
     }
 
+    /** Le guide de premiere connexion a ete vu : memorise pour le compte connecte. */
+    @PostMapping("/tour-vu")
+    public ResponseEntity<ApiResponse<Void>> tourVu(@RequestParam String app) {
+        Long accountId = com.antigone.rh.security.SecurityUtils.getCurrentPrincipal().getAccountId();
+        if (accountId == null || com.antigone.rh.security.SecurityUtils.currentEmployeIdOrNull() == null) {
+            return ResponseEntity.ok(ApiResponse.ok("Ignoré (compte client)", null));
+        }
+        compteService.markTourSeen(accountId, app);
+        return ResponseEntity.ok(ApiResponse.ok("Guide marqué comme vu", null));
+    }
+
     @PostMapping("/client-login")
     public ResponseEntity<ApiResponse<ClientLoginResponse>> clientLogin(
             @RequestBody ClientLoginRequest request,

@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import AppSwitchButton from '../ui/AppSwitchButton';
+import OnboardingTour from '../onboarding/OnboardingTour';
 import { useSidebar } from '../../hooks/useSidebar';
 
 const MainLayout: React.FC = () => {
@@ -15,6 +16,7 @@ const MainLayout: React.FC = () => {
         </main>
       </div>
       <AppSwitchButton />
+      <OnboardingTour />
     </div>
   );
 };
