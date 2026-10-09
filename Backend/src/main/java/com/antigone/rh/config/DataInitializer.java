@@ -170,6 +170,29 @@ public class DataInitializer implements CommandLineRunner {
         createParamIfNotExists("SSID_ENTREPRISE", "",
                 "SSID WiFi du réseau de l'entreprise (ex: Antigone-Corp). Laisser vide si non applicable.",
                 TypeReferentiel.PARAMETRE_SYSTEME);
+
+        // --- Serveur d'emails SMTP (Gmail, Hostinger, OVH...). Vide = valeur du fichier .env ---
+        createParamIfNotExists("MAIL_SMTP_HOST", "",
+                "Serveur SMTP (Gmail: smtp.gmail.com, Hostinger: smtp.hostinger.com, OVH: ssl0.ovh.net)",
+                TypeReferentiel.PARAMETRE_SYSTEME);
+        createParamIfNotExists("MAIL_SMTP_PORT", "",
+                "Port SMTP (587 = STARTTLS, 465 = SSL)",
+                TypeReferentiel.PARAMETRE_SYSTEME);
+        createParamIfNotExists("MAIL_SMTP_USERNAME", "",
+                "Identifiant SMTP (adresse email complète)",
+                TypeReferentiel.PARAMETRE_SYSTEME);
+        createParamIfNotExists("MAIL_SMTP_PASSWORD", "",
+                "Mot de passe SMTP (Gmail: mot de passe d'application)",
+                TypeReferentiel.PARAMETRE_SYSTEME);
+        createParamIfNotExists("MAIL_SMTP_SECURITY", "",
+                "Sécurité SMTP : STARTTLS, SSL ou NONE (vide = automatique selon le port)",
+                TypeReferentiel.PARAMETRE_SYSTEME);
+        createParamIfNotExists("MAIL_FROM", "",
+                "Adresse expéditeur affichée (vide = identifiant SMTP)",
+                TypeReferentiel.PARAMETRE_SYSTEME);
+        createParamIfNotExists("MAIL_FROM_NAME", "",
+                "Nom expéditeur affiché (vide = Antigone RH)",
+                TypeReferentiel.PARAMETRE_SYSTEME);
     }
 
     // ===================== Types de Congé =====================

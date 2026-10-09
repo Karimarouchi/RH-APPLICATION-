@@ -11,8 +11,13 @@ app:
     secret: ${JWT_SECRET:antigone-rh-local-dev-secret-key-change-in-prod}
     expiration-hours: ${JWT_EXPIRATION_HOURS:12}
   mail:
-    from: ${MAIL_USERNAME}
-    brevo-api-key: ${BREVO_API_KEY}
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    security: ${MAIL_SECURITY:}
+    from: ${MAIL_FROM:${MAIL_USERNAME:}}
+    from-name: ${MAIL_FROM_NAME:Antigone RH}
     enabled: true
   upload:
     dir: uploads/justificatifs

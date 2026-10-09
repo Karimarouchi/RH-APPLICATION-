@@ -1,31 +1,55 @@
 package com.antigone.rh.service;
 
+import com.antigone.rh.entity.Referentiel;
+import com.antigone.rh.enums.TypeReferentiel;
+import com.antigone.rh.repository.ReferentielRepository;
+import jakarta.mail.internet.MimeMessage;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
-import java.util.List;
-import java.util.Map;
+import java.nio.charset.StandardCharsets;
+import java.util.Properties;
 
+/**
+ * Envoi d'emails par SMTP (Gmail, Hostinger, OVH, Office 365, etc.).
+ * Les parametres peuvent etre modifies par l'admin dans Referentiels > Parametres systeme
+ * (MAIL_SMTP_HOST, MAIL_SMTP_PORT, MAIL_SMTP_USERNAME, MAIL_SMTP_PASSWORD, MAIL_SMTP_SECURITY,
+ * MAIL_FROM, MAIL_FROM_NAME). Une valeur vide utilise la valeur du .env.
+ */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class EmailService {
 
-  @Value("${app.mail.from:antigone.rh.app@gmail.com}")
-  private String fromEmail;
+  private final ReferentielRepository referentielRepository;
+
+  @Value("${app.mail.host:}")
+  private String defaultHost;
+
+  @Value("${app.mail.port:587}")
+  private String defaultPort;
+
+  @Value("${app.mail.username:}")
+  private String defaultUsername;
+
+  @Value("${app.mail.password:}")
+  private String defaultPassword;
+
+  @Value("${app.mail.security:}")
+  private String defaultSecurity;
+
+  @Value("${app.mail.from:}")
+  private String defaultFrom;
 
   @Value("${app.mail.from-name:Antigone RH}")
-  private String fromName;
+  private String defaultFromName;
 
-  @Value("${app.mail.enabled:false}")
+  @Value("${app.mail.enabled:true}")
   private boolean mailEnabled;
-
-  @Value("${app.mail.brevo-api-key:}")
-  private String brevoApiKey;
-
-  private final RestTemplate restTemplate = new RestTemplate();
 
   public void sendCredentials(String toEmail, String employeNom, String username, String password) {
     String subject = "Antigone RH - Vos identifiants de connexion";
@@ -39,38 +63,81 @@ public class EmailService {
     sendEmail(toEmail, subject, htmlBody, employeNom);
   }
 
+  /** Parametre systeme saisi par l'admin, sinon valeur par defaut (.env). */
+  private String setting(String libelle, String fallback) {
+    try {
+      return referentielRepository
+          .findByTypeReferentielAndActifTrue(TypeReferentiel.PARAMETRE_SYSTEME)
+          .stream()
+          .filter(r -> libelle.equalsIgnoreCase(r.getLibelle()))
+          .map(Referentiel::getValeur)
+          .filter(v -> v != null && !v.isBlank())
+          .findFirst()
+          .map(String::trim)
+          .orElse(fallback == null ? "" : fallback.trim());
+    } catch (Exception e) {
+      return fallback == null ? "" : fallback.trim();
+    }
+  }
+
   private void sendEmail(String toEmail, String subject, String htmlBody, String recipientName) {
+    String host = setting("MAIL_SMTP_HOST", defaultHost);
 
-    if (mailEnabled) {
-      try {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("api-key", brevoApiKey);
-
-        Map<String, Object> body = Map.of(
-            "sender", Map.of("name", fromName, "email", fromEmail),
-            "to", List.of(Map.of("email", toEmail, "name", recipientName)),
-            "subject", subject,
-            "htmlContent", htmlBody);
-
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-        ResponseEntity<String> response = restTemplate.postForEntity(
-            "https://api.brevo.com/v3/smtp/email", request, String.class);
-
-        if (response.getStatusCode().is2xxSuccessful()) {
-          log.info("Email envoyé à {} - {}", toEmail, subject);
-        } else {
-          log.error("Erreur Brevo API: {} - {}", response.getStatusCode(), response.getBody());
-        }
-      } catch (Exception e) {
-        log.error("Erreur lors de l'envoi de l'email à {}: {}", toEmail, e.getMessage());
-      }
-    } else {
-      log.info("=== EMAIL (mode simulation) ===");
+    if (!mailEnabled || host.isBlank()) {
+      log.info("=== EMAIL (mode simulation : aucun serveur SMTP configure) ===");
       log.info("À: {}", toEmail);
       log.info("Sujet: {}", subject);
       log.info("Corps HTML généré pour: {}", recipientName);
       log.info("=== FIN EMAIL ===");
+      return;
+    }
+
+    try {
+      int port = Integer.parseInt(setting("MAIL_SMTP_PORT", defaultPort));
+      String username = setting("MAIL_SMTP_USERNAME", defaultUsername);
+      String password = setting("MAIL_SMTP_PASSWORD", defaultPassword);
+      String from = setting("MAIL_FROM", defaultFrom.isBlank() ? username : defaultFrom);
+      String fromName = setting("MAIL_FROM_NAME", defaultFromName);
+      String security = setting("MAIL_SMTP_SECURITY", defaultSecurity).toUpperCase();
+      if (security.isBlank()) {
+        security = port == 465 ? "SSL" : (port == 25 ? "NONE" : "STARTTLS");
+      }
+
+      JavaMailSenderImpl sender = new JavaMailSenderImpl();
+      sender.setHost(host);
+      sender.setPort(port);
+      sender.setDefaultEncoding(StandardCharsets.UTF_8.name());
+      if (!username.isBlank()) {
+        sender.setUsername(username);
+        sender.setPassword(password);
+      }
+
+      Properties props = sender.getJavaMailProperties();
+      props.put("mail.smtp.auth", String.valueOf(!username.isBlank()));
+      props.put("mail.smtp.connectiontimeout", "10000");
+      props.put("mail.smtp.timeout", "15000");
+      props.put("mail.smtp.writetimeout", "15000");
+      switch (security) {
+        case "SSL" -> props.put("mail.smtp.ssl.enable", "true");
+        case "STARTTLS" -> {
+          props.put("mail.smtp.starttls.enable", "true");
+          props.put("mail.smtp.starttls.required", "true");
+        }
+        default -> { /* NONE */ }
+      }
+      props.put("mail.smtp.ssl.trust", host);
+
+      MimeMessage message = sender.createMimeMessage();
+      MimeMessageHelper helper = new MimeMessageHelper(message, false, StandardCharsets.UTF_8.name());
+      helper.setFrom(from, fromName);
+      helper.setTo(toEmail);
+      helper.setSubject(subject);
+      helper.setText(htmlBody, true);
+      sender.send(message);
+
+      log.info("Email envoyé à {} - {} (SMTP {}:{} {})", toEmail, subject, host, port, security);
+    } catch (Exception e) {
+      log.error("Erreur lors de l'envoi de l'email à {}: {}", toEmail, e.getMessage());
     }
   }
 
