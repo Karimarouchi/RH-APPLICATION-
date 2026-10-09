@@ -1,19 +1,35 @@
-// Contenu du guide de premiere connexion.
+// Contenu du guide de premiere connexion (guide interactif sur la vraie interface).
+//
+// Chaque etape peut cibler un element reel du menu de gauche :
+//   - { rail: 'Projets' }     bouton de la barre d'icones (libelle du bouton)
+//   - { panel: 'Mes projets' } entree du panneau qui s'ouvre a droite de la barre
+//   - { selector: '...' }     element libre
+// `open` = bouton de la barre a ouvrir avant d'afficher l'etape (le panneau s'ouvre et la page correspondante s'affiche).
+// `click` = clique sur le bouton cible (pour les boutons qui ouvrent directement une page).
+//
 // Les etapes affichees dependent des PERMISSIONS de la personne (pas du nom de son role) :
 // un role cree plus tard par un administrateur obtient donc automatiquement le bon guide.
 
 export type AppKind = 'rh' | 'projects';
 
+export type Target = { rail: string } | { panel: string } | { selector: string };
+
 export interface TourStep {
   id: string;
   icon: string;
   title: string;
-  /** Nom de l'entree du menu a gauche, pour la retrouver */
-  menu?: string;
   body: string;
   points?: string[];
-  /** L'etape n'est montree que si la personne a AU MOINS UNE de ces permissions (vide = pour tout le monde) */
+  /** Montree seulement si la personne a AU MOINS UNE de ces permissions (vide = pour tout le monde) */
   any?: string[];
+  /** Element reel a mettre en surbrillance. Sans cible : carte au centre de l'ecran. */
+  target?: Target;
+  /** Bouton de la barre a ouvrir avant l'etape (ouvre le panneau + la page) */
+  open?: string;
+  /** Clique sur la cible (bouton qui ouvre directement une page) */
+  click?: boolean;
+  /** Page a afficher avant l'etape (le guide « entre » dans la page) */
+  go?: string;
 }
 
 export interface TourUser {
@@ -31,330 +47,532 @@ export const getAppKind = (): AppKind =>
 /** Nom de l'application cote serveur ("rh" | "projets") */
 export const serverAppName = (kind: AppKind) => (kind === 'rh' ? 'rh' : 'projets');
 
-const FINAL_RH: TourStep = {
+// ---------------------------------------------------------------- etapes communes
+const SHARED_END: TourStep[] = [
+  {
+    id: 'notifications',
+    icon: '🔔',
+    title: 'Les notifications',
+    body: 'La cloche vous prévient dès que quelque chose change pour vous : demande approuvée ou refusée, tâche assignée, média plan à valider…',
+    target: { rail: 'Notifications' },
+  },
+  {
+    id: 'compte',
+    icon: '👤',
+    title: 'Votre compte',
+    body: 'Cliquez sur vos initiales pour ouvrir votre profil, changer de thème (clair ou sombre), choisir la police et la taille du texte, ou vous déconnecter.',
+    target: { selector: '.pc-avatar-btn' },
+  },
+  {
+    id: 'bascule',
+    icon: '🔀',
+    title: 'Passer de Projets à RH',
+    body: 'Ce bouton vous fait passer d’une application à l’autre sans vous reconnecter : Projets pour le travail avec les clients, RH pour vos congés et votre profil.',
+    target: { selector: '[data-tour="app-switch"]' },
+  },
+  {
+    id: 'aide',
+    icon: '❓',
+    title: 'Besoin d’aide plus tard ?',
+    body: 'Ce bouton « ? » relance ce guide à tout moment.',
+    target: { selector: '[data-tour="help"]' },
+  },
+];
+
+const FINAL: TourStep = {
   id: 'fin',
   icon: '🚀',
   title: 'Vous êtes prêt !',
-  body: 'Vous connaissez maintenant l’essentiel. Quelques astuces pour finir :',
-  points: [
-    'Le bouton « Projets / RH » en bas à droite vous fait passer d’une application à l’autre, sans vous reconnecter.',
-    'La cloche en haut vous prévient dès qu’une demande change de statut.',
-    'Un doute plus tard ? Le bouton « ? » en bas à droite relance ce guide à tout moment.',
-  ],
+  body: 'Vous connaissez maintenant l’essentiel. Bon travail !',
 };
 
-const FINAL_PROJECTS: TourStep = {
-  id: 'fin',
-  icon: '🚀',
-  title: 'Vous êtes prêt !',
-  body: 'Vous connaissez maintenant l’essentiel. Quelques astuces pour finir :',
-  points: [
-    'Le bouton « Projets / RH » en bas à droite vous fait passer à l’application RH (congés, profil) sans vous reconnecter.',
-    'La cloche vous prévient quand une tâche vous est assignée ou qu’un média plan change de statut.',
-    'Un doute plus tard ? Le bouton « ? » en bas à droite relance ce guide à tout moment.',
-  ],
-};
-
+// ---------------------------------------------------------------- application RH
 const RH_STEPS: TourStep[] = [
   {
     id: 'accueil',
     icon: '🏠',
-    title: 'Votre accueil',
-    menu: 'Accueil',
-    body: 'C’est la première page que vous voyez en vous connectant : un résumé de votre situation.',
-    points: ['Votre solde de congés', 'Vos dernières demandes et leur statut', 'Vos notifications et ce qui demande votre attention'],
+    title: 'Accueil',
+    body: 'Votre page d’accueil : un résumé de votre situation.',
+    points: ['Votre solde de congés', 'Vos dernières demandes et leur statut', 'Ce qui demande votre attention'],
+    target: { rail: 'Accueil' },
+    click: true,
+  },
+  // ---- Mon espace
+  {
+    id: 'mon-espace',
+    icon: '🧑‍💼',
+    title: 'Mon Espace',
+    body: 'Tout ce qui vous concerne personnellement : vos demandes et votre calendrier. Cliquez sur « Suivant » : nous ouvrons cette section.',
+    any: ['VIEW_MON_CALENDRIER', 'VIEW_MES_DEMANDES'],
+    target: { rail: 'Mon Espace' },
   },
   {
     id: 'mes-demandes',
     icon: '📝',
-    title: 'Faire une demande',
-    menu: 'Mon Espace › Mes demandes',
-    any: ['VIEW_MES_DEMANDES', 'VIEW_DEMANDES'],
+    title: 'Mes demandes',
     body: 'Congé, autorisation d’absence ou télétravail : tout se demande ici, sans papier.',
     points: [
-      'Choisissez le type, les dates, et ajoutez un justificatif si c’est demandé.',
-      'L’application vous indique la date au plus tôt possible (le préavis dépend de la durée) et calcule vos jours.',
+      'Choisissez le type et les dates ; l’application calcule vos jours et indique la date au plus tôt.',
       'Suivez le statut : En attente, puis Approuvée ou Refusée. Vous pouvez annuler tant que c’est en attente.',
+      'Les demandes de papiers (attestation…) se trouvent dans le sous-menu.',
     ],
+    any: ['VIEW_MES_DEMANDES'],
+    open: 'Mon Espace',
+    target: { panel: 'Mes demandes' },
   },
   {
     id: 'mon-calendrier',
     icon: '📅',
-    title: 'Votre calendrier',
-    menu: 'Mon Espace › Mon calendrier',
-    any: ['VIEW_MON_CALENDRIER'],
+    title: 'Mon calendrier',
     body: 'Votre agenda personnel : vos congés, les jours fériés de l’entreprise et vos réunions au même endroit.',
+    any: ['VIEW_MON_CALENDRIER'],
+    open: 'Mon Espace',
+    target: { panel: 'Mon calendrier' },
   },
   {
     id: 'agent',
     icon: '🖥️',
     title: 'L’agent de pointage',
-    body: 'Un petit programme Windows enregistre vos heures d’arrivée et de départ. Vous le téléchargez depuis le menu, en bas à gauche.',
+    body: 'Un petit programme Windows enregistre vos heures d’arrivée et de départ. Vous l’installez depuis ce bouton.',
     points: [
-      'Il vous demande parfois de confirmer que vous êtes bien présent : un simple clic suffit.',
-      'Vos congés, jours fériés, télétravail et autorisations validés sont pris en compte automatiquement : pas de retard compté à tort.',
+      'Il vous demande parfois de confirmer que vous êtes présent : un clic suffit.',
+      'Vos congés, jours fériés, télétravail et autorisations validés sont pris en compte : pas de retard compté à tort.',
     ],
+    any: ['VIEW_MON_CALENDRIER', 'VIEW_MES_DEMANDES'],
+    open: 'Mon Espace',
+    target: { panel: 'Installer l\'Agent' },
+  },
+  // ---- Gestion RH
+  {
+    id: 'gestion-rh',
+    icon: '👥',
+    title: 'Gestion RH',
+    body: 'Les outils des ressources humaines : employés, validations et chiffres clés. Cliquez sur « Suivant » pour entrer dans cette section.',
+    any: ['VIEW_EMPLOYES', 'VIEW_VALIDATIONS', 'VIEW_DASHBOARD'],
+    target: { rail: 'Gestion RH' },
   },
   {
     id: 'employes',
-    icon: '👥',
-    title: 'Les employés',
-    menu: 'Gestion RH › Liste des employés',
-    any: ['VIEW_EMPLOYES'],
-    body: 'La base de tous les collaborateurs de l’entreprise.',
+    icon: '🧾',
+    title: 'Employés',
+    body: 'La base de tous les collaborateurs.',
     points: [
       'Créez et modifiez les fiches : contrat, poste, département, documents, compétences.',
-      'L’organigramme montre qui dépend de qui ; les départs vont dans les archives.',
-      'Les informations sensibles (salaire, RIB, CIN) ne sont visibles que par les personnes autorisées, comme vous.',
+      'Le sous-menu contient la liste, l’organigramme (qui dépend de qui) et les archives (départs).',
+      'Salaire, RIB et CIN ne sont visibles que par les personnes autorisées, comme vous.',
     ],
+    any: ['VIEW_EMPLOYES'],
+    open: 'Gestion RH',
+    target: { panel: 'Employes' },
   },
   {
     id: 'validations',
     icon: '✅',
-    title: 'Valider les demandes',
-    menu: 'Validation demandes',
-    any: ['VIEW_VALIDATIONS', 'VIEW_DEMANDES'],
+    title: 'Validation des demandes',
     body: 'Les demandes de congé et de papiers de votre équipe arrivent ici.',
     points: [
       'Ouvrez une demande, puis Approuvez ou Refusez (avec un commentaire si besoin).',
-      'Le solde de congé est mis à jour automatiquement à l’approbation, et l’employé est prévenu.',
-      'Pour garder les décisions fiables, vous ne pouvez pas valider vos propres demandes.',
+      'Le solde de congé est mis à jour à l’approbation et l’employé est prévenu.',
+      'Vous ne pouvez pas valider vos propres demandes.',
     ],
+    any: ['VIEW_VALIDATIONS', 'VIEW_DEMANDES'],
+    open: 'Gestion RH',
+    target: { panel: 'Validation demandes' },
   },
   {
     id: 'dashboard-rh',
     icon: '📊',
-    title: 'Le tableau de bord RH',
-    menu: 'Gestion RH › Dashboard RH',
+    title: 'Dashboard RH',
+    body: 'Les chiffres clés en un coup d’œil : présences du jour, absences, demandes en attente, alertes.',
     any: ['VIEW_DASHBOARD'],
-    body: 'Les chiffres clés des ressources humaines en un coup d’œil : présences du jour, absences, demandes en attente, alertes.',
+    open: 'Gestion RH',
+    target: { panel: 'Dashboard RH' },
   },
   {
-    id: 'calendrier',
-    icon: '🗓️',
-    title: 'Calendrier et restrictions',
-    menu: 'Administration › Calendrier entreprise',
-    any: ['VIEW_CALENDRIER', 'VIEW_RESTRICTION_CONGE'],
-    body: 'Définissez les règles du temps de travail pour toute l’entreprise.',
-    points: [
-      'Jours fériés : un employé qui pointe un jour férié n’est jamais compté en retard.',
-      'Restrictions de congés : bloquez des périodes où personne ne peut partir (clôture, forte activité).',
-    ],
+    id: 'departements',
+    icon: '🏢',
+    title: 'Départements',
+    body: 'La répartition des employés par département, et les responsables de chacun.',
+    any: ['VIEW_EMPLOYES'],
+    open: 'Gestion RH',
+    target: { panel: 'Departements' },
+  },
+  // ---- Administration
+  {
+    id: 'administration',
+    icon: '🛠️',
+    title: 'Administration',
+    body: 'Les réglages de l’application : comptes, rôles, listes et calendrier. Cliquez sur « Suivant » pour entrer dans cette section.',
+    any: ['VIEW_COMPTES', 'VIEW_ROLES', 'VIEW_REFERENTIELS', 'VIEW_CALENDRIER', 'VIEW_RESTRICTION_CONGE'],
+    target: { rail: 'Administration' },
   },
   {
     id: 'comptes',
     icon: '🔑',
-    title: 'Les comptes d’accès',
-    menu: 'Administration › Comptes',
-    any: ['VIEW_COMPTES'],
+    title: 'Comptes',
     body: 'Un compte permet à un employé de se connecter.',
     points: [
       'Créez un compte pour un employé et choisissez son ou ses rôles.',
       'Un mot de passe provisoire est généré : la personne devra le changer à sa première connexion.',
       'Vous pouvez désactiver un compte à tout moment (départ, suspension).',
     ],
+    any: ['VIEW_COMPTES'],
+    open: 'Administration',
+    target: { panel: 'Comptes' },
   },
   {
     id: 'roles',
     icon: '🛡️',
-    title: 'Les rôles et permissions',
-    menu: 'Administration › Rôles',
-    any: ['VIEW_ROLES'],
+    title: 'Rôles',
     body: 'Un rôle est une liste de permissions : chaque personne ne voit que les pages que son rôle autorise.',
     points: [
       'Créez un rôle, cochez ce qu’il a le droit de faire, puis attribuez-le dans « Comptes ».',
-      'Ce guide s’adapte tout seul : une personne qui reçoit un nouveau rôle voit uniquement les explications des pages qu’elle peut utiliser.',
-      'Attention : donner une permission de gestion donne aussi le droit de modifier ou supprimer les données concernées.',
+      'Ce guide s’adapte tout seul : une personne qui reçoit un nouveau rôle ne voit que les explications des pages qu’elle peut utiliser.',
     ],
+    any: ['VIEW_ROLES'],
+    open: 'Administration',
+    target: { panel: 'Roles' },
   },
   {
     id: 'referentiels',
     icon: '⚙️',
-    title: 'Les référentiels et réglages',
-    menu: 'Administration › Référentiels',
-    any: ['VIEW_REFERENTIELS'],
+    title: 'Référentiels',
     body: 'Les listes et paramètres utilisés partout dans l’application.',
     points: [
       'Listes : départements, postes, types de contrat, formats de média plan…',
       'Paramètres système : horaires, règles de congés, réseau de l’entreprise pour l’agent.',
-      'Serveur d’e-mails (SMTP, Gmail, OVH…) : renseignez-le ici pour que les identifiants et réinitialisations de mot de passe partent par e-mail.',
+      'Serveur d’e-mails (SMTP) : renseignez-le ici pour envoyer identifiants et réinitialisations de mot de passe par e-mail.',
     ],
+    any: ['VIEW_REFERENTIELS'],
+    open: 'Administration',
+    target: { panel: 'Referentiels' },
   },
+  {
+    id: 'calendrier-entreprise',
+    icon: '🗓️',
+    title: 'Calendrier entreprise',
+    body: 'Les jours fériés et les horaires de l’entreprise. Un employé qui pointe un jour férié n’est jamais compté en retard.',
+    any: ['VIEW_CALENDRIER'],
+    open: 'Administration',
+    target: { panel: 'Calendrier entreprise' },
+  },
+  {
+    id: 'restrictions',
+    icon: '⛔',
+    title: 'Restrictions de congés',
+    body: 'Bloquez des périodes où personne ne peut poser de congé (clôture, forte activité).',
+    any: ['VIEW_RESTRICTION_CONGE'],
+    open: 'Administration',
+    target: { panel: 'Restrictions de congés' },
+  },
+  // ---- Monitoring
   {
     id: 'monitoring',
     icon: '📡',
-    title: 'Suivi des présences',
-    menu: 'Monitoring › Suivi temps réel',
+    title: 'Monitoring',
+    body: 'Voyez qui est présent grâce à l’agent installé sur les postes. Cliquez sur « Suivant » pour entrer dans cette section.',
     any: ['VIEW_MONITORING'],
-    body: 'Voyez qui est présent grâce à l’agent installé sur les postes.',
-    points: [
-      'Suivi temps réel : qui est connecté et actif en ce moment.',
-      'Rapports : les périodes d’inactivité à valider ou à refuser.',
-      'Historique agent : les arrivées, départs et retards jour par jour.',
-    ],
+    target: { rail: 'Monitoring' },
+  },
+  {
+    id: 'temps-reel',
+    icon: '🟢',
+    title: 'Suivi temps réel',
+    body: 'Qui est connecté et actif en ce moment, avec le dernier signe de vie de chaque poste.',
+    any: ['VIEW_MONITORING'],
+    open: 'Monitoring',
+    target: { panel: 'Suivi temps reel' },
+  },
+  {
+    id: 'rapports-inactivite',
+    icon: '📑',
+    title: 'Rapports',
+    body: 'Les périodes d’inactivité détectées : à valider ou à refuser.',
+    any: ['VIEW_MONITORING'],
+    open: 'Monitoring',
+    target: { panel: 'Rapports' },
+  },
+  {
+    id: 'historique-agent',
+    icon: '🕒',
+    title: 'Historique agent',
+    body: 'Les arrivées, départs et retards jour par jour, pour chaque employé.',
+    any: ['VIEW_MONITORING'],
+    open: 'Monitoring',
+    target: { panel: 'Historique agent' },
   },
 ];
 
+// ---------------------------------------------------------------- application Projets
 const PROJECT_STEPS: TourStep[] = [
   {
     id: 'accueil',
     icon: '🏠',
-    title: 'Votre accueil',
-    menu: 'Accueil',
-    body: 'Un résumé de votre activité : vos projets en cours, vos prochaines échéances et vos notifications.',
+    title: 'Accueil',
+    body: 'Votre page d’accueil : vos projets en cours, vos prochaines échéances et vos notifications.',
+    target: { rail: 'Accueil' },
+    click: true,
   },
+  // ---- Projets
   {
     id: 'projets',
     icon: '📁',
-    title: 'Les projets',
-    menu: 'Projets',
-    any: ['MANAGE_ALL_PROJETS', 'VIEW_PROJETS_CREATE_TACHES'],
-    body: 'Le cœur de l’application : un projet regroupe un client, une équipe et des tâches.',
+    title: 'Projets',
+    body: 'Le cœur de l’application : un projet regroupe un client, une équipe et des tâches. Cliquez sur « Suivant » : nous entrons dans cette section.',
+    any: ['VIEW_PROJETS', 'VIEW_MES_PROJETS'],
+    target: { rail: 'Projets' },
+  },
+  {
+    id: 'projets-liste',
+    icon: '🗂️',
+    title: 'Projets',
+    body: 'Tous les projets, regroupés par client.',
     points: [
-      'Créez un projet : choisissez le client, les dates, les chefs de projet et les membres.',
-      'Ajoutez des tâches et assignez-les : une tâche ne peut démarrer que si quelqu’un en est responsable.',
-      'Démarrez puis clôturez le projet. Si des tâches sont encore ouvertes, l’application vous les liste avant de vous laisser forcer la clôture.',
+      'Créez un projet : client, dates, chefs de projet et membres.',
+      'Ajoutez des tâches et assignez-les : une tâche ne démarre que si quelqu’un en est responsable.',
+      'Démarrez puis clôturez le projet. Si des tâches sont ouvertes, l’application vous les liste avant de vous laisser forcer la clôture.',
     ],
+    any: ['MANAGE_ALL_PROJETS', 'VIEW_PROJETS_CREATE_TACHES'],
+    open: 'Projets',
+    target: { panel: 'Projets' },
   },
   {
     id: 'mes-projets',
     icon: '✔️',
-    title: 'Mes projets et mes tâches',
-    menu: 'Mes projets',
-    any: ['VIEW_MES_PROJETS'],
-    body: 'Les projets dont vous faites partie et les tâches qui vous sont assignées.',
+    title: 'Mes projets',
+    body: 'Vos projets et vos tâches.',
     points: [
       'Faites avancer chaque tâche : À faire, En cours, puis Terminée.',
       'Vous ne modifiez que vos propres tâches ; votre responsable voit votre avancement.',
     ],
+    any: ['VIEW_MES_PROJETS'],
+    open: 'Projets',
+    target: { panel: 'Mes projets' },
+  },
+  // ---- Calendrier
+  {
+    id: 'calendrier',
+    icon: '📅',
+    title: 'Calendrier',
+    body: 'Organisez le temps de l’équipe. Cliquez sur « Suivant » : nous ouvrons cette section.',
+    any: ['VIEW_CALENDRIER_PROJETS', 'VIEW_DEADLINES', 'VIEW_REUNIONS'],
+    target: { rail: 'Calendrier' },
   },
   {
-    id: 'equipes',
+    id: 'calendrier-projets',
+    icon: '🗓️',
+    title: 'Calendrier Projets',
+    body: 'Trois vues dans un seul calendrier : les échéances, les réunions et les tournages.',
+    any: ['VIEW_CALENDRIER_PROJETS', 'VIEW_DEADLINES', 'VIEW_REUNIONS'],
+    open: 'Calendrier',
+    target: { panel: 'Calendrier Projets' },
+  },
+  {
+    id: 'deadlines',
+    icon: '⏰',
+    title: 'Deadlines',
+    body: 'Les échéances des tâches et des projets, pour ne rien laisser passer.',
+    any: ['VIEW_DEADLINES', 'VIEW_CALENDRIER_PROJETS'],
+    open: 'Calendrier',
+    target: { panel: 'Deadlines' },
+  },
+  {
+    id: 'reunions',
     icon: '🤝',
-    title: 'Les équipes',
-    menu: 'Équipes',
-    any: ['VIEW_EQUIPES'],
-    body: 'Regroupez des collaborateurs en équipes pour les affecter plus vite aux projets.',
+    title: 'Réunions',
+    body: 'Planifiez une réunion et invitez vos collègues ou un client ; chacun peut accepter ou refuser.',
+    any: ['VIEW_REUNIONS', 'VIEW_CALENDRIER_PROJETS'],
+    open: 'Calendrier',
+    target: { panel: 'Réunions' },
   },
   {
-    id: 'clients',
-    icon: '🏢',
-    title: 'Les clients',
-    menu: 'Clients',
-    any: ['VIEW_CLIENTS', 'MANAGE_CLIENTS'],
-    body: 'La fiche de chaque client et tout ce qui le concerne.',
-    points: [
-      'Ajoutez un client avec ses contacts et son logo.',
-      'Vous pouvez lui créer un accès « portail client » : il valide lui-même ses publications.',
-      'Un dossier Google Drive est préparé automatiquement pour ses fichiers.',
-    ],
+    id: 'tournage',
+    icon: '🎬',
+    title: 'Tournage',
+    body: 'Réservez les créneaux de shooting sans conflit entre les équipes.',
+    any: ['VIEW_CALENDRIER_PROJETS'],
+    open: 'Calendrier',
+    target: { panel: 'Tournage' },
+  },
+  // ---- Media plan
+  {
+    id: 'media-plan-rail',
+    icon: '📱',
+    title: 'Media Plan',
+    body: 'La planification des publications sur les réseaux sociaux. Cliquez sur « Suivant » : nous entrons dans cette section.',
+    any: ['VIEW_MEDIA_PLAN'],
+    target: { rail: 'Media Plan' },
   },
   {
     id: 'media-plan',
-    icon: '📱',
-    title: 'Les média plans',
-    menu: 'Social media › Media Plan',
-    any: ['VIEW_MEDIA_PLAN'],
-    body: 'Planifiez les publications des réseaux sociaux de chaque client.',
+    icon: '🗒️',
+    title: 'Media Plan',
+    body: 'Planifiez les publications de chaque client.',
     points: [
       'Une ligne = une publication : date, heure, plateforme, format, visuel, texte.',
       'Étape 1 : un manager l’approuve en interne. Étape 2 : le client la valide sur son portail.',
-      'Si le client demande des modifications (rectifs), ils s’affichent ici pour être traités.',
+      'Si le client demande des modifications (rectifs), elles s’affichent ici.',
     ],
+    any: ['VIEW_MEDIA_PLAN'],
+    open: 'Media Plan',
+    target: { panel: 'Media Plan' },
   },
   {
     id: 'tous-media-plans',
     icon: '🗂️',
-    title: 'Tous les média plans',
-    menu: 'Social media › Tous les Media Plan',
-    any: ['VIEW_TOUS_MEDIA_PLAN'],
-    body: 'La vue d’ensemble pour les responsables.',
+    title: 'Tous les Media Plan',
+    body: 'La vue d’ensemble des responsables.',
     points: [
       'Approuvez ou refusez les publications préparées par l’équipe.',
       'Affectez les clients à vos collaborateurs.',
-      'Une publication avec tournage prévient automatiquement le Head Prod pour planifier le shooting.',
+      'Une publication avec tournage prévient automatiquement le Head Prod.',
     ],
+    any: ['VIEW_TOUS_MEDIA_PLAN'],
+    open: 'Media Plan',
+    target: { panel: 'Tous les Media Plan' },
   },
+  // ---- Rapports
   {
-    id: 'calendrier-projets',
-    icon: '🎬',
-    title: 'Calendrier des projets',
-    menu: 'Calendrier › Deadlines, Réunions, Tournage',
-    any: ['VIEW_CALENDRIER_PROJETS', 'VIEW_DEADLINES', 'VIEW_REUNIONS'],
-    body: 'Trois vues pour organiser le temps de l’équipe.',
-    points: [
-      'Deadlines : les échéances des tâches et des projets.',
-      'Réunions : planifiez et invitez vos collègues ou un client.',
-      'Tournage : réservez les créneaux de shooting sans conflit.',
-    ],
+    id: 'rapports',
+    icon: '📈',
+    title: 'Rapports',
+    body: 'Analysez et améliorez la qualité du travail. Cliquez sur « Suivant » : nous ouvrons cette section.',
+    any: ['VIEW_PROJETS'],
+    target: { rail: 'Rapports' },
   },
   {
     id: 'dashboard-projets',
     icon: '📊',
-    title: 'Dashboard des projets',
-    menu: 'Rapports › Dashboard Projets',
+    title: 'Dashboard Projets',
+    body: 'L’état de santé de tous les projets : avancement, retards, alertes, charge par personne. Cliquez sur un projet pour voir son détail.',
     any: ['VIEW_TOUS_PROJETS'],
-    body: 'L’état de santé de tous les projets : avancement, retards, alertes, charge par personne. Cliquez sur un projet pour voir le détail.',
+    open: 'Rapports',
+    target: { panel: 'Dashboard Projets' },
   },
   {
-    id: 'rapports',
-    icon: '📈',
-    title: 'Rapports et rectifs',
-    menu: 'Rapports › Rapport Cycle de Vie / Rectifs',
+    id: 'rapport-cycle',
+    icon: '⏱️',
+    title: 'Rapport Cycle de Vie',
+    body: 'La durée réelle de chaque projet et de ses étapes, du démarrage à la clôture.',
     any: ['VIEW_PROJETS'],
-    body: 'Analysez et améliorez la qualité du travail.',
+    open: 'Rapports',
+    target: { panel: 'Rapport Cycle de Vie' },
+  },
+  {
+    id: 'rectifs',
+    icon: '✏️',
+    title: 'Rectifs',
+    body: 'Les corrections demandées par l’équipe (internes) ou par le client (externes), et combien de fois elles reviennent.',
+    any: ['VIEW_PROJETS'],
+    open: 'Rapports',
+    target: { panel: 'Rectifs' },
+  },
+  // ---- Clients
+  {
+    id: 'clients',
+    icon: '🏢',
+    title: 'Clients',
+    body: 'La fiche de chaque client et tout ce qui le concerne.',
     points: [
-      'Rapport cycle de vie : la durée réelle de chaque projet et de ses étapes.',
-      'Rectifs internes et externes : les corrections demandées par l’équipe ou par le client, et combien de fois elles reviennent.',
+      'Ajoutez un client avec ses contacts et son logo.',
+      'Créez-lui un accès « portail client » : il valide lui-même ses publications.',
+      'Un dossier Google Drive est préparé automatiquement pour ses fichiers.',
     ],
+    any: ['VIEW_CLIENTS', 'MANAGE_CLIENTS'],
+    target: { rail: 'Clients' },
+    click: true,
   },
 ];
 
+// ---------------------------------------------------------------- portail client (barre du haut, sans menu de gauche)
 const CLIENT_STEPS: TourStep[] = [
   {
-    id: 'accueil',
+    id: 'client-logo',
     icon: '🏠',
     title: 'Votre espace client',
-    menu: 'Accueil',
-    body: 'Bienvenue sur votre portail. Vous y suivez le travail réalisé pour vous et vous validez vos publications.',
+    body: 'Ce logo vous ramène à tout moment à l’accueil de votre portail.',
+    target: { selector: '[data-tour="client-home"]' },
+    go: '/client/accueil',
   },
   {
-    id: 'client-media-plans',
+    id: 'carte-media-plans',
+    icon: '📱',
+    title: 'Media Plans',
+    body: 'Vos publications sur les réseaux sociaux. Cliquez sur « Suivant » : nous ouvrons cette page.',
+    any: ['MEDIA_PLANS'],
+    target: { selector: '[data-tour="client-card-media-plans"]' },
+    go: '/client/accueil',
+  },
+  {
+    id: 'page-media-plans',
     icon: '📱',
     title: 'Valider vos publications',
-    menu: 'Mes Media Plans',
-    any: ['MEDIA_PLANS'],
     body: 'Les publications préparées pour vous attendent votre accord.',
     points: [
       'Approuvez une publication, ou refusez-la.',
       'Besoin d’un changement ? Écrivez-le dans « Rectifs » : l’équipe est prévenue et vous renvoie une nouvelle version.',
       'Vous pouvez aussi tout approuver d’un coup.',
     ],
+    any: ['MEDIA_PLANS'],
+    go: '/client/media-plans',
   },
   {
-    id: 'client-projets',
+    id: 'carte-projets',
+    icon: '📁',
+    title: 'Projets',
+    body: 'L’avancement de vos projets. Cliquez sur « Suivant » : nous ouvrons cette page.',
+    any: ['PROJETS'],
+    target: { selector: '[data-tour="client-card-projets"]' },
+    go: '/client/accueil',
+  },
+  {
+    id: 'page-projets',
     icon: '📁',
     title: 'Suivre vos projets',
-    menu: 'Mes Projets',
+    body: 'Chaque projet avec son avancement et ses tâches, en temps réel : vous savez toujours où en est le travail.',
     any: ['PROJETS'],
-    body: 'L’avancement de chaque projet et de ses tâches, en temps réel.',
+    go: '/client/projets',
   },
   {
-    id: 'client-fichiers',
+    id: 'carte-fichiers',
+    icon: '🗃️',
+    title: 'Fichiers',
+    body: 'Les visuels et documents qui vous sont livrés. Cliquez sur « Suivant » : nous ouvrons cette page.',
+    any: ['FICHIERS'],
+    target: { selector: '[data-tour="client-card-fichiers"]' },
+    go: '/client/accueil',
+  },
+  {
+    id: 'page-fichiers',
     icon: '🗃️',
     title: 'Vos fichiers',
-    menu: 'Mes Fichiers',
-    any: ['FICHIERS'],
     body: 'Retrouvez les visuels et documents livrés, classés par mois, ou ouvrez directement votre dossier Drive.',
+    any: ['FICHIERS'],
+    go: '/client/fichiers',
+  },
+  {
+    id: 'client-compte',
+    icon: '👤',
+    title: 'Votre compte',
+    body: 'Votre nom ouvre le menu du compte : c’est ici que vous vous déconnectez.',
+    target: { selector: '[data-tour="client-account"]' },
+    go: '/client/accueil',
+  },
+  {
+    id: 'client-theme',
+    icon: '🌙',
+    title: 'Thème clair ou sombre',
+    body: 'Changez l’apparence du portail selon votre confort.',
+    target: { selector: '[aria-label="Changer le thème"]' },
+  },
+  {
+    id: 'aide',
+    icon: '❓',
+    title: 'Besoin d’aide plus tard ?',
+    body: 'Ce bouton « ? » relance ce guide à tout moment.',
+    target: { selector: '[data-tour="help"]' },
   },
 ];
-
-const FINAL_CLIENT: TourStep = {
-  id: 'fin',
-  icon: '🚀',
-  title: 'C’est tout !',
-  body: 'Vous savez tout ce qu’il faut. Le bouton « ? » en bas à droite relance ce guide à tout moment.',
-};
 
 const hasAny = (owned: string[], wanted?: string[]) => !wanted || wanted.length === 0 || wanted.some((p) => owned.includes(p));
 
@@ -385,9 +603,13 @@ export const buildSteps = (user: TourUser, kind: AppKind): TourStep[] => {
       id: 'bienvenue',
       icon: '👋',
       title: user.nom ? `Bonjour ${user.nom} !` : 'Bonjour !',
-      body: 'Ce petit guide de moins d’une minute vous montre à quoi sert chaque partie de votre portail.',
+      body: 'Bienvenue sur votre portail. Ce guide de moins d’une minute vous montre à quoi sert chaque partie.',
     };
-    return [welcome, ...CLIENT_STEPS.filter((s) => hasAny(allowed, s.any)), FINAL_CLIENT];
+    return [
+      welcome,
+      ...CLIENT_STEPS.filter((s) => hasAny(allowed, s.any)),
+      { ...FINAL, body: 'Vous savez tout ce qu’il faut. Le bouton « ? » relance ce guide à tout moment.' },
+    ];
   }
 
   const name = (user.prenom || user.nom || '').trim();
@@ -398,11 +620,11 @@ export const buildSteps = (user: TourUser, kind: AppKind): TourStep[] => {
     title: name ? `Bienvenue ${name} !` : 'Bienvenue !',
     body:
       kind === 'rh'
-        ? 'Voici l’application RH. Ce guide de moins d’une minute vous montre à quoi sert chaque partie, selon votre rôle.'
-        : 'Voici l’application Projets. Ce guide de moins d’une minute vous montre à quoi sert chaque partie, selon votre rôle.',
+        ? 'Voici l’application RH. Ce guide de moins d’une minute vous montre, dans le menu de gauche, à quoi sert chaque partie selon votre rôle.'
+        : 'Voici l’application Projets. Ce guide de moins d’une minute vous montre, dans le menu de gauche, à quoi sert chaque partie selon votre rôle.',
     points: [...(roles.length ? [`Votre rôle : ${roles.join(', ')}`] : []), ...roleSummary(user)],
   };
   const owned = user.permissions ?? [];
   const catalog = kind === 'rh' ? RH_STEPS : PROJECT_STEPS;
-  return [welcome, ...catalog.filter((s) => hasAny(owned, s.any)), kind === 'rh' ? FINAL_RH : FINAL_PROJECTS];
+  return [welcome, ...catalog.filter((s) => hasAny(owned, s.any)), ...SHARED_END, FINAL];
 };

@@ -44,9 +44,12 @@ for (const [who, creds] of Object.entries(users)) {
     const opened = await dlg.isVisible({ timeout: 5000 }).catch(() => false);
     check(opened, `${who}/${app}: le guide s'ouvre tout seul a la premiere connexion`);
     const titles = [];
+    let spotlights = 0;
     if (opened) {
-      for (let i = 0; i < 40; i++) {
+      for (let i = 0; i < 60; i++) {
+        await page.waitForTimeout(900); // laisse le menu s'ouvrir et la surbrillance se placer
         titles.push((await dlg.locator('h2').innerText()).trim());
+        spotlights += (await page.evaluate(() => [...document.querySelectorAll('[role=dialog] [aria-hidden=true]')].some((e) => e.style && e.style.boxShadow))) ? 1 : 0;
         if (shotsDir) { fs.mkdirSync(shotsDir, { recursive: true }); await page.screenshot({ path: path.join(shotsDir, `${who}-${app}-${String(i + 1).padStart(2, '0')}.png`) }); }
         const next = dlg.getByRole('button', { name: /Suivant|Terminer/ });
         const label = (await next.innerText()).trim();
@@ -55,6 +58,9 @@ for (const [who, creds] of Object.entries(users)) {
         if (label.startsWith('Terminer')) break;
       }
       check(titles.length >= 3 && /pr[eê]t|tout/i.test(titles[titles.length - 1]), `${who}/${app}: ${titles.length} etapes parcourues jusqu'a la fin`);
+      check(spotlights >= 3, `${who}/${app}: ${spotlights} etapes mettent un element reel du menu en surbrillance`);
+      const finPage = new URL(page.url()).pathname;
+      check(/^\/(dashboard|accueil|client\/accueil)$/.test(finPage), `${who}/${app}: retour a l'accueil a la fin du guide (${finPage})`);
       const closed = await dlg.waitFor({ state: 'hidden', timeout: 3000 }).then(() => true).catch(() => false);
       check(closed, `${who}/${app}: le guide se ferme apres « Terminer »`);
     }

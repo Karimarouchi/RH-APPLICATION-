@@ -43,7 +43,7 @@ const AppSwitchButton: React.FC = () => {
 
   if (collapsed) {
     return (
-      <div className="fixed right-0 bottom-6 z-[10000]">
+      <div data-tour="app-switch" className="fixed right-0 bottom-6 z-[10000]">
         <button
           type="button"
           onClick={() => setCollapsed(false)}
@@ -57,7 +57,7 @@ const AppSwitchButton: React.FC = () => {
   }
 
   return (
-    <div className="fixed right-6 bottom-6 z-[10000] flex items-center gap-1.5 p-1.5 rounded-full bg-white/90 dark:bg-gray-800/90 border border-gray-200/90 dark:border-gray-700/90 shadow-2xl shadow-black/10 dark:shadow-black/30 backdrop-blur-xl transition-all">
+    <div data-tour="app-switch" className="fixed right-6 bottom-6 z-[10000] flex items-center gap-1.5 p-1.5 rounded-full bg-white/90 dark:bg-gray-800/90 border border-gray-200/90 dark:border-gray-700/90 shadow-2xl shadow-black/10 dark:shadow-black/30 backdrop-blur-xl transition-all">
       <button
         type="button"
         onClick={() => switchTo('projects')}

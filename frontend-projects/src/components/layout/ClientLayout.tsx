@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../hooks/useTheme';
 import { API_BASE } from '../../api/axios';
+import OnboardingTour from '../onboarding/OnboardingTour';
 import {
   HiOutlineLogout,
   HiOutlineMoon,
@@ -64,7 +65,7 @@ const ClientLayout: React.FC = () => {
         <div className="mx-auto max-w-(--breakpoint-2xl) px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             {/* Logo & Brand (Clickable to Home) */}
-            <NavLink to="/client/accueil" className="flex items-center gap-3 transition-transform hover:scale-105">
+            <NavLink to="/client/accueil" data-tour="client-home" className="flex items-center gap-3 transition-transform hover:scale-105">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-lg shadow-brand-500/20">
                 <span className="text-xl font-bold font-heading">A</span>
               </div>
@@ -85,6 +86,7 @@ const ClientLayout: React.FC = () => {
 
               <div className="relative" ref={accountMenuRef}>
                 <button
+                  data-tour="client-account"
                   onClick={() => setShowAccountMenu(!showAccountMenu)}
                   className="flex items-center gap-2 rounded-full border border-gray-200 bg-white p-1 pr-3 transition-all hover:border-brand-300 hover:shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:hover:border-brand-500"
                 >
@@ -129,6 +131,7 @@ const ClientLayout: React.FC = () => {
       <main className="flex-1 w-full mx-auto max-w-(--breakpoint-2xl) p-4 sm:p-6 lg:p-8 animate-in fade-in duration-500">
         <Outlet />
       </main>
+      <OnboardingTour />
     </div>
   );
 };

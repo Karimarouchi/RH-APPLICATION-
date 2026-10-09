@@ -79,7 +79,7 @@ const ClientAccueilPage: React.FC = () => {
         
         {/* Carte Media Plans */}
         {hasPage('MEDIA_PLANS') && (
-          <div 
+          <div  data-tour="client-card-media-plans"
             onClick={() => navigate('/client/media-plans')}
             className="glass-card group relative cursor-pointer overflow-hidden rounded-3xl p-8 transition-all hover:-translate-y-2 hover:shadow-xl dark:hover:shadow-brand-900/20"
           >
@@ -98,7 +98,7 @@ const ClientAccueilPage: React.FC = () => {
 
         {/* Carte Projets */}
         {hasPage('PROJETS') && (
-          <div 
+          <div  data-tour="client-card-projets"
             onClick={() => navigate('/client/projets')}
             className="glass-card group relative cursor-pointer overflow-hidden rounded-3xl p-8 transition-all hover:-translate-y-2 hover:shadow-xl dark:hover:shadow-brand-900/20"
           >
@@ -117,7 +117,7 @@ const ClientAccueilPage: React.FC = () => {
 
         {/* Carte Fichiers / Drive */}
         {hasPage('FICHIERS') && (
-          <div
+          <div data-tour="client-card-fichiers"
 	    onClick={() => navigate('/client/fichiers')} 
             className="glass-card group relative cursor-pointer overflow-hidden rounded-3xl p-8 transition-all hover:-translate-y-2 hover:shadow-xl dark:hover:shadow-brand-900/20"
           >
