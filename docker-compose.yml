@@ -29,7 +29,7 @@ services:
 
     # Bind to localhost only - not exposed to internet
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
 
   # Spring Boot Backend
   backend:
@@ -48,6 +48,9 @@ services:
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
       DB_USERNAME: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
+      # Pointage/retards calcules avec l'heure locale de l'entreprise (pas UTC)
+      TZ: ${TZ:-Africa/Tunis}
+      JAVA_TOOL_OPTIONS: -Duser.timezone=${TZ:-Africa/Tunis}
       SPRING_PROFILES_ACTIVE: prod
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       PORT: 8080
@@ -73,7 +76,7 @@ services:
       - ./secrets/client-viewer-service-account.json:/app/client-viewer-service-account.json:ro
     ports:
       # Expose backend only on localhost - Nginx will proxy it
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
 
     depends_on:
       postgres:
@@ -94,6 +97,24 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  # Nginx serving both React apps (rh.* and project.*) + proxying /api and /uploads to backend
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/frontend.Dockerfile
+      args:
+        RH_APP_URL: ${RH_APP_URL:-https://rh.antigoneinterne.agency}
+        PROJECTS_APP_URL: ${PROJECTS_APP_URL:-https://project.antigoneinterne.agency}
+    container_name: rh-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - rh-network
+    ports:
+      # Host nginx (TLS) proxies project.* and rh.* to this port
+      - "127.0.0.1:${FRONTEND_PORT:-8081}:80"
 
 volumes:
   postgres_data:

@@ -3,7 +3,7 @@ RUN apk add --no-cache curl
 WORKDIR /app
 COPY mvnw pom.xml ./
 COPY .mvn .mvn
-RUN chmod +x mvnw && ./mvnw dependency:go-offline -B
+RUN sed -i 's/$//' mvnw .mvn/wrapper/maven-wrapper.properties && chmod +x mvnw && ./mvnw dependency:go-offline -B
 COPY src src
 RUN ./mvnw clean package -DskipTests -B
 

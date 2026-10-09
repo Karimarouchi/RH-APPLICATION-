@@ -28,6 +28,7 @@ import HistoriqueAgentPage from './pages/HistoriqueAgentPage';
 import DashboardRHPage from './pages/DashboardRHPage';
 import DepartementsPage from './pages/DepartementsPage';
 import ArchivesPage from './pages/ArchivesPage';
+import { relayAuthSnapshotForSwitch } from './utils/authStorage';
 import { NotificationProvider } from './context/NotificationContext';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -35,6 +36,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   if (!isAuthenticated) {
     const projectsAppUrl = (import.meta.env.VITE_PROJECTS_APP_URL as string | undefined)?.trim();
     if (projectsAppUrl) {
+      relayAuthSnapshotForSwitch();
       window.location.replace(`${projectsAppUrl}/login`);
       return <div className="min-h-screen flex items-center justify-center bg-gray-900"><p className="text-gray-400 text-sm">Redirection vers la page de connexion...</p></div>;
     }

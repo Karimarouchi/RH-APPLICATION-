@@ -41,6 +41,7 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) {
         // 1. Initialisation des permissions et rôles
         initPermissionsAndRoles();
+        initDefaultRoles();
 
         // 2. Initialisation des paramètres système (référentiels)
         initSystemParameters();
@@ -89,6 +90,52 @@ public class DataInitializer implements CommandLineRunner {
             roleRepository.save(adminRole);
             log.info("Rôle ADMIN mis à jour avec toutes les permissions ({})", allPermissions.size());
         }
+    }
+
+    /**
+     * Rôles attendus par le code (recherchés par nom exact : MANAGER, RH, Head Prod).
+     * Créés seulement s'ils n'existent pas : les permissions modifiées ensuite par un
+     * admin dans l'application ne sont jamais écrasées au redémarrage.
+     */
+    private void initDefaultRoles() {
+        List<String> espacePersonnel = List.of("VIEW_DASHBOARD_RH", "VIEW_MES_DEMANDES",
+                "VIEW_MON_CALENDRIER", "VIEW_MES_PROJETS");
+
+        createRoleIfNotExists("MANAGER", concat(espacePersonnel, List.of(
+                "VIEW_PROJETS", "VIEW_PROJETS_CREATE_TACHES", "VIEW_CLIENTS", "VIEW_MEDIA_PLAN",
+                "VIEW_TOUS_MEDIA_PLAN", "VIEW_VALIDATIONS", "VIEW_DEADLINES", "VIEW_REUNIONS",
+                "VIEW_CALENDRIER", "VIEW_CALENDRIER_PROJETS")));
+
+        createRoleIfNotExists("RH", concat(espacePersonnel, List.of(
+                "VIEW_DASHBOARD", "VIEW_EMPLOYES", "VIEW_DEMANDES", "VIEW_VALIDATIONS",
+                "VIEW_REFERENTIELS", "VIEW_MONITORING", "VIEW_CALENDRIER", "VIEW_RESTRICTION_CONGE",
+                "VIEW_REUNIONS")));
+
+        // Le code accepte "Head Prod" ou "HEAD_PROD" ; on ne crée que si aucun des deux n'existe
+        if (roleRepository.findByNom("HEAD_PROD").isEmpty()) {
+            createRoleIfNotExists("Head Prod", concat(espacePersonnel, List.of(
+                    "VIEW_CALENDRIER_PROJETS", "VIEW_TOUS_MEDIA_PLAN", "VIEW_MEDIA_PLAN", "VIEW_PROJETS",
+                    "VIEW_CLIENTS", "VIEW_DEADLINES", "VIEW_REUNIONS", "VIEW_CALENDRIER")));
+        }
+    }
+
+    private static List<String> concat(List<String> a, List<String> b) {
+        List<String> all = new java.util.ArrayList<>(a);
+        all.addAll(b);
+        return all;
+    }
+
+    private void createRoleIfNotExists(String nom, List<String> permissionNames) {
+        if (roleRepository.findByNom(nom).isPresent()) {
+            return;
+        }
+        Set<Permission> permissions = new HashSet<>();
+        for (String name : permissionNames) {
+            permissionRepository.findByPermission(name).ifPresentOrElse(permissions::add,
+                    () -> log.warn("Permission {} introuvable pour le rôle {}", name, nom));
+        }
+        roleRepository.save(Role.builder().nom(nom).permissions(permissions).build());
+        log.info("Rôle {} créé avec {} permissions", nom, permissions.size());
     }
 
     // ===================== Paramètres Système =====================

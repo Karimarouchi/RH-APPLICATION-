@@ -1,4 +1,5 @@
 ﻿import React, { useEffect } from 'react';
+import { relayAuthSnapshotForSwitch } from '../utils/authStorage';
 
 const LoginPage: React.FC = () => {
   const projectsAppUrl = (import.meta.env.VITE_PROJECTS_APP_URL as string | undefined)?.trim();
@@ -6,6 +7,7 @@ const LoginPage: React.FC = () => {
   useEffect(() => {
     const loginUrl = projectsAppUrl ? `${projectsAppUrl}/login` : null;
     if (loginUrl) {
+      relayAuthSnapshotForSwitch();
       window.location.replace(loginUrl);
     }
   }, [projectsAppUrl]);

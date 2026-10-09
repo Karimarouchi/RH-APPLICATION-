@@ -1,3 +1,4 @@
+import { peekRelayPrefs } from '../utils/authStorage';
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 
 type Theme = 'light' | 'dark';
@@ -28,9 +29,26 @@ export const getSharedCookie = (name: string): string | null => {
   return null;
 };
 
+// Domaine parent (ex: .antigoneinterne.agency) pour partager le cookie entre rh.* et project.*
+const getCookieDomain = (): string | null => {
+  const host = window.location.hostname;
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return null;
+  const parts = host.split('.');
+  if (parts.length < 2) return null;
+  return '.' + parts.slice(-2).join('.');
+};
+
 export const setSharedCookie = (name: string, value: string) => {
   const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
-  document.cookie = `${name}=${encodeURIComponent(value)};expires=${expires};path=/;SameSite=Lax`;
+  const base = `${name}=${encodeURIComponent(value)};expires=${expires};path=/;SameSite=Lax`;
+  const domain = getCookieDomain();
+  if (domain) {
+    // Supprime l'ancien cookie limite a cet hote, qui masquerait la valeur partagee
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+    document.cookie = `${base};domain=${domain}`;
+    if (getSharedCookie(name) === value) return;
+  }
+  document.cookie = base;
 };
 
 const VALID_FONTS: AppFont[] = ['Inter', 'Poppins'];
@@ -41,19 +59,19 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [theme, setThemeState] = useState<Theme>(() => {
     // Priorité : cookie (partagé entre ports) > localStorage > préférence système
-    const stored = (getSharedCookie('theme') || localStorage.getItem('theme')) as Theme | null;
+    const stored = (peekRelayPrefs()?.theme || getSharedCookie('theme') || localStorage.getItem('theme')) as Theme | null;
     if (stored === 'dark' || stored === 'light') return stored;
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
 
   const [font, setFontState] = useState<AppFont>(() => {
-    const stored = (getSharedCookie('app-font') || localStorage.getItem('app-font')) as AppFont | null;
+    const stored = (peekRelayPrefs()?.font || getSharedCookie('app-font') || localStorage.getItem('app-font')) as AppFont | null;
     if (stored && VALID_FONTS.includes(stored as AppFont)) return stored as AppFont;
     return 'Inter';
   });
 
   const [fontSize, setFontSizeState] = useState<AppFontSize>(() => {
-    const stored = (getSharedCookie('app-font-size') || localStorage.getItem('app-font-size')) as AppFontSize | null;
+    const stored = (peekRelayPrefs()?.fontSize || getSharedCookie('app-font-size') || localStorage.getItem('app-font-size')) as AppFontSize | null;
     if (stored && VALID_SIZES.includes(stored as AppFontSize)) return stored as AppFontSize;
     return '14px';
   });

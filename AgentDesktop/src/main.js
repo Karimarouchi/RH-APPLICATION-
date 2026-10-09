@@ -79,6 +79,10 @@ app.whenReady().then(() => {
   }
 
   // Setup IPC handlers
+  // Postes deja installes: forcer l'URL serveur verrouillee (remplace l'ancienne IP enregistree)
+  const startupRuntime = getRuntimeConfig();
+  if (startupRuntime.serverUrlLocked) config.set('serverUrl', startupRuntime.serverUrl);
+
   setupIPC();
   popupManager.setupIPC();
 
@@ -212,13 +216,15 @@ function setupIPC() {
 function getRuntimeConfig() {
   const envServerUrl = process.env.AGENT_SERVER_URL?.trim();
   const storedServerUrl = config?.get('serverUrl');
-  const defaultServerUrl = app.isPackaged ? 'http://2.24.15.95' : 'http://localhost:8080';
+  const defaultServerUrl = app.isPackaged ? 'https://rh.antigoneinterne.agency' : 'http://localhost:8080';
+  const serverUrlLocked = app.isPackaged || process.env.AGENT_LOCK_SERVER_URL === 'true';
 
   return {
     appVersion: app.getVersion(),
     isPackaged: app.isPackaged,
-    serverUrlLocked: app.isPackaged || process.env.AGENT_LOCK_SERVER_URL === 'true',
-    serverUrl: envServerUrl || storedServerUrl || defaultServerUrl,
+    serverUrlLocked,
+    // URL verrouillee: on ignore l'ancienne URL enregistree (ex: ancienne IP) sur les postes deja installes
+    serverUrl: envServerUrl || (serverUrlLocked ? defaultServerUrl : (storedServerUrl || defaultServerUrl)),
     logFilePath: logger.getLogFilePath()
   };
 }

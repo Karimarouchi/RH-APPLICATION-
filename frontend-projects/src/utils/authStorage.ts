@@ -1,4 +1,5 @@
 import { LoginResponse } from '../types';
+import { setSharedCookie } from '../hooks/useTheme';
 
 const USER_STORAGE_KEY = 'user';
 const LOGIN_TIME_STORAGE_KEY = 'loginTime';
@@ -10,6 +11,9 @@ type AuthSnapshot = {
   user: LoginResponse;
   loginTime: number;
 };
+
+// Preferences d'affichage transportees lors du passage RH <-> Projets (origines differentes)
+export type RelayPrefs = { theme?: string; font?: string; fontSize?: string };
 
 const hasExpiredToken = (user: LoginResponse): boolean => {
   if (!user.tokenExpiresAt) return false;
@@ -91,14 +95,46 @@ const parseRelaySnapshot = (): AuthSnapshot | null => {
   }
 };
 
+// Lit les preferences d'affichage du relais sans le consommer
+export const peekRelayPrefs = (): RelayPrefs | null => {
+  if (!window.name.startsWith(RELAY_PREFIX)) return null;
+  try {
+    const decoded = fromBase64(window.name.slice(RELAY_PREFIX.length));
+    if (!decoded) return null;
+    const prefs = (JSON.parse(decoded) as { prefs?: RelayPrefs }).prefs;
+    return prefs ?? null;
+  } catch {
+    return null;
+  }
+};
+
+const applyRelayPrefs = (prefs: RelayPrefs | null): void => {
+  if (!prefs) return;
+  const entries: Array<[string, string | undefined]> = [
+    ['theme', prefs.theme],
+    ['app-font', prefs.font],
+    ['app-font-size', prefs.fontSize],
+  ];
+  for (const [key, value] of entries) {
+    if (!value) continue;
+    localStorage.setItem(key, value);
+    setSharedCookie(key, value);
+  }
+};
+
 const clearRelaySnapshot = (): void => {
   if (window.name.startsWith(RELAY_PREFIX)) {
     window.name = '';
   }
 };
 
-const writeRelaySnapshot = (snapshot: AuthSnapshot): void => {
-  const encodedSnapshot = toBase64(JSON.stringify(snapshot));
+const writeRelaySnapshot = (snapshot: AuthSnapshot | null): void => {
+  const prefs: RelayPrefs = {
+    theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
+    font: localStorage.getItem('app-font') ?? undefined,
+    fontSize: localStorage.getItem('app-font-size') ?? undefined,
+  };
+  const encodedSnapshot = toBase64(JSON.stringify({ ...(snapshot ?? {}), prefs }));
   if (!encodedSnapshot) return;
 
   window.name = `${RELAY_PREFIX}${encodedSnapshot}`;
@@ -106,6 +142,7 @@ const writeRelaySnapshot = (snapshot: AuthSnapshot): void => {
 
 const consumeRelaySnapshot = (): AuthSnapshot | null => {
   const snapshot = parseRelaySnapshot();
+  applyRelayPrefs(peekRelayPrefs());
   clearRelaySnapshot();
   return snapshot;
 };
@@ -134,9 +171,8 @@ export const saveAuthSnapshot = (user: LoginResponse): void => {
 };
 
 export const relayAuthSnapshotForSwitch = (): void => {
-  const snapshot = getLatestSnapshot();
-  if (!snapshot) return;
-  writeRelaySnapshot(snapshot);
+  // Sans session (page de login), on transmet quand meme theme et police
+  writeRelaySnapshot(getLatestSnapshot());
 };
 
 export const clearAuthSnapshot = (): void => {

@@ -10,7 +10,7 @@ const CREDS_FALLBACK_KEY = 'credsPasswordFallback';
 const store = new Store({
   name: 'antigone-rh-agent-config',
   defaults: {
-    serverUrl: 'http://2.24.15.95',
+    serverUrl: 'https://rh.antigoneinterne.agency',
     employeId: null,
     username: null,
     // Config récupérée du serveur
