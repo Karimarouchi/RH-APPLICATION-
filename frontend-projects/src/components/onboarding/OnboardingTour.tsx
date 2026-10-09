@@ -47,7 +47,10 @@ const closeMenuPanel = () => {
 
 const OnboardingTour: React.FC = () => {
   const { user, updateUser } = useAuth();
-  const navigate = useNavigate();
+  const navigateHook = useNavigate();
+  const navigateRef = useRef(navigateHook);
+  navigateRef.current = navigateHook;
+  const navigate = useCallback((to: string) => navigateRef.current(to), []);
   const location = useLocation();
   const locationRef = useRef(location.pathname);
   locationRef.current = location.pathname;
@@ -139,69 +142,96 @@ const OnboardingTour: React.FC = () => {
   );
 
   const step = steps[Math.min(index, Math.max(steps.length - 1, 0))];
+  const stepRef = useRef(step);
+  stepRef.current = step;
+  const canSpotlightRef = useRef(canSpotlight);
+  canSpotlightRef.current = canSpotlight;
+  const clickedStep = useRef<string | null>(null);
+  const stepId = step?.id;
   const last = index === steps.length - 1;
 
   // Prepare l'interface reelle pour l'etape : ouvre / ferme le panneau, clique si besoin, attend la cible.
+  // Tout est tolerant a la lenteur : on attend les elements au lieu d'abandonner, et le suivi ci-dessous
+  // retrouve la cible meme si elle apparait tard.
   useEffect(() => {
-    if (!open || !step) return;
+    const s = stepRef.current;
+    if (!open || !s) return;
     let cancelled = false;
     (async () => {
       targetEl.current = null;
       setRect(null);
-      if (canSpotlight && !step.target && step.go && locationRef.current !== step.go) {
-        navigate(step.go);
+      const wantsMenu = canSpotlightRef.current && !!s.target;
+      if (s.go && canSpotlightRef.current && locationRef.current !== s.go) {
+        navigate(s.go);
+        await sleep(450);
       }
-      if (!canSpotlight || !step.target) {
+      if (!wantsMenu) {
         if (openedRail.current) {
           closeMenuPanel();
           openedRail.current = null;
         }
         return;
       }
-      if (step.go && locationRef.current !== step.go) {
-        navigate(step.go);
-        await sleep(450);
-      }
-      const wantedRail = step.open ?? null;
+      const target = s.target as Target;
+      const wantedRail = s.open ?? null;
       if (openedRail.current !== wantedRail) {
         if (openedRail.current) {
           closeMenuPanel();
           openedRail.current = null;
-          await sleep(280);
+          // attend la fermeture reelle du panneau (machine lente) avant de continuer
+          for (let k = 0; k < 25 && document.querySelector('.pc-secondary-panel.open') && !cancelled; k++) {
+            if (k === 12) closeMenuPanel();
+            await sleep(60);
+          }
+          await sleep(120);
         }
-        if (wantedRail) {
+        if (wantedRail && !cancelled) {
+          for (let k = 0; k < 30 && !findTarget({ rail: wantedRail }) && !cancelled; k++) await sleep(60);
           findTarget({ rail: wantedRail })?.click();
           openedRail.current = wantedRail;
           await sleep(420);
         }
       }
       if (cancelled) return;
-      if (step.click && 'rail' in step.target) {
-        findTarget(step.target)?.click();
+      if (s.click && 'rail' in target && clickedStep.current !== s.id) {
+        clickedStep.current = s.id;
+        findTarget(target)?.click();
         await sleep(350);
       }
-      for (let i = 0; i < 40 && !cancelled; i++) {
-        const el = findTarget(step.target);
+      for (let k = 0; k < 100 && !cancelled; k++) {
+        const el = findTarget(target);
         if (isShown(el)) {
           el.scrollIntoView({ block: 'nearest' });
           targetEl.current = el;
           setRect(el.getBoundingClientRect());
           return;
         }
+        // le panneau ne s'est pas ouvert (clic perdu pendant une animation) : on reessaie une fois
+        if (k === 40 && wantedRail && !document.querySelector('.pc-secondary-panel.open')) {
+          findTarget({ rail: wantedRail })?.click();
+        }
         await sleep(60);
       }
-      // cible introuvable : carte au centre, sans surbrillance
+      // cible vraiment introuvable : carte au centre (le suivi ci-dessous retentera tant que l'etape est affichee)
     })();
     return () => {
       cancelled = true;
     };
-  }, [open, index, step, canSpotlight, navigate]);
+  }, [open, index, stepId, canSpotlight, navigate]);
 
-  // Suit l'element cible (animation du panneau, defilement, redimensionnement)
+  // Suit l'element cible (animation du panneau, defilement, redimensionnement) et le retrouve s'il apparait tard
   useEffect(() => {
     if (!open) return;
     const id = window.setInterval(() => {
-      const el = targetEl.current;
+      const s = stepRef.current;
+      let el = targetEl.current;
+      if ((!el || !el.isConnected) && s?.target && canSpotlightRef.current) {
+        const found = findTarget(s.target);
+        if (isShown(found)) {
+          el = found;
+          targetEl.current = found;
+        }
+      }
       if (el && el.isConnected) {
         const r = el.getBoundingClientRect();
         setRect((prev) =>
