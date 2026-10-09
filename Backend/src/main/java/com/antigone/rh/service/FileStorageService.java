@@ -39,10 +39,8 @@ public class FileStorageService {
         }
 
         String originalFilename = file.getOriginalFilename();
-        String extension = "";
-        if (originalFilename != null && originalFilename.contains(".")) {
-            extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-        }
+        String extension = com.antigone.rh.security.UploadPolicy.requireExtension(
+                originalFilename, com.antigone.rh.security.UploadPolicy.DOCUMENTS);
 
         // Generate unique filename
         String storedFilename = UUID.randomUUID().toString() + extension;

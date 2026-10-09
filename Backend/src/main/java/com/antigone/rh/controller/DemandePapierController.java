@@ -4,6 +4,7 @@ import com.antigone.rh.dto.ApiResponse;
 import com.antigone.rh.dto.DemandePapierRequest;
 import com.antigone.rh.dto.DemandeResponse;
 import com.antigone.rh.service.DemandePapierService;
+import com.antigone.rh.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +30,10 @@ public class DemandePapierController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<DemandeResponse>> create(@RequestBody DemandePapierRequest request) {
+        if (request.getEmployeId() == null) {
+            request.setEmployeId(SecurityUtils.currentEmployeIdOrNull());
+        }
+        SecurityUtils.requireSelfOrAny(request.getEmployeId(), "VIEW_VALIDATIONS", "VIEW_DEMANDES");
         return ResponseEntity.ok(ApiResponse.ok("Demande papier créée", demandePapierService.create(request)));
     }
 

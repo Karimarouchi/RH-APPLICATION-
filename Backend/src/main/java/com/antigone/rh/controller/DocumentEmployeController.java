@@ -66,9 +66,8 @@ public class DocumentEmployeController {
             }
 
             String originalFilename = file.getOriginalFilename();
-            String extension = originalFilename != null && originalFilename.contains(".")
-                    ? originalFilename.substring(originalFilename.lastIndexOf('.'))
-                    : "";
+            String extension = com.antigone.rh.security.UploadPolicy.requireExtension(
+                    originalFilename, com.antigone.rh.security.UploadPolicy.DOCUMENTS);
             String filename = UUID.randomUUID() + extension;
 
             Path filePath = uploadPath.resolve(filename);

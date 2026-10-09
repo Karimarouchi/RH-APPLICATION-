@@ -16,6 +16,7 @@ import com.antigone.rh.repository.EmployeRepository;
 import com.antigone.rh.repository.MediaPlanAssignmentRepository;
 import com.antigone.rh.repository.MediaPlanRepository;
 import com.antigone.rh.repository.ProjetRepository;
+import com.antigone.rh.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -43,6 +44,8 @@ public class MediaPlanService {
     private final com.antigone.rh.repository.TacheRepository tacheRepository;
     private final GoogleDriveService googleDriveService;
     private final MediaPlanShootingWorkflowService mediaPlanShootingWorkflowService;
+    private final com.antigone.rh.repository.ReactifInternRepository reactifInternRepository;
+    private final com.antigone.rh.repository.CalendrierProjetRepository calendrierProjetRepository;
 
     // =============================================
     // QUERIES
@@ -290,6 +293,9 @@ public class MediaPlanService {
         if (!mediaPlanRepository.existsById(id)) {
             throw new ResourceNotFoundException("MediaPlan", id);
         }
+        // Elements lies : rectifs (reactifs) et creneau de tournage
+        reactifInternRepository.deleteAll(reactifInternRepository.findByMediaPlan_IdOrderByDateReactifDesc(id));
+        calendrierProjetRepository.findByMediaPlanLigneId(id).ifPresent(calendrierProjetRepository::delete);
         mediaPlanRepository.deleteById(id);
     }
 
@@ -421,6 +427,7 @@ public class MediaPlanService {
     public MediaPlanDTO clientApprove(Long mediaPlanId) {
         MediaPlan mp = mediaPlanRepository.findById(mediaPlanId)
                 .orElseThrow(() -> new ResourceNotFoundException("MediaPlan", mediaPlanId));
+        SecurityUtils.requireOwnClientIfClient(mp.getClient().getId());
         if (mp.getStatut() != StatutMediaPlan.EN_ATTENTE_CLIENT) {
             throw new RuntimeException("Ce media plan n'est pas en attente de validation client");
         }
@@ -440,6 +447,7 @@ public class MediaPlanService {
         for (Long id : ids) {
             MediaPlan mp = mediaPlanRepository.findById(id)
                     .orElseThrow(() -> new ResourceNotFoundException("MediaPlan", id));
+            SecurityUtils.requireOwnClientIfClient(mp.getClient().getId());
             if (mp.getStatut() == StatutMediaPlan.EN_ATTENTE_CLIENT) {
                 mp.setStatut(StatutMediaPlan.APPROUVE);
                 mediaPlanRepository.save(mp);
@@ -461,6 +469,7 @@ public class MediaPlanService {
     public MediaPlanDTO clientDisapprove(Long mediaPlanId) {
         MediaPlan mp = mediaPlanRepository.findById(mediaPlanId)
                 .orElseThrow(() -> new ResourceNotFoundException("MediaPlan", mediaPlanId));
+        SecurityUtils.requireOwnClientIfClient(mp.getClient().getId());
         if (mp.getStatut() != StatutMediaPlan.EN_ATTENTE_CLIENT) {
             throw new RuntimeException("Ce media plan n'est pas en attente de validation client");
         }
@@ -618,6 +627,7 @@ public class MediaPlanService {
     public MediaPlanDTO updateRectifs(Long mediaPlanId, String rectifs) {
         MediaPlan mp = mediaPlanRepository.findById(mediaPlanId)
                 .orElseThrow(() -> new ResourceNotFoundException("MediaPlan", mediaPlanId));
+        SecurityUtils.requireOwnClientIfClient(mp.getClient().getId());
         mp.setRectifs(rectifs);
         return toDTO(mediaPlanRepository.save(mp));
     }

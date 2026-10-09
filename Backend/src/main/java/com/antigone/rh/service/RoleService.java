@@ -44,6 +44,9 @@ public class RoleService {
             Map.entry("VIEW_PROJETS", "Consultation des Projets— Accéder à la liste de tous les projets"),
             Map.entry("MANAGE_ALL_PROJETS",
                     "Gestion des Projets — Administration complète : créer, modifier, supprimer les projets et les tâches et assigner aux autres employés"),
+            Map.entry("VIEW_TOUS_PROJETS",
+                    "Dashboard Projets — Tableau de bord global et suivi détaillé de tous les projets"),
+            Map.entry("VIEW_EQUIPES", "Équipes — Consulter et gérer les équipes de projet"),
             Map.entry("VIEW_PROJETS_CREATE_TACHES",
                     "Gestion des tâches — Gérer les tâches sur les projets assignés et assignés aux autres employés"),
             // ── Clients ──────────────────────────────────────────────────────

@@ -128,6 +128,7 @@ public class AgentController {
 
     @GetMapping("/status/{employeId}")
     public ResponseEntity<ApiResponse<Map<String, Boolean>>> getAgentStatus(@PathVariable Long employeId) {
+        com.antigone.rh.security.SecurityUtils.requireSelfOrAny(employeId, "VIEW_MONITORING", "VIEW_DASHBOARD");
         Heartbeat last = heartbeatRepository.findLastByEmployeId(employeId);
         // L'agent est considéré installé s'il a envoyé un heartbeat dans les 30
         // derniers jours

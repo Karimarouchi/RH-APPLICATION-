@@ -4,6 +4,7 @@ import com.antigone.rh.dto.ApiResponse;
 import com.antigone.rh.dto.ValidationRequest;
 import com.antigone.rh.entity.Validation;
 import com.antigone.rh.service.ValidationService;
+import com.antigone.rh.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,11 +25,13 @@ public class ValidationController {
 
     @GetMapping("/validateur/{validateurId}")
     public ResponseEntity<ApiResponse<List<Validation>>> getByValidateur(@PathVariable Long validateurId) {
+        SecurityUtils.requireSelfOrAny(validateurId, "VIEW_DEMANDES");
         return ResponseEntity.ok(ApiResponse.ok(validationService.findByValidateur(validateurId)));
     }
 
     @GetMapping("/validateur/{validateurId}/pending")
     public ResponseEntity<ApiResponse<List<Validation>>> getPendingByValidateur(@PathVariable Long validateurId) {
+        SecurityUtils.requireSelfOrAny(validateurId, "VIEW_DEMANDES");
         return ResponseEntity.ok(ApiResponse.ok(validationService.findPendingByValidateur(validateurId)));
     }
 

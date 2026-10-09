@@ -4,6 +4,7 @@ import com.antigone.rh.dto.ApiResponse;
 import com.antigone.rh.dto.MediaPlanDTO;
 import com.antigone.rh.dto.MediaPlanRequest;
 import com.antigone.rh.service.MediaPlanService;
+import com.antigone.rh.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -61,8 +62,10 @@ public class MediaPlanController {
 
     @PatchMapping("/{id}/approve")
     public ResponseEntity<ApiResponse<MediaPlanDTO>> approve(@PathVariable Long id,
-            @RequestParam Long managerId) {
-        return ResponseEntity.ok(ApiResponse.ok("Media plan approuvé", mediaPlanService.approve(id, managerId)));
+            @RequestParam(required = false) Long managerId) {
+        // l'approbateur est l'utilisateur connecte, jamais l'identifiant fourni dans la requete
+        Long approver = SecurityUtils.currentEmployeIdOrNull() != null ? SecurityUtils.currentEmployeIdOrNull() : managerId;
+        return ResponseEntity.ok(ApiResponse.ok("Media plan approuvé", mediaPlanService.approve(id, approver)));
     }
 
     @PatchMapping("/{id}/disapprove")

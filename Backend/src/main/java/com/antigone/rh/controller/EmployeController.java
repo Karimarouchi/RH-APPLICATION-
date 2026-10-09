@@ -131,9 +131,8 @@ public class EmployeController {
             }
 
             // Generate unique filename
-            String extension = file.getOriginalFilename() != null
-                    ? file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf('.'))
-                    : ".jpg";
+            String extension = com.antigone.rh.security.UploadPolicy.requireExtension(
+                    file.getOriginalFilename(), com.antigone.rh.security.UploadPolicy.IMAGES);
             String filename = UUID.randomUUID() + extension;
 
             // Save file

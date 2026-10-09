@@ -942,18 +942,35 @@ public class EmployeService {
         return node;
     }
 
+    /**
+     * Salaire, RIB, CIN et CNSS ne sont visibles que par l'employe lui-meme, un admin ou un
+     * utilisateur ayant VIEW_EMPLOYES. Hors requete authentifiee (taches planifiees), pas de masquage.
+     */
+    private boolean canSeeSensitiveData(Employe employe) {
+        if (org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication() == null) {
+            return true;
+        }
+        Long me = com.antigone.rh.security.SecurityUtils.currentEmployeIdOrNull();
+        if (me != null && me.equals(employe.getId())) {
+            return true;
+        }
+        return com.antigone.rh.security.SecurityUtils.isAdmin()
+                || com.antigone.rh.security.SecurityUtils.hasAnyAuthority("VIEW_EMPLOYES");
+    }
+
     public EmployeDTO toDTO(Employe employe) {
+        boolean sensitive = canSeeSensitiveData(employe);
         return EmployeDTO.builder()
                 .id(employe.getId())
                 .matricule(employe.getMatricule())
-                .cin(employe.getCin())
-                .cnss(employe.getCnss())
+                .cin(sensitive ? employe.getCin() : null)
+                .cnss(sensitive ? employe.getCnss() : null)
                 .nom(employe.getNom())
                 .prenom(employe.getPrenom())
                 .email(employe.getEmail())
                 .telephone(employe.getTelephone())
                 .telephonePro(employe.getTelephonePro())
-                .salaire(employe.getSalaire())
+                .salaire(sensitive ? employe.getSalaire() : null)
                 .dateEmbauche(employe.getDateEmbauche())
                 .soldeConge(employe.getSoldeConge())
                 .soldeCongeInitial(employe.getSoldeCongeInitial())
@@ -962,7 +979,7 @@ public class EmployeService {
                 .dateFinContrat(employe.getDateFinContrat())
                 .genre(employe.getGenre())
                 .departement(employe.getDepartement())
-                .ribBancaire(employe.getRibBancaire())
+                .ribBancaire(sensitive ? employe.getRibBancaire() : null)
                 .managerId(employe.getManager() != null ? employe.getManager().getId() : null)
                 .managerNom(employe.getManager() != null
                         ? employe.getManager().getNom() + " " + employe.getManager().getPrenom()

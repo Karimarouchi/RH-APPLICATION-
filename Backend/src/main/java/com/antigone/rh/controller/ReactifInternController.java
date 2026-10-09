@@ -2,6 +2,7 @@ package com.antigone.rh.controller;
 
 import com.antigone.rh.dto.ReactifInternDTO;
 import com.antigone.rh.service.ReactifInternService;
+import com.antigone.rh.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -42,7 +43,9 @@ public class ReactifInternController {
             @PathVariable Long mediaPlanId,
             @RequestParam Long clientId,
             @RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(reactifService.createForMediaPlanExtern(mediaPlanId, clientId, body.get("contenu")));
+        Long callerClient = SecurityUtils.currentClientIdOrNull();
+        Long effectiveClientId = callerClient != null ? callerClient : clientId; // jamais l'identifiant fourni par un client
+        return ResponseEntity.ok(reactifService.createForMediaPlanExtern(mediaPlanId, effectiveClientId, body.get("contenu")));
     }
 
     // ─── List endpoints (admin dashboard) ────────────────────────────────────

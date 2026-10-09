@@ -33,6 +33,10 @@ public class ClientService {
     private final PasswordEncoder passwordEncoder;
     private final GoogleDriveService googleDriveService;
     private final JwtService jwtService;
+    private final com.antigone.rh.repository.ProjetRepository projetRepository;
+    private final com.antigone.rh.repository.MediaPlanRepository mediaPlanRepository;
+    private final com.antigone.rh.repository.MediaPlanAssignmentRepository assignmentRepository;
+    private final com.antigone.rh.repository.ReactifInternRepository reactifInternRepository;
 
     @Value("${app.upload.dir:uploads/justificatifs}")
     private String uploadDir;
@@ -204,9 +208,22 @@ public class ClientService {
 
     public void delete(Long id) {
         Client client = findOrThrow(id);
-        deleteFile(client.getFilePath());
-        deleteFile(client.getLogoPath());
+        int projets = projetRepository.findByClientId(id).size();
+        int plans = mediaPlanRepository.findByClientId(id).size();
+        if (projets > 0 || plans > 0) {
+            throw new RuntimeException("Impossible de supprimer ce client : " + projets + " projet(s) et " + plans
+                    + " média plan(s) lui sont rattachés. Supprimez-les d'abord.");
+        }
+        // Affectations et rectifs du client : sans valeur sans lui
+        assignmentRepository.deleteAll(assignmentRepository.findByClientId(id));
+        reactifInternRepository.deleteAll(reactifInternRepository.findByClient_IdOrderByDateReactifDesc(id));
+        String filePath = client.getFilePath();
+        String logoPath = client.getLogoPath();
         clientRepository.delete(client);
+        clientRepository.flush();
+        // fichiers supprimes seulement si la suppression en base a reussi
+        deleteFile(filePath);
+        deleteFile(logoPath);
     }
 
     // ── File ─────────────────────────────────────────────────────────────────
@@ -238,7 +255,8 @@ public class ClientService {
     private String saveFile(MultipartFile file) throws IOException {
         Path dir = Paths.get(uploadDir, CLIENTS_SUBDIR).toAbsolutePath().normalize();
         Files.createDirectories(dir);
-        String ext = getExtension(Objects.requireNonNull(file.getOriginalFilename()));
+        String ext = com.antigone.rh.security.UploadPolicy.requireExtension(
+                file.getOriginalFilename(), com.antigone.rh.security.UploadPolicy.DOCUMENTS);
         String uniqueName = UUID.randomUUID() + ext;
         Path target = dir.resolve(uniqueName);
         Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);

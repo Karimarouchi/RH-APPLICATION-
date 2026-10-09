@@ -6,6 +6,7 @@ import com.antigone.rh.dto.HistoriqueStatutDTO;
 import com.antigone.rh.entity.*;
 import com.antigone.rh.enums.*;
 import com.antigone.rh.repository.*;
+import com.antigone.rh.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -174,6 +175,9 @@ public class DemandeService {
                 typeConge.name());
         int nombreJours = (int) calcResult.get("nombreJours");
         int joursOuvrables = (int) calcResult.get("joursOuvrables");
+        if (joursOuvrables == 0) {
+            throw new RuntimeException("La période choisie ne contient aucun jour ouvrable (week-end ou jours fériés uniquement).");
+        }
 
         // Congé maladie: max 2 jours ouvrables
         if (typeConge == TypeConge.CONGE_MALADIE && joursOuvrables > 2) {
@@ -347,6 +351,7 @@ public class DemandeService {
     public DemandeResponse update(Long demandeId, DemandeRequest request) {
         Demande demande = demandeRepository.findById(demandeId)
                 .orElseThrow(() -> new RuntimeException("Demande non trouvée"));
+        SecurityUtils.requireSelfOrAny(demande.getEmploye().getId(), "VIEW_DEMANDES");
 
         if (demande.getStatut() != StatutDemande.EN_ATTENTE) {
             throw new RuntimeException("Seules les demandes en attente peuvent être modifiées");
@@ -396,6 +401,9 @@ public class DemandeService {
                 typeConge.name());
         int nombreJours = (int) calcResult.get("nombreJours");
         int joursOuvrables = (int) calcResult.get("joursOuvrables");
+        if (joursOuvrables == 0) {
+            throw new RuntimeException("La période choisie ne contient aucun jour ouvrable (week-end ou jours fériés uniquement).");
+        }
 
         if (typeConge == TypeConge.CONGE_DECES_PROCHE)
             nombreJours = 5;
@@ -465,6 +473,9 @@ public class DemandeService {
 
         if (demande.getStatut() != StatutDemande.EN_ATTENTE) {
             throw new RuntimeException("Seules les demandes en attente peuvent être approuvées");
+        }
+        if (!SecurityUtils.isAdmin() && demande.getEmploye().getId().equals(adminEmployeId)) {
+            throw new org.springframework.security.access.AccessDeniedException("Auto-approbation interdite");
         }
 
         StatutDemande ancien = demande.getStatut();
@@ -536,6 +547,7 @@ public class DemandeService {
     public DemandeResponse cancel(Long demandeId) {
         Demande demande = demandeRepository.findById(demandeId)
                 .orElseThrow(() -> new RuntimeException("Demande non trouvée"));
+        SecurityUtils.requireSelfOrAny(demande.getEmploye().getId(), "VIEW_DEMANDES");
 
         if (demande.getStatut() != StatutDemande.EN_ATTENTE) {
             throw new RuntimeException("Seules les demandes en attente peuvent être annulées");
@@ -665,7 +677,7 @@ public class DemandeService {
             cur = cur.plusDays(1);
         }
         if (!hasWorkingDays) {
-            return Map.of("nombreJours", 0, "details", "Aucun jour ouvrable dans la période",
+            return Map.of("nombreJours", 0, "joursOuvrables", 0, "details", "Aucun jour ouvrable dans la période",
                     "dateDebutEffective", dateDebut.toString(), "dateFinEffective", dateFin.toString());
         }
 

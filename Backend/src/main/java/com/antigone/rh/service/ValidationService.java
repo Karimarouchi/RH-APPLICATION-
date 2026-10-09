@@ -9,6 +9,7 @@ import com.antigone.rh.enums.StatutDemande;
 import com.antigone.rh.repository.DemandeRepository;
 import com.antigone.rh.repository.EmployeRepository;
 import com.antigone.rh.repository.ValidationRepository;
+import com.antigone.rh.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -61,6 +62,10 @@ public class ValidationService {
     public Validation approve(Long validationId, String commentaire) {
         Validation validation = validationRepository.findById(validationId)
                 .orElseThrow(() -> new RuntimeException("Validation non trouvée"));
+        if (!SecurityUtils.isAdmin()
+                && !validation.getValidateur().getId().equals(SecurityUtils.currentEmployeIdOrNull())) {
+            throw new org.springframework.security.access.AccessDeniedException("Vous n'etes pas le validateur designe");
+        }
 
         if (validation.getDecision() != DecisionValidation.EN_ATTENTE) {
             throw new RuntimeException("Cette validation a déjà été traitée");
@@ -79,6 +84,10 @@ public class ValidationService {
     public Validation refuse(Long validationId, String commentaire) {
         Validation validation = validationRepository.findById(validationId)
                 .orElseThrow(() -> new RuntimeException("Validation non trouvée"));
+        if (!SecurityUtils.isAdmin()
+                && !validation.getValidateur().getId().equals(SecurityUtils.currentEmployeIdOrNull())) {
+            throw new org.springframework.security.access.AccessDeniedException("Vous n'etes pas le validateur designe");
+        }
 
         if (validation.getDecision() != DecisionValidation.EN_ATTENTE) {
             throw new RuntimeException("Cette validation a déjà été traitée");

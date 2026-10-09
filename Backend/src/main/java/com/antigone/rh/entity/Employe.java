@@ -24,9 +24,11 @@ public class Employe {
 
     @Column(unique = true)
     @jakarta.validation.constraints.Pattern(regexp = "^[0-9]{8}$", message = "Le CIN doit contenir exactement 8 chiffres")
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private String cin;
 
     @jakarta.validation.constraints.Pattern(regexp = "^[0-9]{1,12}(-[0-9]+)*$", message = "Le CNSS doit contenir des chiffres (tirets autorisés)")
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private String cnss;
 
     @Column(nullable = false)
@@ -42,6 +44,7 @@ public class Employe {
 
     private String telephonePro;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private Double salaire;
 
     private LocalDate dateEmbauche;
@@ -67,6 +70,7 @@ public class Employe {
     private String departement;
 
     @jakarta.validation.constraints.Pattern(regexp = "^[0-9]{20}$", message = "Le RIB doit contenir exactement 20 chiffres")
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private String ribBancaire;
 
     private String imageUrl;

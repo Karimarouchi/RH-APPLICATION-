@@ -21,28 +21,46 @@ public class AuthController {
 
     private final CompteService compteService;
     private final ClientService clientService;
+    private final com.antigone.rh.security.LoginThrottle loginThrottle;
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(
             @RequestBody LoginRequest request,
             HttpServletRequest httpRequest) {
+        String ipAddress = httpRequest.getRemoteAddr();
+        long blocked = loginThrottle.minutesBlocked(request.getUsername(), ipAddress);
+        if (blocked > 0) {
+            return tooManyAttempts(blocked);
+        }
         try {
-            String ipAddress = httpRequest.getRemoteAddr();
             LoginResponse response = compteService.login(request, ipAddress);
+            loginThrottle.recordSuccess(request.getUsername(), ipAddress);
             return ResponseEntity.ok(ApiResponse.ok("Connexion réussie", response));
         } catch (RuntimeException e) {
+            if (!"Compte désactivé".equals(e.getMessage())) {
+                loginThrottle.recordFailure(request.getUsername(), ipAddress);
+            }
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }
 
     @PostMapping("/client-login")
     public ResponseEntity<ApiResponse<ClientLoginResponse>> clientLogin(
-            @RequestBody ClientLoginRequest request) {
+            @RequestBody ClientLoginRequest request,
+            HttpServletRequest httpRequest) {
+        String ipAddress = httpRequest.getRemoteAddr();
+        String key = "client:" + request.getLoginClient();
+        long blocked = loginThrottle.minutesBlocked(key, ipAddress);
+        if (blocked > 0) {
+            return tooManyAttempts(blocked);
+        }
         try {
             ClientLoginResponse response = clientService.loginClient(
                     request.getLoginClient(), request.getPasswordClient());
+            loginThrottle.recordSuccess(key, ipAddress);
             return ResponseEntity.ok(ApiResponse.ok("Connexion client réussie", response));
         } catch (RuntimeException e) {
+            loginThrottle.recordFailure(key, ipAddress);
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }
@@ -67,5 +85,9 @@ public class AuthController {
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
+    }
+    private <T> ResponseEntity<ApiResponse<T>> tooManyAttempts(long minutes) {
+        return ResponseEntity.status(429).body(ApiResponse.error(
+                "Trop de tentatives de connexion. Réessayez dans " + minutes + " minute(s)."));
     }
 }

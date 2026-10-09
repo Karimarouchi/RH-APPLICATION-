@@ -101,8 +101,10 @@ public class DataInitializer implements CommandLineRunner {
         List<String> espacePersonnel = List.of("VIEW_DASHBOARD_RH", "VIEW_MES_DEMANDES",
                 "VIEW_MON_CALENDRIER", "VIEW_MES_PROJETS");
 
+        // Manager : gere toute la partie Projets (projets, taches, equipes, clients, media plans)
         createRoleIfNotExists("MANAGER", concat(espacePersonnel, List.of(
-                "VIEW_PROJETS", "VIEW_PROJETS_CREATE_TACHES", "VIEW_CLIENTS", "VIEW_MEDIA_PLAN",
+                "VIEW_PROJETS", "MANAGE_ALL_PROJETS", "VIEW_PROJETS_CREATE_TACHES", "VIEW_TOUS_PROJETS",
+                "VIEW_EQUIPES", "VIEW_CLIENTS", "MANAGE_CLIENTS", "VIEW_MEDIA_PLAN",
                 "VIEW_TOUS_MEDIA_PLAN", "VIEW_VALIDATIONS", "VIEW_DEADLINES", "VIEW_REUNIONS",
                 "VIEW_CALENDRIER", "VIEW_CALENDRIER_PROJETS")));
 
@@ -333,12 +335,13 @@ public class DataInitializer implements CommandLineRunner {
             // Réinitialiser le mot de passe admin à chaque démarrage
             Compte adminCompte = compteRepository.findByUsername("admin")
                     .orElseThrow(() -> new RuntimeException("Compte admin introuvable"));
-            adminCompte.setPasswordHash(passwordEncoder.encode("Admin@123"));
+            // Le mot de passe n'est JAMAIS reinitialise : il a pu etre change par l'administrateur.
+            // On garantit seulement que le compte reste actif et garde le role ADMIN.
             adminCompte.setEnabled(true);
-            adminCompte.setMustChangePassword(true);
-            adminCompte.setRoles(Set.of(adminRole));
+            Set<Role> roles = new HashSet<>(adminCompte.getRoles());
+            roles.add(adminRole);
+            adminCompte.setRoles(roles);
             compteRepository.save(adminCompte);
-            log.info("Compte admin réinitialisé - username: admin, mot de passe: Admin@123 (changement obligatoire à la première connexion)");
             return;
         }
 

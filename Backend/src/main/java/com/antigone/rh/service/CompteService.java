@@ -209,9 +209,19 @@ public CompteDTO toggleEnabled(Long id) {
             throw new RuntimeException("Ancien mot de passe incorrect");
         }
 
+        requireValidNewPassword(request.getNewPassword());
+        if (passwordEncoder.matches(request.getNewPassword(), compte.getPasswordHash())) {
+            throw new RuntimeException("Le nouveau mot de passe doit être différent de l'ancien");
+        }
         compte.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         compte.setMustChangePassword(false);
         compteRepository.save(compte);
+    }
+
+    private void requireValidNewPassword(String password) {
+        if (password == null || password.length() < 8) {
+            throw new RuntimeException("Le mot de passe doit contenir au moins 8 caractères");
+        }
     }
 
     // ─── Forgot Password ────────────────────────────────────────
@@ -254,6 +264,7 @@ public CompteDTO toggleEnabled(Long id) {
             throw new RuntimeException("Le lien de réinitialisation a expiré. Veuillez en demander un nouveau.");
         }
 
+        requireValidNewPassword(newPassword);
         compte.setPasswordHash(passwordEncoder.encode(newPassword));
         compte.setResetToken(null);
         compte.setResetTokenExpiry(null);

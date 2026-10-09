@@ -5,6 +5,7 @@ import com.antigone.rh.dto.TacheDetailDTO;
 import com.antigone.rh.entity.Tache;
 import com.antigone.rh.enums.StatutTache;
 import com.antigone.rh.service.TacheService;
+import com.antigone.rh.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -52,6 +53,7 @@ public class TacheController {
 
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<Tache>> update(@PathVariable Long id, @RequestBody Tache tache) {
+        requireManagerOrAssignee(id);
         return ResponseEntity.ok(ApiResponse.ok("Tâche mise à jour", tacheService.update(id, tache)));
     }
 
@@ -67,6 +69,7 @@ public class TacheController {
 
     @PatchMapping("/{id}/statut")
     public ResponseEntity<ApiResponse<Tache>> changeStatut(@PathVariable Long id, @RequestParam StatutTache statut) {
+        requireManagerOrAssignee(id);
         try {
             return ResponseEntity.ok(ApiResponse.ok("Statut mis à jour", tacheService.changeStatut(id, statut)));
         } catch (IllegalStateException e) {
@@ -93,5 +96,17 @@ public class TacheController {
             @RequestBody Map<String, String> body) {
         LocalDate newDeadline = LocalDate.parse(body.get("dateEcheance"));
         return ResponseEntity.ok(ApiResponse.ok("Deadline mise à jour", tacheService.updateDeadline(id, newDeadline)));
+    }
+    /** Gestionnaires de projet : toutes les taches. Les autres : uniquement celles qui leur sont assignees. */
+    private void requireManagerOrAssignee(Long tacheId) {
+        if (SecurityUtils.isAdmin()
+                || SecurityUtils.hasAnyAuthority("MANAGE_ALL_PROJETS", "VIEW_PROJETS_CREATE_TACHES")) {
+            return;
+        }
+        Tache existing = tacheService.findById(tacheId);
+        Long me = SecurityUtils.currentEmployeIdOrNull();
+        if (existing.getAssignee() == null || me == null || !me.equals(existing.getAssignee().getId())) {
+            throw new org.springframework.security.access.AccessDeniedException("Cette tache ne vous est pas assignee");
+        }
     }
 }

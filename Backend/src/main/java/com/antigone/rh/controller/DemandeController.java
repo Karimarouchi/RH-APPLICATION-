@@ -6,6 +6,7 @@ import com.antigone.rh.dto.DemandeResponse;
 import com.antigone.rh.dto.HistoriqueStatutDTO;
 import com.antigone.rh.enums.StatutDemande;
 import com.antigone.rh.service.DemandeService;
+import com.antigone.rh.security.SecurityUtils;
 import com.antigone.rh.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
@@ -41,6 +42,7 @@ public class DemandeController {
 
     @GetMapping("/employe/{employeId}")
     public ResponseEntity<ApiResponse<List<DemandeResponse>>> getByEmploye(@PathVariable Long employeId) {
+        SecurityUtils.requireSelfOrAny(employeId, "VIEW_DEMANDES", "VIEW_VALIDATIONS", "VIEW_EMPLOYES");
         return ResponseEntity.ok(ApiResponse.ok(demandeService.findByEmploye(employeId)));
     }
 
@@ -51,6 +53,7 @@ public class DemandeController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<DemandeResponse>> create(@RequestBody DemandeRequest request) {
+        bindToCaller(request);
         return ResponseEntity.ok(ApiResponse.ok("Demande créée", demandeService.create(request)));
     }
 
@@ -58,6 +61,7 @@ public class DemandeController {
     public ResponseEntity<ApiResponse<DemandeResponse>> createWithFile(
             @RequestPart("demande") DemandeRequest request,
             @RequestPart(value = "justificatif", required = false) MultipartFile justificatif) {
+        bindToCaller(request);
         if (justificatif != null && !justificatif.isEmpty()) {
             String storedFilename = fileStorageService.store(justificatif);
             request.setJustificatifPath(storedFilename);
@@ -101,15 +105,15 @@ public class DemandeController {
 
     @PatchMapping("/{id}/approve")
     public ResponseEntity<ApiResponse<DemandeResponse>> approve(
-            @PathVariable Long id, @RequestParam Long adminEmployeId) {
-        return ResponseEntity.ok(ApiResponse.ok("Demande approuvée", demandeService.approve(id, adminEmployeId)));
+            @PathVariable Long id, @RequestParam(required = false) Long adminEmployeId) {
+        return ResponseEntity.ok(ApiResponse.ok("Demande approuvée", demandeService.approve(id, SecurityUtils.requireEmployeId())));
     }
 
     @PatchMapping("/{id}/refuse")
     public ResponseEntity<ApiResponse<DemandeResponse>> refuse(
-            @PathVariable Long id, @RequestParam Long adminEmployeId,
+            @PathVariable Long id, @RequestParam(required = false) Long adminEmployeId,
             @RequestParam(required = false) String commentaire) {
-        return ResponseEntity.ok(ApiResponse.ok("Demande refusée", demandeService.refuse(id, adminEmployeId, commentaire)));
+        return ResponseEntity.ok(ApiResponse.ok("Demande refusée", demandeService.refuse(id, SecurityUtils.requireEmployeId(), commentaire)));
     }
 
     @PatchMapping("/{id}/cancel")
@@ -119,15 +123,15 @@ public class DemandeController {
 
     @PatchMapping("/batch/approve")
     public ResponseEntity<ApiResponse<List<DemandeResponse>>> batchApprove(
-            @RequestBody List<Long> ids, @RequestParam Long adminEmployeId) {
-        return ResponseEntity.ok(ApiResponse.ok("Demandes approuvées", demandeService.batchApprove(ids, adminEmployeId)));
+            @RequestBody List<Long> ids, @RequestParam(required = false) Long adminEmployeId) {
+        return ResponseEntity.ok(ApiResponse.ok("Demandes approuvées", demandeService.batchApprove(ids, SecurityUtils.requireEmployeId())));
     }
 
     @PatchMapping("/batch/refuse")
     public ResponseEntity<ApiResponse<List<DemandeResponse>>> batchRefuse(
-            @RequestBody List<Long> ids, @RequestParam Long adminEmployeId,
+            @RequestBody List<Long> ids, @RequestParam(required = false) Long adminEmployeId,
             @RequestParam(required = false) String commentaire) {
-        return ResponseEntity.ok(ApiResponse.ok("Demandes refusées", demandeService.batchRefuse(ids, adminEmployeId, commentaire)));
+        return ResponseEntity.ok(ApiResponse.ok("Demandes refusées", demandeService.batchRefuse(ids, SecurityUtils.requireEmployeId(), commentaire)));
     }
 
     @GetMapping("/{id}/historique")
@@ -142,5 +146,13 @@ public class DemandeController {
             @RequestParam(required = false, defaultValue = "CONGE_PAYE") String typeConge) {
         Map<String, Object> result = demandeService.computeEffectiveDays(dateDebut, dateFin, typeConge);
         return ResponseEntity.ok(ApiResponse.ok(result));
+    }
+    /** Un employe ne cree une demande que pour lui-meme ; seuls RH / admin peuvent le faire pour un autre. */
+    private void bindToCaller(DemandeRequest request) {
+        Long me = SecurityUtils.currentEmployeIdOrNull();
+        if (request.getEmployeId() == null) {
+            request.setEmployeId(me);
+        }
+        SecurityUtils.requireSelfOrAny(request.getEmployeId(), "VIEW_DEMANDES");
     }
 }
