@@ -75,6 +75,8 @@ services:
       # Tokens directory for Google Drive
       - tokens:/app/tokens
       # Optional: Mount Google Drive service account keys if they exist
+      # Installateur de l'agent Windows, versionne dans git (AgentDesktop/release) : git pull suffit
+      - ./AgentDesktop/release:/app/agent-release:ro
       - ${SECRETS_DIR:-./secrets}/service-account.json:/app/service-account.json:ro
       - ${SECRETS_DIR:-./secrets}/client-viewer-service-account.json:/app/client-viewer-service-account.json:ro
     ports:

@@ -145,6 +145,8 @@ public class AgentController {
             
             // Try multiple possible paths
             String[] possiblePaths = {
+                // dossier du depot (AgentDesktop/release), monte dans le conteneur : un simple "git pull" met l'agent a jour
+                "/app/agent-release/AgentDesktop-Setup.exe",
                 "/var/www/solutions-web/rh-application/Backend/uploads/agent/AgentDesktop-Setup.exe",
                 "uploads/agent/AgentDesktop-Setup.exe"
             };
