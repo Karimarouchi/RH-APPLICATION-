@@ -136,6 +136,9 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.PUT, "/api/taches/*")
                                                 .hasAnyAuthority(ADMIN, "MANAGE_ALL_PROJETS", "VIEW_PROJETS_CREATE_TACHES",
                                                                 "VIEW_MES_PROJETS", "VIEW_PROJETS")
+                                                .requestMatchers(HttpMethod.POST, "/api/taches/*/livrables")
+                                                .hasAnyAuthority(ADMIN, "MANAGE_ALL_PROJETS", "VIEW_PROJETS_CREATE_TACHES",
+                                                                "VIEW_MES_PROJETS", "VIEW_PROJETS")
                                                 .requestMatchers(HttpMethod.POST, "/api/taches/**")
                                                 .hasAnyAuthority(ADMIN, "MANAGE_ALL_PROJETS", "VIEW_PROJETS_CREATE_TACHES")
                                                 .requestMatchers(HttpMethod.PUT, "/api/taches/**")

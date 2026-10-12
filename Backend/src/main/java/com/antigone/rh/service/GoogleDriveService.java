@@ -1,6 +1,7 @@
 package com.antigone.rh.service;
 
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.http.InputStreamContent;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.gson.GsonFactory;
@@ -121,6 +122,44 @@ public class GoogleDriveService {
 
         log.info("Tâche Drive path resolved. Type folder link: {}", typeFolder.getWebViewLink());
         return typeFolder.getWebViewLink();
+    }
+
+    /** Extrait l'identifiant d'un dossier depuis son lien webViewLink (.../folders/{id}?...). */
+    public static String folderIdFromLink(String link) {
+        if (link == null) return null;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("/folders/([A-Za-z0-9_-]+)").matcher(link);
+        return m.find() ? m.group(1) : null;
+    }
+
+    /**
+     * Envoie un fichier directement dans un dossier Drive (flux, resumable par morceaux de 8 Mo).
+     * Rien n'est conserve sur le serveur ni en base de donnees.
+     */
+    public File uploadFile(String folderId, String fileName, String mimeType, java.io.InputStream in, long size)
+            throws IOException {
+        ensureInitialized();
+        File meta = new File();
+        meta.setName(fileName);
+        meta.setParents(Collections.singletonList(folderId));
+        InputStreamContent content = new InputStreamContent(mimeType, in);
+        content.setLength(size);
+        Drive.Files.Create req = driveService.files().create(meta, content)
+                .setFields("id, name, mimeType, size, webViewLink, thumbnailLink, createdTime");
+        req.getMediaHttpUploader().setDirectUploadEnabled(false).setChunkSize(8 * 1024 * 1024);
+        File created = req.execute();
+        log.info("Livrable '{}' envoye dans le dossier Drive {}", fileName, folderId);
+        return created;
+    }
+
+    /** Liste les fichiers (hors sous-dossiers) d'un dossier Drive, du plus recent au plus ancien. */
+    public List<File> listFiles(String folderId) throws IOException {
+        ensureInitialized();
+        return driveService.files().list()
+                .setQ("'" + folderId + "' in parents and trashed=false and mimeType!='application/vnd.google-apps.folder'")
+                .setOrderBy("createdTime desc")
+                .setPageSize(100)
+                .setFields("files(id, name, mimeType, size, webViewLink, thumbnailLink, createdTime)")
+                .execute().getFiles();
     }
 
     /**

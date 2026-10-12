@@ -1,3 +1,5 @@
+import TypeDrivePicker from '../components/taches/TypeDrivePicker';
+import LivrablesSection from '../components/taches/LivrablesSection';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { HiOutlinePlus, HiOutlinePencil, HiOutlineTrash, HiOutlineArrowLeft, HiOutlineCalendar, HiOutlineClock, HiOutlineCheckCircle, HiOutlineChartBar, HiDotsHorizontal } from 'react-icons/hi';
@@ -40,6 +42,7 @@ interface TacheForm {
     statut: StatutTache;
     assigneeIds: string[];
     urgente: boolean;
+    typeDrive: string[];
 }
 
 const emptyForm = (): TacheForm => ({
@@ -48,6 +51,7 @@ const emptyForm = (): TacheForm => ({
     statut: StatutTache.TODO,
     assigneeIds: [],
     urgente: false,
+    typeDrive: [],
 });
 
 const ProjetTachesPage: React.FC = () => {
@@ -203,6 +207,10 @@ const ProjetTachesPage: React.FC = () => {
     };
 
     const handleCreateAll = async () => {
+        if (taskForms.some(f => f.typeDrive.length === 0)) {
+            setCreateError('Choisissez un type de tâche (Post, Vidéo ou Documentation) pour chaque tâche');
+            return;
+        }
         if (taskForms.some(f => !f.titre.trim())) {
             setCreateError('Tous les titres sont obligatoires');
             return;
@@ -218,6 +226,7 @@ const ProjetTachesPage: React.FC = () => {
                         statut: form.statut,
                         dateEcheance: form.dateEcheance || undefined,
                         urgente: form.urgente,
+                        typeDrive: form.typeDrive.join(','),
                     } as any);
                     if (form.assigneeIds[0]) {
                         await tacheService.assign(created.data.data.id, Number(form.assigneeIds[0]));
@@ -230,6 +239,7 @@ const ProjetTachesPage: React.FC = () => {
                             statut: form.statut,
                             dateEcheance: form.dateEcheance || undefined,
                             urgente: form.urgente,
+                            typeDrive: form.typeDrive.join(','),
                         } as any);
                         await tacheService.assign(created.data.data.id, Number(memberId));
                     }
@@ -255,6 +265,7 @@ const ProjetTachesPage: React.FC = () => {
             statut: tache.statut,
             assigneeIds: tache.assigneeId ? [String(tache.assigneeId)] : [],
             urgente: tache.urgente ?? false,
+            typeDrive: ((tache as any).typeDrive ? String((tache as any).typeDrive).split(',').map((t: string) => t.trim()).filter(Boolean) : []),
         });
         setEditError(null);
     };
@@ -269,6 +280,7 @@ const ProjetTachesPage: React.FC = () => {
                 dateEcheance: editForm.dateEcheance || undefined,
                 statut: editForm.statut,
                 urgente: editForm.urgente,
+                typeDrive: editForm.typeDrive.join(',') || undefined,
             } as any);
             // Assign the first selected member (or clear)
             if (editForm.assigneeIds[0]) {
@@ -554,6 +566,7 @@ const ProjetTachesPage: React.FC = () => {
                                         ))}
                                     </select>
                                 </div>
+                                <TypeDrivePicker value={form.typeDrive} onChange={v => updateTaskForm(idx, 'typeDrive', v)} />
                                 <MemberCheckList
                                     selectedIds={form.assigneeIds}
                                     onToggle={id => toggleTaskAssignee(idx, id)}
@@ -618,6 +631,7 @@ const ProjetTachesPage: React.FC = () => {
                                 {Object.entries(statutLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                             </select>
                         </div>
+                        <TypeDrivePicker value={editForm.typeDrive} onChange={v => setEditForm(f => ({ ...f, typeDrive: v }))} />
                         <MemberCheckList
                             selectedIds={editForm.assigneeIds}
                             onToggle={toggleEditAssignee}
@@ -679,6 +693,9 @@ const ProjetTachesPage: React.FC = () => {
                                     Ouvrir le dossier Drive ↗
                                 </a>
                             </div>
+                        )}
+                        {(viewingTache as any).driveLink && (
+                            <LivrablesSection tacheId={viewingTache.id as number} typeDrive={(viewingTache as any).typeDrive} canUpload />
                         )}
                         {/* Media Plan details if available */}
                         {projet?.isMediaPlanProject && mediaPlanDetails && (

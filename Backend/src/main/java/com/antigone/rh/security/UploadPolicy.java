@@ -15,6 +15,10 @@ public final class UploadPolicy {
     public static final Set<String> DOCUMENTS = Set.of(".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".doc",
             ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv", ".zip");
 
+    /** Livrables envoyes directement dans Google Drive (jamais servis par l'application). */
+    public static final Set<String> LIVRABLES = Set.of(".png", ".jpg", ".jpeg", ".gif", ".webp", ".mp4", ".mov",
+            ".avi", ".mkv", ".webm", ".m4v", ".pdf", ".zip");
+
     private UploadPolicy() {
     }
 

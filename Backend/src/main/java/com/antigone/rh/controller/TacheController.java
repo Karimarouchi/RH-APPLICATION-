@@ -9,6 +9,7 @@ import com.antigone.rh.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -97,6 +98,22 @@ public class TacheController {
         LocalDate newDeadline = LocalDate.parse(body.get("dateEcheance"));
         return ResponseEntity.ok(ApiResponse.ok("Deadline mise à jour", tacheService.updateDeadline(id, newDeadline)));
     }
+    /** Fichiers finaux (video / image) deposes dans le dossier Drive de la tache. */
+    @GetMapping("/{id}/livrables")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> listLivrables(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok(tacheService.listLivrables(id)));
+    }
+
+    /** Envoie le fichier final directement vers Drive (non stocke sur le serveur ni en base). */
+    @PostMapping(value = "/{id}/livrables", consumes = "multipart/form-data")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> uploadLivrable(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "type", required = false) String type) {
+        requireManagerOrAssignee(id);
+        return ResponseEntity.ok(ApiResponse.ok("Livrable envoyé sur Drive", tacheService.uploadLivrable(id, file, type)));
+    }
+
     /** Gestionnaires de projet : toutes les taches. Les autres : uniquement celles qui leur sont assignees. */
     private void requireManagerOrAssignee(Long tacheId) {
         if (SecurityUtils.isAdmin()

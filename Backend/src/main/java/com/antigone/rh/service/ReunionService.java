@@ -10,6 +10,7 @@ import com.antigone.rh.repository.ClientRepository;
 import com.antigone.rh.repository.EmployeRepository;
 import com.antigone.rh.repository.ReunionRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional
 public class ReunionService {
@@ -26,6 +28,7 @@ public class ReunionService {
     private final EmployeRepository employeRepository;
     private final ClientRepository clientRepository;
     private final NotificationService notificationService;
+    private final EmailService emailService;
 
     public ReunionDTO create(ReunionRequest request, Long initiateurId) {
         Employe initiateur = employeRepository.findById(initiateurId)
@@ -56,7 +59,7 @@ public class ReunionService {
             Client client = clientRepository.findById(request.getClientParticipantId())
                     .orElseThrow(() -> new RuntimeException("Client introuvable: " + request.getClientParticipantId()));
             reunion.setClientParticipant(client);
-            // For client participants, auto-accept (no notification system for clients)
+            // For client participants, auto-accept (the client is informed by email)
             reunion.setStatut(StatutReunion.ACCEPTEE);
         }
 
@@ -71,7 +74,36 @@ public class ReunionService {
             notificationService.createForReunion(saved.getParticipant(), "Demande de réunion", msg, saved);
         }
 
+        // Client invite : envoi d'un email (le portail client n'a pas de centre de notifications).
+        if (saved.getClientParticipant() != null) {
+            sendClientInvitation(saved, initiateur);
+        }
+
         return toDTO(saved);
+    }
+
+    private void sendClientInvitation(Reunion r, Employe initiateur) {
+        Client c = r.getClientParticipant();
+        String to = (c.getContactEmail() != null && !c.getContactEmail().isBlank()) ? c.getContactEmail() : c.getEmail();
+        if (to == null || to.isBlank()) {
+            log.warn("Reunion #{} : le client '{}' n'a aucune adresse email, invitation non envoyee", r.getId(), c.getNom());
+            return;
+        }
+        final String dest = to.trim();
+        final String clientNom = c.getContactNom() != null && !c.getContactNom().isBlank() ? c.getContactNom() : c.getNom();
+        final String initiateurNom = initiateur.getPrenom() + " " + initiateur.getNom();
+        // Hors transaction / hors requete : un SMTP lent ne doit pas bloquer la creation de la reunion.
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                emailService.sendReunionInvitation(dest, clientNom, initiateurNom, r.getTitre(),
+                        String.valueOf(r.getDateReunion()), String.valueOf(r.getHeureDebut()),
+                        r.getHeureFin() == null ? null : String.valueOf(r.getHeureFin()),
+                        r.getTypeReunion() == com.antigone.rh.enums.TypeReunion.EN_LIGNE,
+                        r.getPlateforme(), r.getLienReunion(), r.getLieu());
+            } catch (Exception e) {
+                log.error("Invitation reunion #{} non envoyee a {}: {}", r.getId(), dest, e.getMessage());
+            }
+        });
     }
 
     public ReunionDTO respond(Long reunionId, boolean accepter) {

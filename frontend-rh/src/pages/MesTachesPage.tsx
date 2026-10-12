@@ -1,3 +1,4 @@
+import LivrablesSection from '../components/taches/LivrablesSection';
 import React, { useState, useEffect } from 'react';
 import { tacheService } from '../api/tacheService';
 import { demandeService } from '../api/demandeService';
@@ -789,6 +790,9 @@ const MesTachesPage: React.FC = () => {
                                     Ouvrir le dossier Drive ↗
                                 </a>
                             </div>
+                        )}
+                        {(viewingTache as any).driveLink && (
+                            <LivrablesSection tacheId={viewingTache.id as number} typeDrive={(viewingTache as any).typeDrive} canUpload />
                         )}
                         {/* Media Plan details if available */}
                         {(() => {

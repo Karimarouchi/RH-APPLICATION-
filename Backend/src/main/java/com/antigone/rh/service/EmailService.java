@@ -63,6 +63,47 @@ public class EmailService {
     sendEmail(toEmail, subject, htmlBody, employeNom);
   }
 
+  /** Invitation a une reunion envoyee a un client (participant externe). */
+  public void sendReunionInvitation(String toEmail, String clientNom, String initiateurNom, String titre,
+      String date, String heureDebut, String heureFin, boolean enLigne, String plateforme, String lien,
+      String lieu) {
+    String subject = "Antigone - Invitation à une réunion : " + titre;
+    String where;
+    if (enLigne) {
+      where = "En ligne" + (plateforme != null && !plateforme.isBlank() ? " (" + esc(plateforme) + ")" : "");
+      if (lien != null && !lien.isBlank() && lien.matches("(?i)^https?://.*")) {
+        where += "<br><a href=\"" + esc(lien) + "\" style=\"color:#683b77;\">Rejoindre la réunion</a>";
+      }
+    } else {
+      where = "Présentiel" + (lieu != null && !lieu.isBlank() ? " — " + esc(lieu) : "");
+    }
+    String hours = esc(heureDebut) + (heureFin != null && !heureFin.isBlank() ? " - " + esc(heureFin) : "");
+    String html = "<!DOCTYPE html><html lang=\"fr\"><head><meta charset=\"UTF-8\"></head>"
+        + "<body style=\"margin:0;padding:0;background:#f8fafc;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;\">"
+        + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"padding:40px 0;\"><tr><td align=\"center\">"
+        + "<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:16px;\">"
+        + "<tr><td style=\"background:#683b77;border-radius:15px 15px 0 0;padding:28px 40px;text-align:center;\">"
+        + "<h1 style=\"margin:0;font-size:24px;color:#fff;\">Antigone</h1></td></tr>"
+        + "<tr><td style=\"padding:32px 40px;\">"
+        + "<h2 style=\"margin:0 0 12px;font-size:20px;color:#0f172a;\">Bonjour " + esc(clientNom) + ",</h2>"
+        + "<p style=\"margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;\">" + esc(initiateurNom)
+        + " vous invite à une réunion.</p>"
+        + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#faf8fc;border:1px solid #f3ebf7;border-radius:12px;\">"
+        + "<tr><td style=\"padding:18px 24px;font-size:15px;color:#0f172a;line-height:1.8;\">"
+        + "<strong>Sujet :</strong> " + esc(titre) + "<br>"
+        + "<strong>Date :</strong> " + esc(date) + "<br>"
+        + "<strong>Heure :</strong> " + hours + "<br>"
+        + "<strong>Lieu :</strong> " + where
+        + "</td></tr></table></td></tr>"
+        + "<tr><td style=\"background:#f8fafc;border-top:1px solid #f1f5f9;border-radius:0 0 15px 15px;padding:20px 40px;text-align:center;font-size:12px;color:#64748b;\">"
+        + "Cet email a été envoyé automatiquement." + "</td></tr></table></td></tr></table></body></html>";
+    sendEmail(toEmail, subject, html, clientNom);
+  }
+
+  private static String esc(String v) {
+    return v == null ? "" : org.springframework.web.util.HtmlUtils.htmlEscape(v);
+  }
+
   /** Parametre systeme saisi par l'admin, sinon valeur par defaut (.env). */
   private String setting(String libelle, String fallback) {
     try {

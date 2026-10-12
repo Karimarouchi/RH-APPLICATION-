@@ -60,6 +60,36 @@ public class TacheService {
         return tacheRepository.findByProjetIdAndStatutAndArchivedFalse(projetId, statut);
     }
 
+    /** Normalise "Video, Post ,Video" -> "Video,Post" (ordre conserve, sans doublon ni vide). */
+    private static String normalizeTypes(String raw) {
+        if (raw == null) return "";
+        java.util.LinkedHashSet<String> set = new java.util.LinkedHashSet<>();
+        for (String t : raw.split(",")) {
+            if (!t.trim().isEmpty()) set.add(t.trim());
+        }
+        return String.join(",", set);
+    }
+
+    /** Cree (si besoin) un dossier Drive par type et renseigne driveLink (meme ordre que typeDrive). */
+    private void applyDriveFolders(Tache tache, Projet projet) throws java.io.IOException {
+        String types = normalizeTypes(tache.getTypeDrive());
+        tache.setTypeDrive(types.isEmpty() ? null : types);
+        if (types.isEmpty()) {
+            return;
+        }
+        LocalDate folderDate = tache.getDateEcheance() != null ? tache.getDateEcheance() : LocalDate.now();
+        String clientName = (projet.getClient() != null && projet.getClient().getNom() != null)
+                ? projet.getClient().getNom()
+                : (projet.getNom() != null ? projet.getNom() : "Inconnu");
+        java.util.List<String> links = new java.util.ArrayList<>();
+        for (String type : types.split(",")) {
+            String link = googleDriveService.getOrCreateTacheTypeFolder(clientName, folderDate, type);
+            links.add(link);
+            log.info("Drive folder ready for tache '{}' type '{}': {}", tache.getTitre(), type, link);
+        }
+        tache.setDriveLink(String.join(",", links));
+    }
+
     public Tache create(Long projetId, Tache tache) {
         Projet projet = projetRepository.findById(projetId)
                 .orElseThrow(() -> new RuntimeException("Projet non trouvé"));
@@ -67,37 +97,14 @@ public class TacheService {
         tache.setProjet(projet);
         validateTacheDate(tache, projet);
         tache.setStatut(StatutTache.TODO);
+        tache.setDriveLink(null); // jamais fourni par le client : uniquement genere via typeDrive
 
-        // Auto-create Drive folder(s) when typeDrive is provided (can be
-        // comma-separated e.g. "Post,Documentation")
-        if (tache.getTypeDrive() != null && !tache.getTypeDrive().isBlank()) {
-            try {
-                LocalDate folderDate = tache.getDateEcheance() != null
-                        ? tache.getDateEcheance()
-                        : LocalDate.now();
-                // Get client name from the project (fall back to project name or "Inconnu")
-                String clientName = (projet.getClient() != null && projet.getClient().getNom() != null)
-                        ? projet.getClient().getNom()
-                        : (projet.getNom() != null ? projet.getNom() : "Inconnu");
-
-                // Support multiple types (comma-separated) — create one folder per type
-                String[] types = tache.getTypeDrive().split(",");
-                java.util.List<String> links = new java.util.ArrayList<>();
-                for (String type : types) {
-                    String trimmedType = type.trim();
-                    if (!trimmedType.isEmpty()) {
-                        String link = googleDriveService.getOrCreateTacheTypeFolder(clientName, folderDate,
-                                trimmedType);
-                        links.add(link);
-                        log.info("Drive folder created for tache '{}' type '{}': {}", tache.getTitre(), trimmedType,
-                                link);
-                    }
-                }
-                tache.setDriveLink(String.join(",", links));
-            } catch (Exception e) {
-                log.error("Failed to create Drive folder for tache: {}", e.getMessage());
-                // Don't block creation — just skip Drive link
-            }
+        // Auto-create Drive folder(s) when typeDrive is provided (comma-separated e.g. "Post,Documentation")
+        try {
+            applyDriveFolders(tache, projet);
+        } catch (Exception e) {
+            log.error("Failed to create Drive folder for tache: {}", e.getMessage());
+            // Don't block creation — the type can be re-saved from the edit form to retry.
         }
 
         Tache saved = tacheRepository.save(tache);
@@ -113,6 +120,72 @@ public class TacheService {
         }
 
         return saved;
+    }
+
+    private String resolveLivrableFolderId(Tache tache, String type) {
+        if (tache.getDriveLink() == null || tache.getDriveLink().isBlank()) {
+            throw new RuntimeException("Aucun dossier Drive n'est associé à cette tâche");
+        }
+        String[] links = tache.getDriveLink().split(",");
+        String[] types = tache.getTypeDrive() == null ? new String[0] : tache.getTypeDrive().split(",");
+        int idx = 0;
+        if (type != null && !type.isBlank()) {
+            for (int i = 0; i < types.length; i++) {
+                if (types[i].trim().equalsIgnoreCase(type.trim())) idx = i;
+            }
+        }
+        String folderId = GoogleDriveService.folderIdFromLink(links[Math.min(idx, links.length - 1)].trim());
+        if (folderId == null) throw new RuntimeException("Lien Drive de la tâche invalide");
+        return folderId;
+    }
+
+    private static java.util.Map<String, Object> toLivrable(com.google.api.services.drive.model.File f) {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("id", f.getId());
+        m.put("name", f.getName());
+        m.put("mimeType", f.getMimeType());
+        m.put("size", f.getSize());
+        m.put("webViewLink", f.getWebViewLink());
+        m.put("thumbnailLink", f.getThumbnailLink());
+        m.put("createdTime", f.getCreatedTime() == null ? null : f.getCreatedTime().toStringRfc3339());
+        return m;
+    }
+
+    public java.util.List<java.util.Map<String, Object>> listLivrables(Long tacheId) {
+        Tache tache = findById(tacheId);
+        if (tache.getDriveLink() == null || tache.getDriveLink().isBlank()) return java.util.List.of();
+        try {
+            java.util.List<java.util.Map<String, Object>> out = new java.util.ArrayList<>();
+            for (String link : tache.getDriveLink().split(",")) {
+                String folderId = GoogleDriveService.folderIdFromLink(link.trim());
+                if (folderId == null) continue;
+                // Le dossier Drive est partage par mois : on ne garde que les fichiers prefixes par cette tache.
+                for (var f : googleDriveService.listFiles(folderId)) {
+                    if (f.getName() != null && f.getName().startsWith("T" + tacheId + "_")) out.add(toLivrable(f));
+                }
+            }
+            return out;
+        } catch (java.io.IOException e) {
+            throw new RuntimeException("Impossible de lire les fichiers Drive : " + e.getMessage());
+        }
+    }
+
+    public java.util.Map<String, Object> uploadLivrable(Long tacheId,
+            org.springframework.web.multipart.MultipartFile file, String type) {
+        if (file == null || file.isEmpty()) throw new RuntimeException("Aucun fichier reçu");
+        Tache tache = findById(tacheId);
+        com.antigone.rh.security.UploadPolicy.requireExtension(file.getOriginalFilename(),
+                com.antigone.rh.security.UploadPolicy.LIVRABLES);
+        String folderId = resolveLivrableFolderId(tache, type);
+        String safeName = file.getOriginalFilename().replaceAll("[\\\\/:*?\"<>|]", "_");
+        String mime = file.getContentType() != null ? file.getContentType() : "application/octet-stream";
+        try (java.io.InputStream in = file.getInputStream()) {
+            var created = googleDriveService.uploadFile(folderId, "T" + tacheId + "_" + safeName, mime, in,
+                    file.getSize());
+            return toLivrable(created);
+        } catch (java.io.IOException e) {
+            throw new RuntimeException("Échec de l'envoi vers Drive : " + e.getMessage());
+        }
     }
 
     public Tache assign(Long tacheId, Long employeId) {
@@ -204,6 +277,20 @@ public class TacheService {
             tache.setStatut(tacheDetails.getStatut());
         }
         validateTacheDate(tache, tache.getProjet());
+
+        // Type de tache (Drive) : (re)cree les dossiers si le type change ou si le dossier n'existe pas encore.
+        String newTypes = normalizeTypes(tacheDetails.getTypeDrive());
+        if (!newTypes.isEmpty()
+                && (!newTypes.equals(normalizeTypes(tache.getTypeDrive()))
+                        || tache.getDriveLink() == null || tache.getDriveLink().isBlank())) {
+            tache.setTypeDrive(newTypes);
+            try {
+                applyDriveFolders(tache, tache.getProjet());
+            } catch (Exception e) {
+                log.error("Drive folder creation failed for tache #{}: {}", id, e.getMessage());
+                throw new RuntimeException("Impossible de créer le dossier Drive : " + e.getMessage());
+            }
+        }
         return tacheRepository.save(tache);
     }
 
