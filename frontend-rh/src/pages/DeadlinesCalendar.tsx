@@ -46,6 +46,7 @@ const DeadlinesCalendar: React.FC = () => {
   const [drillProjet, setDrillProjet] = useState<Projet | null>(null);
   const [drillTaches, setDrillTaches] = useState<Tache[]>([]);
   const [drillLoading, setDrillLoading] = useState(false);
+  const [taches, setTaches] = useState<Tache[]>([]);
 
   // Determine user role level
   const isAdmin = permissions.includes('VIEW_TOUS_PROJETS') || permissions.includes('MANAGE_ALL_PROJETS');
@@ -78,6 +79,38 @@ const DeadlinesCalendar: React.FC = () => {
     };
     fetchProjets();
   }, [isAdmin, isManager, employeId]);
+
+  // Echeances des taches : chargees pour tous les projets visibles.
+  // Un employe simple ne voit que les taches qui lui sont assignees.
+  useEffect(() => {
+    if (projets.length === 0) { setTaches([]); return; }
+    let cancelled = false;
+    Promise.all(projets.map(p => tacheService.getByProjet(p.id).then(r => (r.data?.data || []) as Tache[]).catch(() => [] as Tache[])))
+      .then(lists => {
+        if (cancelled) return;
+        const all = lists.flat().filter(t => t.dateEcheance);
+        setTaches(isAdmin || isManager ? all : all.filter(t => t.assigneeId === employeId));
+      });
+    return () => { cancelled = true; };
+  }, [projets, isAdmin, isManager, employeId]);
+
+  const projetById: Record<number, Projet> = {};
+  projets.forEach(p => { projetById[p.id] = p; });
+
+  // Build a map: date -> tasks with deadline on that date
+  const tacheMap: Record<string, Tache[]> = {};
+  taches.forEach(t => {
+    if (!tacheMap[t.dateEcheance]) tacheMap[t.dateEcheance] = [];
+    tacheMap[t.dateEcheance].push(t);
+  });
+
+  const tacheCls = (t: Tache) => {
+    if (t.statut === 'DONE') return 'bg-emerald-100 dark:bg-emerald-900/40 border-emerald-200 text-emerald-700';
+    const du = daysUntil(t.dateEcheance);
+    if (du < 0) return 'bg-red-100 dark:bg-red-900/40 border-red-200 text-red-700';
+    if (du <= 3) return 'bg-amber-100 dark:bg-amber-900/40 border-amber-200 text-amber-700';
+    return 'bg-violet-100 dark:bg-violet-900/40 border-violet-200 text-violet-700';
+  };
 
   // Build a map: date -> projects with deadline on that date
   const deadlineMap: Record<string, Projet[]> = {};
@@ -114,7 +147,9 @@ const DeadlinesCalendar: React.FC = () => {
   const deadlinesThisMonth = Object.entries(deadlineMap)
     .filter(([d]) => d.startsWith(monthPrefix))
     .reduce((acc, [, ps]) => acc + ps.length, 0);
-  const overdueCount = projets.filter(p => p.dateFin && daysUntil(p.dateFin) < 0 && p.statut !== 'CLOTURE' && p.statut !== 'ANNULE').length;
+  const tachesThisMonth = taches.filter(t => t.dateEcheance.startsWith(monthPrefix));
+  const overdueCount = projets.filter(p => p.dateFin && daysUntil(p.dateFin) < 0 && p.statut !== 'CLOTURE' && p.statut !== 'ANNULE').length
+    + taches.filter(t => t.statut !== 'DONE' && daysUntil(t.dateEcheance) < 0).length;
   const indetermineCount = projets.filter(p => p.typeProjet === 'INDETERMINE').length;
 
   return (
@@ -128,7 +163,7 @@ const DeadlinesCalendar: React.FC = () => {
               <HiOutlineClock size={20} className="text-blue-500" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{deadlinesThisMonth}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{deadlinesThisMonth + tachesThisMonth.length}</p>
               <p className="text-xs text-gray-400">Deadlines ce mois</p>
             </div>
           </div>
@@ -170,6 +205,10 @@ const DeadlinesCalendar: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <span className="w-3 h-3 rounded-sm bg-red-100 border border-red-300 inline-block shrink-0"/>
                   <span className="text-xs text-gray-500 dark:text-gray-400">En retard</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-sm bg-violet-100 border border-violet-300 inline-block shrink-0"/>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Tâche (✓)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-3 h-3 rounded-full bg-blue-500 inline-block shrink-0"/>
@@ -231,6 +270,31 @@ const DeadlinesCalendar: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Task deadlines this month */}
+            {tachesThisMonth.length > 0 && (
+              <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4">
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Tâches du mois ({tachesThisMonth.length})</p>
+                <div className="space-y-2 max-h-52 overflow-y-auto">
+                  {[...tachesThisMonth].sort((a, b) => a.dateEcheance.localeCompare(b.dateEcheance)).map(t => {
+                    const pr = projetById[t.projetId];
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => pr && handleProjetClick(pr)}
+                        className={`w-full text-left flex items-start gap-2 p-2 rounded-lg border transition hover:opacity-80 ${tacheCls(t)}`}
+                      >
+                        <HiOutlineCheckCircle size={13} className="mt-0.5 shrink-0 opacity-60" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium truncate">{t.titre}</p>
+                          <p className="text-[10px] opacity-70 truncate">{t.dateEcheance}{pr ? ` • ${pr.nom}` : ''}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Calendar */}
@@ -243,7 +307,7 @@ const DeadlinesCalendar: React.FC = () => {
               </button>
               <div className="text-center">
                 <p className="font-semibold text-gray-900 dark:text-white">{MONTHS_FR[calMonth]} {calYear}</p>
-                <p className="text-xs text-gray-400 mt-0.5">Cliquez sur un projet pour voir ses tâches</p>
+                <p className="text-xs text-gray-400 mt-0.5">Cliquez sur un projet ou une tâche pour voir les tâches du projet</p>
               </div>
               <button onClick={nextMonth} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors">
                 <HiOutlineChevronRight size={18}/>
@@ -270,12 +334,13 @@ const DeadlinesCalendar: React.FC = () => {
                   const key = fmt(date);
                   const isToday = key === today;
                   const deadlines = deadlineMap[key] || [];
+                  const dayTaches = tacheMap[key] || [];
 
                   return (
                     <div
                       key={key}
                       className={`min-h-[90px] border-r border-b border-gray-100 dark:border-gray-700 p-1.5 transition-all relative
-                        ${deadlines.length > 0 ? 'bg-blue-50/30 dark:bg-blue-900/10' : 'bg-white dark:bg-gray-800'}`}
+                        ${deadlines.length + dayTaches.length > 0 ? 'bg-blue-50/30 dark:bg-blue-900/10' : 'bg-white dark:bg-gray-800'}`}
                     >
                       <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-semibold
                         ${isToday ? 'bg-blue-500 text-white' : 'text-gray-600 dark:text-gray-400'}`}>
@@ -302,6 +367,19 @@ const DeadlinesCalendar: React.FC = () => {
                         })}
                         {deadlines.length > 3 && (
                           <p className="text-[9px] text-gray-400 pl-1">+{deadlines.length - 3} autre(s)</p>
+                        )}
+                        {dayTaches.slice(0, Math.max(0, 4 - Math.min(deadlines.length, 3))).map(t => (
+                          <button
+                            key={`t${t.id}`}
+                            onClick={() => projetById[t.projetId] && handleProjetClick(projetById[t.projetId])}
+                            title={`${t.titre}${projetById[t.projetId] ? ' — ' + projetById[t.projetId].nom : ''}`}
+                            className={`w-full text-left rounded px-1 py-0.5 border ${tacheCls(t)} hover:opacity-80 transition cursor-pointer`}
+                          >
+                            <p className="text-[9px] font-semibold truncate leading-tight">✓ {t.titre}</p>
+                          </button>
+                        ))}
+                        {dayTaches.length > Math.max(0, 4 - Math.min(deadlines.length, 3)) && (
+                          <p className="text-[9px] text-gray-400 pl-1">+{dayTaches.length - Math.max(0, 4 - Math.min(deadlines.length, 3))} tâche(s)</p>
                         )}
                       </div>
                     </div>

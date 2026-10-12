@@ -76,7 +76,12 @@ public class ProjetController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
-        projetService.delete(id);
-        return ResponseEntity.ok(ApiResponse.ok("Projet supprimé", null));
+        try {
+            projetService.delete(id);
+            return ResponseEntity.ok(ApiResponse.ok("Projet supprimé", null));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(
+                    "Impossible de supprimer le projet : " + (e.getMessage() == null ? "erreur inattendue" : e.getMessage())));
+        }
     }
 }

@@ -123,7 +123,7 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.POST, "/api/projets")
                                                 .hasAnyAuthority(ADMIN, "MANAGE_ALL_PROJETS")
                                                 .requestMatchers(HttpMethod.DELETE, "/api/projets/*")
-                                                .hasAnyAuthority(ADMIN, "MANAGE_ALL_PROJETS")
+                                                .hasAnyAuthority(ADMIN, "DELETE_PROJET")
                                                 .requestMatchers(HttpMethod.PUT, "/api/projets/*")
                                                 .hasAnyAuthority(ADMIN, "MANAGE_ALL_PROJETS", "VIEW_PROJETS_CREATE_TACHES")
                                                 .requestMatchers(HttpMethod.PATCH, "/api/projets/*/statut")
@@ -146,7 +146,7 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.PATCH, "/api/taches/**")
                                                 .hasAnyAuthority(ADMIN, "MANAGE_ALL_PROJETS", "VIEW_PROJETS_CREATE_TACHES")
                                                 .requestMatchers(HttpMethod.DELETE, "/api/taches/**")
-                                                .hasAnyAuthority(ADMIN, "MANAGE_ALL_PROJETS", "VIEW_PROJETS_CREATE_TACHES")
+                                                .hasAnyAuthority(ADMIN, "DELETE_TACHE")
 
                                                 // --- Equipes, taches obligatoires ---
                                                 .requestMatchers(HttpMethod.POST, "/api/equipes", "/api/equipes/**", "/api/taches-obligatoires")
@@ -164,7 +164,7 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.PUT, "/api/clients/*")
                                                 .hasAnyAuthority(ADMIN, "MANAGE_CLIENTS")
                                                 .requestMatchers(HttpMethod.DELETE, "/api/clients/*")
-                                                .hasAnyAuthority(ADMIN, "MANAGE_CLIENTS")
+                                                .hasAnyAuthority(ADMIN, "DELETE_CLIENT")
 
                                                 // --- Media plans : actions du client ---
                                                 .requestMatchers(HttpMethod.PATCH, "/api/media-plans/*/client-approve",

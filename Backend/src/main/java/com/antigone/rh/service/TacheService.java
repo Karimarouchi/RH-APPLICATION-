@@ -29,6 +29,7 @@ public class TacheService {
     private final EmployeRepository employeRepository;
     private final NotificationService notificationService;
     private final GoogleDriveService googleDriveService;
+    private final com.antigone.rh.repository.ReactifInternRepository reactifInternRepository;
 
     public List<Tache> findAll() {
         return tacheRepository.findAll();
@@ -362,6 +363,8 @@ public class TacheService {
     }
 
     public void delete(Long id) {
+        reactifInternRepository.deleteAll(reactifInternRepository.findByTache_IdOrderByDateReactifDesc(id));
+        reactifInternRepository.flush();
         tacheRepository.deleteById(id);
     }
 

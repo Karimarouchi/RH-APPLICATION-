@@ -10,6 +10,7 @@ import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useConfirm } from '../hooks/useConfirm';
+import { useAuth } from '../context/AuthContext';
 
 const statutBadgeMap: Record<string, 'neutral' | 'primary' | 'success'> = {
     TODO: 'neutral',
@@ -54,6 +55,7 @@ const AdminProjetTachesPage: React.FC = () => {
     const { projetId } = useParams<{ projetId: string }>();
     const navigate = useNavigate();
     const { confirmState, confirm, handleConfirm, handleCancel } = useConfirm();
+    const { user } = useAuth();
 
     const [projet, setProjet] = useState<Projet | null>(null);
     const [taches, setTaches] = useState<Tache[]>([]);
@@ -266,6 +268,7 @@ const AdminProjetTachesPage: React.FC = () => {
                 setTaches(prev => prev.filter(t => t.id !== id));
             } catch (err) {
                 console.error('Erreur suppression:', err);
+                alert((err as any)?.response?.data?.message || 'Suppression impossible (droits insuffisants ou erreur serveur).');
             }
         }, 'Supprimer la tâche');
     };
@@ -429,6 +432,7 @@ const AdminProjetTachesPage: React.FC = () => {
                                                     >
                                                         <HiOutlinePencil size={13} />
                                                     </button>
+{(user?.permissions ?? []).includes('DELETE_TACHE') && (
                                                     <button
                                                         onClick={() => handleDelete(tache.id)}
                                                         className="rounded p-1 text-gray-400 hover:text-error-500 hover:bg-error-50"
@@ -437,6 +441,7 @@ const AdminProjetTachesPage: React.FC = () => {
                                                     >
                                                         <HiOutlineTrash size={13} />
                                                     </button>
+)}
                                                 </div>
                                             </div>
                                             <div className="flex justify-center opacity-20">

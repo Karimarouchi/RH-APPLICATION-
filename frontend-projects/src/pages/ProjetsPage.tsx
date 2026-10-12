@@ -359,7 +359,7 @@ const ProjetsPage: React.FC = () => {
   /* ── Other actions ─────────────────────────────────────────────────────── */
   const handleDelete = (id: number) => {
     confirm('Supprimer ce projet ?', async () => {
-      try { await projetService.delete(id); loadData(); } catch (err) { console.error(err); }
+      try { await projetService.delete(id); setSelectedProject(null); loadData(); } catch (err: any) { alert(err?.response?.data?.message || 'Suppression impossible (droits insuffisants ou erreur serveur).'); }
     }, 'Supprimer le projet');
   };
 
@@ -877,7 +877,7 @@ const ProjetsPage: React.FC = () => {
                     <HiOutlinePencil size={16} /> Modifier
                   </button>
                 )}
-                {canManageAllProjets && (
+                {perms.includes('DELETE_PROJET') && (
                   <button className="flex items-center gap-1.5 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition shadow-sm hover:-translate-y-0.5" onClick={() => handleDelete(selectedProject.id)}>
                     <HiOutlineTrash size={16} /> Supprimer
                   </button>

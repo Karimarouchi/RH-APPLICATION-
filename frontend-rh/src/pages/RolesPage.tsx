@@ -58,12 +58,12 @@ const RolesPage: React.FC = () => {
     {
       label: 'Projets',
       color: '#059669',
-      codes: ['VIEW_PROJETS', 'MANAGE_ALL_PROJETS', 'VIEW_PROJETS_CREATE_TACHES'],
+      codes: ['VIEW_PROJETS', 'MANAGE_ALL_PROJETS', 'VIEW_PROJETS_CREATE_TACHES', 'DELETE_PROJET', 'DELETE_TACHE'],
     },
     {
       label: 'Clients',
       color: '#d97706',
-      codes: ['VIEW_CLIENTS', 'MANAGE_CLIENTS'],
+      codes: ['VIEW_CLIENTS', 'MANAGE_CLIENTS', 'DELETE_CLIENT'],
     },
     {
       label: 'Média Plan',

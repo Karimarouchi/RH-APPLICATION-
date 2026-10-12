@@ -35,6 +35,7 @@ public class ProjetService {
     private final ClientRepository clientRepository;
     private final EmployeService employeService;
     private final TacheRepository tacheRepository;
+    private final com.antigone.rh.repository.ReactifInternRepository reactifInternRepository;
 
     public List<ProjetDTO> findAll() {
         return projetRepository.findAll().stream()
@@ -271,6 +272,14 @@ public class ProjetService {
     }
 
     public void delete(Long id) {
+        if (!projetRepository.existsById(id)) {
+            throw new RuntimeException("Projet introuvable");
+        }
+        // Les rectifs pointent vers les taches (cle etrangere) : a supprimer avant les taches.
+        for (com.antigone.rh.entity.Tache t : tacheRepository.findByProjetId(id)) {
+            reactifInternRepository.deleteAll(reactifInternRepository.findByTache_IdOrderByDateReactifDesc(t.getId()));
+        }
+        reactifInternRepository.flush();
         List<Equipe> equipes = equipeRepository.findByProjetId(id);
         for (Equipe eq : equipes) {
             eq.setProjet(null);

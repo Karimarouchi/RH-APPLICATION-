@@ -53,7 +53,7 @@ const ClientsPage: React.FC = () => {
     const canManage = perms.includes('MANAGE_CLIENTS') || perms.includes('CREATE_CLIENT') || perms.includes('EDIT_CLIENT');
     const canCreate = canManage || perms.includes('CREATE_CLIENT');
     const canEdit = canManage || perms.includes('EDIT_CLIENT');
-    const canDelete = canManage || perms.includes('DELETE_CLIENT');
+    const canDelete = perms.includes('DELETE_CLIENT');
 
     const [clients, setClients] = useState<ClientDTO[]>([]);
     const [loading, setLoading] = useState(true);

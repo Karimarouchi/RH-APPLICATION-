@@ -326,6 +326,7 @@ const AdminProjetTachesPage: React.FC = () => {
                 setTaches(prev => prev.filter(t => t.id !== id));
             } catch (err) {
                 console.error('Erreur suppression:', err);
+                alert((err as any)?.response?.data?.message || 'Suppression impossible (droits insuffisants ou erreur serveur).');
             }
         }, 'Supprimer la tâche');
     };
@@ -494,6 +495,7 @@ const AdminProjetTachesPage: React.FC = () => {
                                                     >
                                                         <HiOutlinePencil size={13} />
                                                     </button>
+{(user?.permissions ?? []).includes('DELETE_TACHE') && (
                                                     <button
                                                         onClick={() => handleDelete(tache.id)}
                                                         className="rounded p-1 text-gray-400 hover:text-error-500 hover:bg-error-50"
@@ -502,6 +504,7 @@ const AdminProjetTachesPage: React.FC = () => {
                                                     >
                                                         <HiOutlineTrash size={13} />
                                                     </button>
+)}
                                                     {tache.statut === 'DONE' && (
                                                         <button
                                                             onClick={() => { setReactifTache(tache); setReactifContenu(''); setReactifError(null); }}

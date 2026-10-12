@@ -49,9 +49,12 @@ public class RoleService {
             Map.entry("VIEW_EQUIPES", "Équipes — Consulter et gérer les équipes de projet"),
             Map.entry("VIEW_PROJETS_CREATE_TACHES",
                     "Gestion des tâches — Gérer les tâches sur les projets assignés et assignés aux autres employés"),
+            Map.entry("DELETE_PROJET", "Supprimer des projets — Supprimer définitivement un projet et toutes ses tâches"),
+            Map.entry("DELETE_TACHE", "Supprimer des tâches — Supprimer définitivement une tâche"),
             // ── Clients ──────────────────────────────────────────────────────
             Map.entry("VIEW_CLIENTS", "Consultation des Clients — Consulter la liste et le détail des clients"),
-            Map.entry("MANAGE_CLIENTS", "Gestion des Clients — Ajouter, modifier et supprimer des clients"),
+            Map.entry("MANAGE_CLIENTS", "Gestion des Clients — Ajouter et modifier des clients"),
+            Map.entry("DELETE_CLIENT", "Supprimer des clients — Supprimer définitivement un client"),
             // ── Media Plan ──────────────────────────────────────────────────
             Map.entry("VIEW_MEDIA_PLAN", "Média Plan — Voir et gérer ses propres médias plans"),
             Map.entry("VIEW_TOUS_MEDIA_PLAN",
