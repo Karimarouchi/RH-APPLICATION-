@@ -233,6 +233,11 @@ public class DataInitializer implements CommandLineRunner {
         createParamIfNotExists("Marketing & Communication", null, "Département marketing et communication", TypeReferentiel.DEPARTEMENT);
         createParamIfNotExists("Production", null, "Département production", TypeReferentiel.DEPARTEMENT);
         createParamIfNotExists("Juridique", null, "Département juridique", TypeReferentiel.DEPARTEMENT);
+        // Departements utilises par les media plans (le code les retrouve par mot-cle dans le nom) :
+        //   "Social Media" -> assignation des clients et format Story, "Production" -> Reel/Video,
+        //   "Designer" -> Carrousel. Ne pas les renommer sans adapter MediaPlanService / MediaPlanAssignmentService.
+        createParamIfNotExists("Social Media", null, "Département social media (assigné aux media plans)", TypeReferentiel.DEPARTEMENT);
+        createParamIfNotExists("Designer graphique", null, "Département design graphique (carrousels des media plans)", TypeReferentiel.DEPARTEMENT);
     }
 
     // ===================== Postes =====================
