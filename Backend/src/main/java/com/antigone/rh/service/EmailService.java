@@ -121,10 +121,28 @@ public class EmailService {
     }
   }
 
+  /**
+   * Envoi d'un email de test : contrairement aux autres envois, l'erreur SMTP est remontee a l'appelant
+   * (identifiants refusés, port invalide, serveur injoignable...).
+   */
+  public void sendTestEmail(String toEmail) {
+    String html = "<html><body style=\"font-family:Arial,sans-serif;\">"
+        + "<h2 style=\"color:#683b77;\">Test d'envoi d'email</h2>"
+        + "<p>Si vous lisez ce message, la configuration SMTP d'Antigone fonctionne.</p></body></html>";
+    sendEmail(toEmail, "Antigone - Test d'envoi d'email", html, toEmail, true);
+  }
+
   private void sendEmail(String toEmail, String subject, String htmlBody, String recipientName) {
+    sendEmail(toEmail, subject, htmlBody, recipientName, false);
+  }
+
+  private void sendEmail(String toEmail, String subject, String htmlBody, String recipientName, boolean rethrow) {
     String host = setting("MAIL_SMTP_HOST", defaultHost);
 
     if (!mailEnabled || host.isBlank()) {
+      if (rethrow) {
+        throw new RuntimeException("SMTP non configuré : MAIL_SMTP_HOST est vide (ou app.mail.enabled=false)");
+      }
       log.info("=== EMAIL (mode simulation : aucun serveur SMTP configure) ===");
       log.info("À: {}", toEmail);
       log.info("Sujet: {}", subject);
@@ -179,6 +197,9 @@ public class EmailService {
       log.info("Email envoyé à {} - {} (SMTP {}:{} {})", toEmail, subject, host, port, security);
     } catch (Exception e) {
       log.error("Erreur lors de l'envoi de l'email à {}: {}", toEmail, e.getMessage());
+      if (rethrow) {
+        throw new RuntimeException(e.getMessage() == null ? e.toString() : e.getMessage(), e);
+      }
     }
   }
 

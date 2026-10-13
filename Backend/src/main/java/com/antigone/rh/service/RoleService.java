@@ -31,6 +31,7 @@ public class RoleService {
             Map.entry("VIEW_REFERENTIELS",
                     "Référentiels — Gérer les listes de valeurs (postes, contrats, départements…)"),
             Map.entry("VIEW_COMPTES", "Comptes utilisateurs — Créer et gérer les accès à l'application"),
+            Map.entry("DELETE_COMPTE", "Supprimer des comptes — Supprimer définitivement un compte utilisateur (l'employé est conservé)"),
             Map.entry("VIEW_ROLES", "Rôles & Permissions — Définir les droits d'accès par rôle"),
             Map.entry("VIEW_MONITORING",
                     "Monitoring — Suivre la présence et l'activité des utilisateurs en temps réel"),

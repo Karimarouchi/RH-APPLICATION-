@@ -15,6 +15,7 @@ import java.util.List;
 public class CompteController {
 
     private final CompteService compteService;
+    private final com.antigone.rh.service.EmailService emailService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<CompteDTO>>> getAll() {
@@ -60,6 +61,30 @@ public class CompteController {
         try {
             compteService.changePassword(id, request);
             return ResponseEntity.ok(ApiResponse.ok("Mot de passe modifié avec succès", null));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    /** Admin uniquement : envoie un email de test et renvoie l'erreur SMTP exacte en cas d'echec. */
+    @PostMapping("/test-email")
+    public ResponseEntity<ApiResponse<Void>> testEmail(@RequestParam("to") String to) {
+        if (to == null || !to.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Adresse email invalide"));
+        }
+        try {
+            emailService.sendTestEmail(to.trim());
+            return ResponseEntity.ok(ApiResponse.ok("Email de test envoyé à " + to.trim(), null));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Échec de l'envoi : " + e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
+        try {
+            compteService.deleteCompte(id);
+            return ResponseEntity.ok(ApiResponse.ok("Compte supprimé définitivement", null));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }

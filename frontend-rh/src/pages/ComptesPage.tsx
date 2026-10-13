@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HiOutlinePlus, HiOutlineSearch, HiOutlinePencil, HiOutlineEye, HiOutlineBan, HiOutlineCheck } from 'react-icons/hi';
+import { HiOutlinePlus, HiOutlineSearch, HiOutlinePencil, HiOutlineEye, HiOutlineBan, HiOutlineCheck, HiOutlineTrash } from 'react-icons/hi';
 import { compteService } from '../api/compteService';
 import { roleService } from '../api/roleService';
 import { employeService } from '../api/employeService';
@@ -8,8 +8,14 @@ import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import DataTable from '../components/ui/DataTable';
 import Badge from '../components/ui/Badge';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { useConfirm } from '../hooks/useConfirm';
+import { useAuth } from '../context/AuthContext';
 
 const ComptesPage: React.FC = () => {
+  const { user } = useAuth();
+  const { confirmState, confirm, handleConfirm, handleCancel } = useConfirm();
+  const canDelete = (user?.permissions ?? []).includes('DELETE_COMPTE');
   const [comptes, setComptes] = useState<CompteDTO[]>([]);
   const [roles, setRoles] = useState<RoleDTO[]>([]);
   const [employes, setEmployes] = useState<Employe[]>([]);
@@ -101,6 +107,22 @@ const ComptesPage: React.FC = () => {
     }
   };
 
+  const handleDelete = (compte: CompteDTO) => {
+    confirm(
+      `Supprimer définitivement le compte « ${compte.username} » (${compte.employePrenom} ${compte.employeNom}) ? ` +
+        "Ses identifiants et son historique de connexion seront effacés. L'employé est conservé. Cette action est irréversible.",
+      async () => {
+        try {
+          await compteService.delete(compte.id);
+          loadData();
+        } catch (err: any) {
+          alert(err?.response?.data?.message || 'Suppression impossible.');
+        }
+      },
+      'Supprimer le compte',
+    );
+  };
+
   const handleViewLogs = async (compte: CompteDTO) => {
     try {
       const res = await compteService.getAccessLogs(compte.id);
@@ -186,6 +208,11 @@ const ComptesPage: React.FC = () => {
           <button onClick={() => handleViewLogs(item)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors dark:hover:bg-gray-700" title="Voir les logs">
             <HiOutlineEye size={16} />
           </button>
+          {canDelete && (
+            <button onClick={() => handleDelete(item)} className="p-1.5 rounded-lg hover:bg-error-50 text-error-500 transition-colors" title="Supprimer définitivement">
+              <HiOutlineTrash size={16} />
+            </button>
+          )}
         </div>
       ),
     },
@@ -369,6 +396,14 @@ const ComptesPage: React.FC = () => {
           </div>
         )}
       </Modal>
+      <ConfirmDialog
+        isOpen={confirmState.isOpen}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmLabel="Supprimer"
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </div>
   );
 };

@@ -48,7 +48,7 @@ const RolesPage: React.FC = () => {
     {
       label: 'RH Administration',
       color: '#683b77',
-      codes: ['VIEW_DASHBOARD', 'VIEW_EMPLOYES', 'VIEW_DEMANDES', 'VIEW_VALIDATIONS', 'VIEW_REFERENTIELS', 'VIEW_COMPTES', 'VIEW_ROLES', 'VIEW_MONITORING'],
+      codes: ['VIEW_DASHBOARD', 'VIEW_EMPLOYES', 'VIEW_DEMANDES', 'VIEW_VALIDATIONS', 'VIEW_REFERENTIELS', 'VIEW_COMPTES', 'DELETE_COMPTE', 'VIEW_ROLES', 'VIEW_MONITORING'],
     },
     {
       label: 'Calendriers',

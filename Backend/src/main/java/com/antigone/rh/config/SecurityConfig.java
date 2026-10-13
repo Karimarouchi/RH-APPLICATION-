@@ -92,6 +92,12 @@ public class SecurityConfig {
                                                                 "MANAGE_ALL_PROJETS",
                                                                 "VIEW_TOUS_PROJETS")
 
+                                                .requestMatchers(HttpMethod.POST, "/api/comptes/test-email")
+                                                .hasAuthority("ROLE_ADMIN")
+
+                                                .requestMatchers(HttpMethod.DELETE, "/api/comptes/*")
+                                                .hasAnyAuthority("ROLE_ADMIN", "DELETE_COMPTE")
+
                                                 .requestMatchers("/api/comptes/**")
                                                 .hasAnyAuthority(
                                                                 "ROLE_ADMIN",

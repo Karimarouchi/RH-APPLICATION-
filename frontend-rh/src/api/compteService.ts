@@ -8,5 +8,6 @@ export const compteService = {
   update: (id: number, data: CompteRequest) => api.put<ApiResponse<CompteDTO>>(`/comptes/${id}`, data),
   toggleEnabled: (id: number) => api.patch<ApiResponse<CompteDTO>>(`/comptes/${id}/toggle`),
   changePassword: (id: number, data: ChangePasswordRequest) => api.put<ApiResponse<void>>(`/comptes/${id}/password`, data),
+  delete: (id: number) => api.delete<ApiResponse<void>>(`/comptes/${id}`),
   getAccessLogs: (id: number) => api.get<ApiResponse<AccessLogDTO[]>>(`/comptes/${id}/logs`),
 };

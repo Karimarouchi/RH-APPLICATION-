@@ -221,6 +221,41 @@ public CompteDTO toggleEnabled(Long id) {
         
         return toDTO(compteRepository.save(compte));
     }
+    // ─── Suppression definitive ──────────────────────────────────
+    /**
+     * Supprime definitivement le compte (identifiants, roles, historique de connexion).
+     * L'employe est conserve : seul son acces a l'application disparait.
+     */
+    public void deleteCompte(Long id) {
+        Compte compte = compteRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Compte non trouvé"));
+
+        Employe employe = compte.getEmploye();
+        Long me = com.antigone.rh.security.SecurityUtils.currentEmployeIdOrNull();
+        if (employe != null && me != null && me.equals(employe.getId())) {
+            throw new RuntimeException("Vous ne pouvez pas supprimer votre propre compte");
+        }
+
+        boolean isAdmin = compte.getRoles().stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getNom()));
+        if (isAdmin) {
+            long admins = compteRepository.findAll().stream()
+                    .filter(c -> c.getRoles().stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getNom())))
+                    .count();
+            if (admins <= 1) {
+                throw new RuntimeException("Impossible de supprimer le dernier compte administrateur");
+            }
+        }
+
+        accessLogRepository.deleteAll(accessLogRepository.findByCompteIdOrderByDateAccesDesc(id));
+        accessLogRepository.flush();
+        if (employe != null) {
+            employe.setCompte(null);
+        }
+        compteRepository.delete(compte);
+        compteRepository.flush();
+        log.info("Compte '{}' (#{}) supprimé définitivement", compte.getUsername(), id);
+    }
+
     // ─── Change Password ─────────────────────────────────────────
     public void changePassword(Long compteId, ChangePasswordRequest request) {
         Compte compte = compteRepository.findById(compteId)
