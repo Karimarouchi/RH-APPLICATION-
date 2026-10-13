@@ -36,9 +36,12 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@lombok.extern.slf4j.Slf4j
 public class EmployeService {
 
     private final EmployeRepository employeRepository;
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager em;
     private final ReferentielRepository referentielRepository;
     private final CongeRepository congeRepository;
     private final NotificationRepository notificationRepository;
@@ -325,6 +328,68 @@ public class EmployeService {
         }
 
         return toDTO(saved);
+    }
+
+    private long count(String jpql, Long id) {
+        return em.createQuery(jpql, Long.class).setParameter("id", id).getSingleResult();
+    }
+
+    /**
+     * Suppression definitive d'un employe ARCHIVE et de toutes ses donnees (voir delete()).
+     * Refuse si l'employe est lie a des donnees qu'on ne peut pas supprimer sans perte
+     * (media plans crees, commentaires, dernier admin...) : il faut alors les reassigner ou le garder archive.
+     */
+    public void deleteDefinitivement(Long id) {
+        Employe employe = employeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Employé non trouvé"));
+
+        if (!Boolean.TRUE.equals(employe.getArchived())) {
+            throw new RuntimeException("Archivez d'abord l'employé avant de le supprimer définitivement");
+        }
+        Long me = com.antigone.rh.security.SecurityUtils.currentEmployeIdOrNull();
+        if (me != null && me.equals(id)) {
+            throw new RuntimeException("Vous ne pouvez pas supprimer votre propre fiche");
+        }
+        if (employe.getCompte() != null && employe.getCompte().getRoles().stream()
+                .anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getNom()))) {
+            long admins = compteRepository.findAll().stream()
+                    .filter(c -> c.getRoles().stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getNom())))
+                    .count();
+            if (admins <= 1) {
+                throw new RuntimeException("Impossible de supprimer le dernier administrateur");
+            }
+        }
+        long plans = count("select count(m) from MediaPlan m where m.createur.id = :id", id);
+        if (plans > 0) {
+            throw new RuntimeException("Impossible : cet employé a créé " + plans
+                    + " ligne(s) de media plan. Conservez-le archivé.");
+        }
+        long comments = count("select count(c) from MediaPlanComment c where c.auteur.id = :id", id);
+        if (comments > 0) {
+            throw new RuntimeException("Impossible : cet employé a écrit " + comments
+                    + " commentaire(s) de media plan. Conservez-le archivé.");
+        }
+
+        // Liens que delete() ne gere pas : on les detache / supprime avant (cles etrangeres).
+        em.createQuery("delete from Notification n where n.reunion.id in "
+                + "(select r.id from Reunion r where r.initiateur.id = :id or r.participant.id = :id)")
+                .setParameter("id", id).executeUpdate();
+        em.createQuery("delete from Notification n where n.demande.id in "
+                + "(select d.id from Demande d where d.employe.id = :id)")
+                .setParameter("id", id).executeUpdate();
+        em.createQuery("update MediaPlan m set m.calendrierProjet = null where m.calendrierProjet.id in "
+                + "(select c.id from CalendrierProjet c where c.manager.id = :id or c.socialManager.id = :id)")
+                .setParameter("id", id).executeUpdate();
+        em.createQuery("update Projet p set p.createur = null where p.createur.id = :id")
+                .setParameter("id", id).executeUpdate();
+        em.createQuery("update RapportInactivite r set r.decidePar = null where r.decidePar.id = :id")
+                .setParameter("id", id).executeUpdate();
+        em.flush();
+        em.clear();
+
+        delete(id);
+        employeRepository.flush();
+        log.info("Employé #{} supprimé définitivement", id);
     }
 
     public void delete(Long id) {

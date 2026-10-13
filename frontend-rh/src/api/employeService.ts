@@ -11,6 +11,7 @@ export const employeService = {
   update: (id: number, data: Partial<Employe>) => api.put<ApiResponse<Employe>>(`/employes/${id}`, data),
   delete: (id: number) => api.delete<ApiResponse<void>>(`/employes/${id}`),
   archive: (id: number) => api.put<ApiResponse<void>>(`/employes/${id}/archive`),
+  deleteDefinitivement: (id: number) => api.delete<ApiResponse<void>>(`/employes/${id}/definitif`),
   unarchive: (id: number) => api.put<ApiResponse<void>>(`/employes/${id}/unarchive`),
   getArchived: () => api.get<ApiResponse<Employe[]>>('/employes/archived'),
   updateSoldeConge: (id: number, solde: number) => api.patch<ApiResponse<void>>(`/employes/${id}/solde-conge?solde=${solde}`),

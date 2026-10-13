@@ -26,6 +26,7 @@ public class RoleService {
             // ── RH Administration ────────────────────────────────────────────
             Map.entry("VIEW_DASHBOARD", "Tableau de bord RH — Vue générale des indicateurs et alertes"),
             Map.entry("VIEW_EMPLOYES", "Employés — Consulter, créer et gérer les fiches employés"),
+            Map.entry("DELETE_EMPLOYE", "Supprimer des employés — Supprimer définitivement un employé archivé et toutes ses données"),
             Map.entry("VIEW_DEMANDES", "Demandes RH — Voir et traiter toutes les demandes (congés, absences…)"),
             Map.entry("VIEW_VALIDATIONS", "Validations — Approuver ou refuser les demandes soumises par les employés"),
             Map.entry("VIEW_REFERENTIELS",

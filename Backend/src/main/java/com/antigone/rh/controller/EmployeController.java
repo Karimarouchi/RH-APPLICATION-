@@ -78,6 +78,18 @@ public class EmployeController {
         return ResponseEntity.ok(ApiResponse.ok("Employé archivé", null));
     }
 
+    /** Suppression definitive (employe deja archive uniquement) : irreversible. */
+    @DeleteMapping("/{id}/definitif")
+    public ResponseEntity<ApiResponse<Void>> deleteDefinitivement(@PathVariable Long id) {
+        try {
+            employeService.deleteDefinitivement(id);
+            return ResponseEntity.ok(ApiResponse.ok("Employé supprimé définitivement", null));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(
+                    e.getMessage() == null ? "Suppression impossible" : e.getMessage()));
+        }
+    }
+
     @PutMapping("/{id}/archive")
     public ResponseEntity<ApiResponse<Void>> archive(@PathVariable Long id) {
         employeService.archive(id);

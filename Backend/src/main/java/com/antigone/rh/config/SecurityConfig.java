@@ -216,6 +216,8 @@ public class SecurityConfig {
                                                 .hasAnyAuthority(ADMIN, "VIEW_EMPLOYES")
                                                 .requestMatchers(HttpMethod.PATCH, "/api/employes/**")
                                                 .hasAnyAuthority(ADMIN, "VIEW_EMPLOYES")
+                                                .requestMatchers(HttpMethod.DELETE, "/api/employes/*/definitif")
+                                                .hasAnyAuthority(ADMIN, "DELETE_EMPLOYE")
                                                 .requestMatchers(HttpMethod.DELETE, "/api/employes/**")
                                                 .hasAnyAuthority(ADMIN, "VIEW_EMPLOYES")
                                                 .requestMatchers(HttpMethod.POST, "/api/competences")

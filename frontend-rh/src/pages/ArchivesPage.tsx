@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HiOutlineSearch, HiOutlineEye, HiOutlineRefresh, HiOutlineCalendar, HiOutlineViewGrid, HiOutlineTable } from 'react-icons/hi';
+import { HiOutlineSearch, HiOutlineEye, HiOutlineRefresh, HiOutlineTrash, HiOutlineCalendar, HiOutlineViewGrid, HiOutlineTable } from 'react-icons/hi';
 import { motion } from 'framer-motion';
 import { employeService } from '../api/employeService';
 import { Employe } from '../types';
@@ -10,9 +10,12 @@ import DataTable from '../components/ui/DataTable';
 import Badge from '../components/ui/Badge';
 import { API_BASE } from '../api/axios';
 import { useConfirm } from '../hooks/useConfirm';
+import { useAuth } from '../context/AuthContext';
 
 const ArchivesPage: React.FC = () => {
   const { confirmState, confirm, handleConfirm, handleCancel } = useConfirm();
+  const { user } = useAuth();
+  const canDelete = (user?.permissions ?? []).includes('DELETE_EMPLOYE');
   const [archivedEmployes, setArchivedEmployes] = useState<Employe[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,6 +52,23 @@ const ArchivesPage: React.FC = () => {
         }
       },
       'Restaurer l\'employé'
+    );
+  };
+
+  const handleDeleteDefinitivement = (emp: Employe) => {
+    confirm(
+      `Supprimer DÉFINITIVEMENT ${emp.prenom} ${emp.nom} ? Sa fiche, son compte, ses congés, pointages, documents, demandes ` +
+        'et notifications seront effacés de la base de données. Ses tâches resteront sans assigné. Cette action est irréversible.',
+      async () => {
+        try {
+          await employeService.deleteDefinitivement(emp.id);
+          setViewingEmploye(null);
+          loadArchived();
+        } catch (err: any) {
+          alert(err?.response?.data?.message || 'Suppression impossible.');
+        }
+      },
+      'Suppression définitive'
     );
   };
 
@@ -130,6 +150,15 @@ const ArchivesPage: React.FC = () => {
           >
             <HiOutlineRefresh size={16} />
           </button>
+          {canDelete && (
+            <button
+              onClick={() => handleDeleteDefinitivement(item)}
+              className="p-1.5 rounded-lg hover:bg-error-50 text-error-500 dark:hover:bg-error-500/10 transition-colors"
+              title="Supprimer définitivement"
+            >
+              <HiOutlineTrash size={16} />
+            </button>
+          )}
         </div>
       ),
     },
@@ -253,6 +282,15 @@ const ArchivesPage: React.FC = () => {
                     >
                       <HiOutlineRefresh size={15} />
                     </button>
+                    {canDelete && (
+                      <button
+                        onClick={() => handleDeleteDefinitivement(emp)}
+                        className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-error-500 transition-all"
+                        title="Supprimer définitivement"
+                      >
+                        <HiOutlineTrash size={15} />
+                      </button>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -320,6 +358,11 @@ const ArchivesPage: React.FC = () => {
 
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
               <Button variant="ghost" onClick={() => setViewingEmploye(null)}>Fermer</Button>
+              {canDelete && (
+                <Button variant="ghost" onClick={() => handleDeleteDefinitivement(viewingEmploye)}>
+                  Supprimer définitivement
+                </Button>
+              )}
               <Button variant="primary" onClick={() => { handleRestore(viewingEmploye.id); setViewingEmploye(null); }}>
                 Restaurer l'employé
               </Button>
