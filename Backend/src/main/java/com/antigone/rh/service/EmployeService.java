@@ -147,6 +147,10 @@ public class EmployeService {
         normalizeEmptyStrings(dto);
 
         validateFields(dto);
+        if (Boolean.TRUE.equals(dto.getManagerDepartement())
+                && (dto.getDepartement() == null || dto.getDepartement().isBlank())) {
+            throw new RuntimeException("Un département est obligatoire pour désigner le manager du département");
+        }
 
         // Check for duplicates before saving
         if (dto.getEmail() != null && employeRepository.existsByEmail(dto.getEmail())) {
@@ -165,6 +169,7 @@ public class EmployeService {
             employe.setManager(manager);
         }
         Employe saved = employeRepository.save(employe);
+        syncDepartmentManager(saved, Boolean.TRUE.equals(dto.getManagerDepartement()));
 
         if (Boolean.TRUE.equals(dto.getUseInitialSolde()) && dto.getSoldeCongeInitial() != null) {
             // Solde congé initial saisi manuellement — on ne recalcule pas
@@ -201,6 +206,42 @@ public class EmployeService {
         */
 
         return toDTO(saved);
+    }
+
+    /**
+     * Une seule personne est manager de son département.
+     * requested null = ne pas changer (mise à jour partielle).
+     */
+    private void syncDepartmentManager(Employe saved, Boolean requested) {
+        if (requested == null) {
+            return;
+        }
+        if (!requested) {
+            if (Boolean.TRUE.equals(saved.getManagerDepartement())) {
+                saved.setManagerDepartement(false);
+                employeRepository.save(saved);
+            }
+            return;
+        }
+        String dept = saved.getDepartement();
+        if (dept == null || dept.isBlank()) {
+            throw new RuntimeException("Un département est obligatoire pour désigner le manager du département");
+        }
+        String key = dept.trim().toLowerCase();
+        for (Employe other : employeRepository.findAll()) {
+            if (other.getId().equals(saved.getId())) {
+                continue;
+            }
+            if (!Boolean.TRUE.equals(other.getManagerDepartement())) {
+                continue;
+            }
+            if (other.getDepartement() != null && other.getDepartement().trim().toLowerCase().equals(key)) {
+                other.setManagerDepartement(false);
+                employeRepository.save(other);
+            }
+        }
+        saved.setManagerDepartement(true);
+        employeRepository.save(saved);
     }
 
     private void validateFields(EmployeDTO dto) {
@@ -248,6 +289,10 @@ public class EmployeService {
     public EmployeDTO update(Long id, EmployeDTO dto) {
         normalizeEmptyStrings(dto);
         validateFields(dto);
+        if (Boolean.TRUE.equals(dto.getManagerDepartement())
+                && (dto.getDepartement() == null || dto.getDepartement().isBlank())) {
+            throw new RuntimeException("Un département est obligatoire pour désigner le manager du département");
+        }
         Employe employe = employeRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Employé non trouvé avec l'id: " + id));
         // Le matricule ne change pas (généré automatiquement)
@@ -288,6 +333,7 @@ public class EmployeService {
         }
 
         Employe saved = employeRepository.save(employe);
+        syncDepartmentManager(saved, dto.getManagerDepartement());
 
         // Auto-recalculate for employees without initial balance
         if (saved.getSoldeCongeInitial() == null && saved.getDateEmbauche() != null) {
@@ -1044,6 +1090,7 @@ public class EmployeService {
                 .dateFinContrat(employe.getDateFinContrat())
                 .genre(employe.getGenre())
                 .departement(employe.getDepartement())
+                .managerDepartement(Boolean.TRUE.equals(employe.getManagerDepartement()))
                 .ribBancaire(sensitive ? employe.getRibBancaire() : null)
                 .managerId(employe.getManager() != null ? employe.getManager().getId() : null)
                 .managerNom(employe.getManager() != null
@@ -1088,6 +1135,7 @@ public class EmployeService {
                 .orElseThrow(() -> new RuntimeException("Employé non trouvé avec l'id: " + id));
         employe.setArchived(true);
         employe.setArchivedAt(LocalDateTime.now());
+        employe.setManagerDepartement(false);
         
         if (employe.getCompte() != null) {
             employe.getCompte().setEnabled(false);

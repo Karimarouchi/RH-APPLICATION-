@@ -69,6 +69,11 @@ public class Employe {
 
     private String departement;
 
+    /** Chef désigné de son département. Un seul employé par département. */
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private Boolean managerDepartement = false;
+
     @jakarta.validation.constraints.Pattern(regexp = "^[0-9]{20}$", message = "Le RIB doit contenir exactement 20 chiffres")
     @com.fasterxml.jackson.annotation.JsonIgnore
     private String ribBancaire;

@@ -315,7 +315,7 @@ const EmployesPage: React.FC = () => {
     cin: '', cnss: '', nom: '', prenom: '', email: '', telephone: '',
     telephonePro: '', salaire: '' as string | number,
     dateEmbauche: '', soldeConge: 0, poste: '', typeContrat: '', dateFinContrat: '', genre: '',
-    departement: '', ribBancaire: '', managerId: null as number | null,
+    departement: '', ribBancaire: '', managerId: null as number | null, managerDepartement: false,
     useInitialSolde: false, soldeCongeInitial: '' as string | number,
   });
 
@@ -486,7 +486,7 @@ const EmployesPage: React.FC = () => {
       soldeConge: employe.soldeConge, poste: employe.poste || '',
       typeContrat: employe.typeContrat || '', dateFinContrat: employe.dateFinContrat || '', genre: employe.genre || '',
       departement: employe.departement || '', ribBancaire: employe.ribBancaire || '',
-      managerId: employe.managerId,
+      managerId: employe.managerId, managerDepartement: !!employe.managerDepartement,
       useInitialSolde: employe.soldeCongeInitial != null, soldeCongeInitial: employe.soldeCongeInitial ?? '',
     });
     setCreateCompte(false);
@@ -530,7 +530,7 @@ const EmployesPage: React.FC = () => {
       cin: '', cnss: '', nom: '', prenom: '', email: '', telephone: '',
       telephonePro: '', salaire: '',
       dateEmbauche: '', soldeConge: 0, poste: '', typeContrat: '', dateFinContrat: '', genre: '',
-      departement: '', ribBancaire: '', managerId: null,
+      departement: '', ribBancaire: '', managerId: null, managerDepartement: false,
       useInitialSolde: false, soldeCongeInitial: '',
     });
     setCreateCompte(false);
@@ -1237,7 +1237,7 @@ const EmployesPage: React.FC = () => {
             <label className="block text-theme-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Département *</label>
             <FormSelect
               value={formData.departement}
-              onChange={val => setFormData({ ...formData, departement: val })}
+              onChange={val => setFormData({ ...formData, departement: val, managerDepartement: val ? formData.managerDepartement : false })}
               options={departements.map((d: Referentiel) => ({ value: d.libelle, label: d.libelle }))}
               placeholder="Sélectionner un département"
               error={!!(submitted && formErrors.departement)}
@@ -1316,7 +1316,21 @@ const EmployesPage: React.FC = () => {
               options={managers.filter((m: Employe) => m.id !== editingEmploye?.id).map((m: Employe) => ({ value: String(m.id), label: `${m.prenom} ${m.nom}` }))}
               placeholder="Aucun manager"
             />
+            <p className="text-theme-xs text-gray-400 mt-1">Supérieur de cet employé. Vide = pas de supérieur.</p>
           </div>
+          <label className={`mt-1 flex items-start gap-3 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-3 ${formData.departement ? 'cursor-pointer' : 'opacity-60'}`}>
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={!!formData.managerDepartement}
+              disabled={!formData.departement}
+              onChange={(e) => setFormData({ ...formData, managerDepartement: e.target.checked })}
+            />
+            <span>
+              <span className="block text-theme-sm font-medium text-gray-700 dark:text-gray-300">Manager du département</span>
+              <span className="block text-theme-xs text-gray-400">Ce compte dirige le département choisi. Une seule personne par département.</span>
+            </span>
+          </label>
         </div>
 
         {/* Solde congé initial */}
@@ -1481,6 +1495,7 @@ const EmployesPage: React.FC = () => {
                 <InfoRow label="Salaire" value={viewingEmploye.salaire != null ? `${viewingEmploye.salaire} DT` : null} />
                 <InfoRow label="Solde congé" value={`${viewingEmploye.soldeConge} jours`} />
                 <InfoRow label="Manager" value={viewingEmploye.managerNom} />
+                <InfoRow label="Manager du département" value={viewingEmploye.managerDepartement ? 'Oui' : 'Non'} />
               </div>
             )}
 

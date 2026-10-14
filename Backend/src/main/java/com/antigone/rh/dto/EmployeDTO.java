@@ -33,6 +33,8 @@ public class EmployeDTO {
     private LocalDate dateFinContrat;
     private String genre;
     private String departement;
+    /** True si cet employé est le manager désigné de son département. */
+    private Boolean managerDepartement;
     @jakarta.validation.constraints.Pattern(regexp = "^[0-9]{20}$", message = "Le RIB doit contenir exactement 20 chiffres")
     private String ribBancaire;
     private Long managerId;

@@ -585,10 +585,11 @@ public class MediaPlanService {
     // =============================================
 
     /**
-     * Find a manager from the department that matches the media plan format:
-     * - Reel/Video → department containing "prod" (Production)
-     * - Carrousel → department containing "design"
-     * - Story → department containing "social media"
+     * Chef de projet du département qui correspond au format du média plan.
+     * C'est l'employé coché « manager du département », pas le premier sans supérieur.
+     * - Reel/Video → département contenant "prod"
+     * - Carrousel → département contenant "design"
+     * - Story → département contenant "social media"
      */
     private Long findManagerByFormat(String format) {
         if (format == null)
@@ -610,12 +611,13 @@ public class MediaPlanService {
                 return null;
         }
 
-        // Find employees in the matching department whose role includes management
+        // Le chef de projet est la personne cochée « manager du département », pas le premier sans supérieur.
         List<Employe> allEmployees = employeRepository.findAll();
         return allEmployees.stream()
+                .filter(e -> !Boolean.TRUE.equals(e.getArchived()))
+                .filter(e -> Boolean.TRUE.equals(e.getManagerDepartement()))
                 .filter(e -> e.getDepartement() != null
                         && e.getDepartement().toLowerCase().contains(departmentKeyword))
-                .filter(e -> e.getManager() == null || e.getSubordonnes() != null && !e.getSubordonnes().isEmpty())
                 .map(Employe::getId)
                 .findFirst()
                 .orElse(null);
