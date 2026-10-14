@@ -60,7 +60,9 @@ public class RoleService {
             // ── Media Plan ──────────────────────────────────────────────────
             Map.entry("VIEW_MEDIA_PLAN", "Média Plan — Voir et gérer ses propres médias plans"),
             Map.entry("VIEW_TOUS_MEDIA_PLAN",
-                    "Management de tous les media plan — Gérer tous les médias plans et assignes aux employés "),
+                    "Voir tous les médias plans — Consulter tous les médias plans et assigner les employés aux clients"),
+            Map.entry("VALIDATE_MEDIA_PLAN",
+                    "Valider les médias plans — Approuver ou refuser les médias plans"),
             // ── Espace personnel (employé) ───────────────────────────────────
             Map.entry("VIEW_DASHBOARD_RH", "Mon tableau de bord — Vue personnelle des congés, documents et activité"),
             Map.entry("VIEW_MES_DEMANDES", "Mes demandes — Soumettre et suivre ses propres demandes de congé/absence"),

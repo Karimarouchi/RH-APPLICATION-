@@ -19,8 +19,10 @@ def run(w):
     w.media_plans.append(mid)
     r.check(data_of(j)['statut'] == 'EN_ATTENTE', 'statut initial EN_ATTENTE')
     r.expect('un employe n\'approuve pas', w.req('bob', 'PATCH', f"/api/media-plans/{mid}/approve?managerId={E('bob')}")[0], 403)
-    c, j = w.req('alice', 'PATCH', f"/api/media-plans/{mid}/approve?managerId={E('carol')}")
-    r.check(c == 200 and data_of(j)['statut'] == 'APPROUVE', 'le manager approuve (managerId fourni ignore)')
+    r.expect('voir tous les media plans ne permet pas d\'approuver', w.req('alice', 'PATCH', f"/api/media-plans/{mid}/approve?managerId={E('carol')}")[0], 403)
+    r.expect('voir tous les media plans ne permet pas de desapprouver', w.req('alice', 'PATCH', f'/api/media-plans/{mid}/disapprove')[0], 403)
+    c, j = w.req('admin', 'PATCH', f"/api/media-plans/{mid}/approve?managerId={E('carol')}")
+    r.check(c == 200 and data_of(j)['statut'] == 'APPROUVE', 'le droit Valider les medias plans approuve (managerId fourni ignore)')
     c, j = w.req('alice', 'PATCH', f'/api/media-plans/{mid}/request-client-validation')
     r.check(c == 200 and data_of(j)['statut'] == 'EN_ATTENTE_CLIENT', 'envoi a la validation du client')
 
@@ -39,7 +41,7 @@ def run(w):
     c, j = w.req('alice', 'POST', '/api/media-plans', {**mp, 'titre': 'Post 2'})
     m2 = data_of(j)['id']
     w.media_plans.append(m2)
-    w.req('alice', 'PATCH', f'/api/media-plans/{m2}/approve')
+    w.req('admin', 'PATCH', f'/api/media-plans/{m2}/approve')
     w.req('alice', 'PATCH', f'/api/media-plans/{m2}/request-client-validation')
     c, j = call('PATCH', f'/api/media-plans/{m2}/client-disapprove', tok_a)
     r.check(c == 200 and data_of(j)['statut'] == 'DESAPPROUVE', 'le client A desapprouve')
@@ -67,7 +69,7 @@ def run(w):
         return sum(len(data_of(w.req('admin', 'GET', f'/api/notifications/employe/{i}')[1]) or []) for i in head_ids)
 
     avant = notifs()
-    c, j = w.req('alice', 'PATCH', f'/api/media-plans/{sid}/approve')
+    c, j = w.req('admin', 'PATCH', f'/api/media-plans/{sid}/approve')
     r.expect("approbation d'un plan avec tournage", c, 200, msg_of(j))
     r.check(notifs() > avant, 'un Head Prod recoit une notification de validation du tournage')
     c, j = w.req('dave', 'GET', f"/api/notifications/employe/{E('dave')}")

@@ -178,10 +178,10 @@ public class SecurityConfig {
                                                 .hasAnyAuthority(ADMIN, "ROLE_CLIENT", "VIEW_MEDIA_PLAN", "VIEW_TOUS_MEDIA_PLAN")
                                                 .requestMatchers(HttpMethod.POST, "/api/media-plans/client-approve-all")
                                                 .hasAnyAuthority(ADMIN, "ROLE_CLIENT", "VIEW_MEDIA_PLAN", "VIEW_TOUS_MEDIA_PLAN")
-                                                // --- Media plans : validation interne reservee aux managers ---
+                                                // --- Media plans : validation interne reservee au droit dedie ---
                                                 .requestMatchers(HttpMethod.PATCH, "/api/media-plans/*/approve",
                                                                 "/api/media-plans/*/disapprove")
-                                                .hasAnyAuthority(ADMIN, "ROLE_MANAGER", "VIEW_TOUS_MEDIA_PLAN")
+                                                .hasAnyAuthority(ADMIN, "VALIDATE_MEDIA_PLAN")
                                                 // --- Media plans : ecriture interne ---
                                                 .requestMatchers(HttpMethod.POST, "/api/media-plans", "/api/media-plans/**")
                                                 .hasAnyAuthority(ADMIN, "VIEW_MEDIA_PLAN", "VIEW_TOUS_MEDIA_PLAN")

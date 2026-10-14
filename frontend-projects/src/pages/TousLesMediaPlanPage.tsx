@@ -97,6 +97,8 @@ const getBatchLabel = (batch: PlanBatch) => {
 
 const TousLesMediaPlanPage: React.FC = () => {
     const { user } = useAuth();
+    const canValidateMediaPlans = (user?.permissions ?? []).includes('VALIDATE_MEDIA_PLAN')
+        || (user?.roles ?? []).includes('ADMIN');
     const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
 
     const [clients, setClients] = useState<ClientDTO[]>([]);
@@ -717,13 +719,13 @@ const TousLesMediaPlanPage: React.FC = () => {
 
                                 return (
                                     <>
-                                        {!allApproved && (
+                                        {canValidateMediaPlans && !allApproved && (
                                             <button onClick={() => handleApproveBatch(activeBatch)}
                                                 className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors">
                                                 <HiOutlineCheck size={16} className="text-green-500" /> Approuver
                                             </button>
                                         )}
-                                        {!allDisapproved && (
+                                        {canValidateMediaPlans && !allDisapproved && (
                                             <button onClick={() => handleDisapproveBatch(activeBatch)}
                                                 className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg border border-red-200 bg-red-50 text-red-600 text-sm font-medium dark:bg-red-900/10 dark:border-red-900/50 dark:text-red-400 hover:bg-red-100 transition-colors">
                                                 <HiOutlineX size={16} /> Désapprouver

@@ -68,7 +68,7 @@ const RolesPage: React.FC = () => {
     {
       label: 'Média Plan',
       color: '#dc2626',
-      codes: ['VIEW_MEDIA_PLAN', 'VIEW_TOUS_MEDIA_PLAN'],
+      codes: ['VIEW_MEDIA_PLAN', 'VIEW_TOUS_MEDIA_PLAN', 'VALIDATE_MEDIA_PLAN'],
     },
     {
       label: 'Espace personnel (employé)',
