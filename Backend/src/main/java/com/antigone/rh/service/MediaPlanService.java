@@ -49,6 +49,7 @@ public class MediaPlanService {
     private final com.antigone.rh.repository.ReactifInternRepository reactifInternRepository;
     private final com.antigone.rh.repository.CalendrierProjetRepository calendrierProjetRepository;
     private final NotificationService notificationService;
+    private final ReactifInternService reactifInternService;
 
     private static final List<String> CHAMPS_CLIENT = List.of(
             "datePublication", "heure", "format", "type", "titre", "texteSurVisuel",
@@ -246,6 +247,10 @@ public class MediaPlanService {
     public MediaPlanDTO update(Long id, MediaPlanRequest request) {
         MediaPlan mp = mediaPlanRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("MediaPlan", id));
+        boolean validator = SecurityUtils.isAdmin() || SecurityUtils.hasAnyAuthority("VALIDATE_MEDIA_PLAN");
+        if (!validator && !employeeMayEdit(mp)) {
+            throw new RuntimeException("Cette ligne est déjà validée, vous ne pouvez plus la modifier");
+        }
 
         if (request.getDatePublication() != null) {
             mp.setDatePublication(LocalDate.parse(request.getDatePublication()));
@@ -308,7 +313,12 @@ public class MediaPlanService {
             mp.setClient(client);
         }
 
-        return toDTO(mediaPlanRepository.save(mp));
+        MediaPlan saved = mediaPlanRepository.save(mp);
+        if (validator && request.getRectifs() != null && !request.getRectifs().isBlank()
+                && saved.getStatut() == StatutMediaPlan.EN_ATTENTE) {
+            return refuse(id, request.getRectifs());
+        }
+        return toDTO(saved);
     }
 
     public void delete(Long id) {
@@ -415,7 +425,8 @@ public class MediaPlanService {
     public MediaPlanDTO accept(Long id, List<String> champs, Long approverId) {
         MediaPlan mp = mediaPlanRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("MediaPlan", id));
-        if (mp.getStatut() != StatutMediaPlan.EN_ATTENTE) {
+        boolean retour = mp.getStatut() == StatutMediaPlan.DESAPPROUVE && Boolean.TRUE.equals(mp.getRetourManager());
+        if (mp.getStatut() != StatutMediaPlan.EN_ATTENTE && !retour) {
             throw new RuntimeException("Seule une ligne en attente peut être acceptée");
         }
         Set<String> chosen = new LinkedHashSet<>();
@@ -431,6 +442,7 @@ public class MediaPlanService {
         }
         mp.setChampsVisiblesClient(String.join(",", chosen));
         mp.setRectifs(null);
+        mp.setRetourManager(false);
         mp.setStatut(StatutMediaPlan.EN_ATTENTE_CLIENT);
         mediaPlanRepository.save(mp);
 
@@ -452,8 +464,13 @@ public class MediaPlanService {
             throw new RuntimeException("Seule une ligne en attente peut être refusée");
         }
         mp.setRectifs(rectifs.trim());
+        mp.setRetourManager(false);
         mp.setStatut(StatutMediaPlan.DESAPPROUVE);
         mediaPlanRepository.save(mp);
+        Long managerId = SecurityUtils.currentEmployeIdOrNull();
+        if (managerId != null) {
+            reactifInternService.createForMediaPlanIntern(mp.getId(), managerId, rectifs.trim());
+        }
         if (mp.getCreateur() != null) {
             notificationService.create(mp.getCreateur(), "MEDIA_PLAN_REFUS",
                     "La ligne '" + mp.getTitre() + "' a été refusée. Rectifs : " + rectifs.trim(), null);
@@ -541,8 +558,8 @@ public class MediaPlanService {
         MediaPlan mp = mediaPlanRepository.findById(mediaPlanId)
                 .orElseThrow(() -> new ResourceNotFoundException("MediaPlan", mediaPlanId));
 
-        if (mp.getStatut() != StatutMediaPlan.DESAPPROUVE) {
-            throw new RuntimeException("Seuls les media plans désapprouvés peuvent être renvoyés");
+        if (mp.getStatut() != StatutMediaPlan.DESAPPROUVE || Boolean.TRUE.equals(mp.getRetourManager())) {
+            throw new RuntimeException("Seuls les media plans renvoyés à l'employé peuvent être resoumis");
         }
 
         mp.setStatut(StatutMediaPlan.EN_ATTENTE);
@@ -614,15 +631,51 @@ public class MediaPlanService {
      * The admin can then edit and re-send it (requestClientValidation) so the
      * client only sees the modified lignes again.
      */
-    public MediaPlanDTO clientDisapprove(Long mediaPlanId) {
+    public MediaPlanDTO clientDisapprove(Long mediaPlanId, String rectifs) {
         MediaPlan mp = mediaPlanRepository.findById(mediaPlanId)
                 .orElseThrow(() -> new ResourceNotFoundException("MediaPlan", mediaPlanId));
         SecurityUtils.requireOwnClientIfClient(mp.getClient().getId());
         if (mp.getStatut() != StatutMediaPlan.EN_ATTENTE_CLIENT) {
             throw new RuntimeException("Ce media plan n'est pas en attente de validation client");
         }
+        String text = rectifs != null && !rectifs.isBlank()
+                ? rectifs.trim()
+                : (mp.getRectifs() != null ? mp.getRectifs().trim() : "");
+        if (text.isBlank()) {
+            throw new RuntimeException("Les rectifs sont obligatoires pour refuser la ligne");
+        }
+        mp.setRectifs(text);
         mp.setStatut(StatutMediaPlan.DESAPPROUVE);
-        return toDTO(mediaPlanRepository.save(mp));
+        mp.setRetourManager(true);
+        mediaPlanRepository.save(mp);
+        if (mp.getClient() != null) {
+            reactifInternService.createForMediaPlanExtern(mp.getId(), mp.getClient().getId(), text);
+        }
+        notifyValidators("Le client a demandé des rectifs sur la ligne '" + mp.getTitre() + "' : " + text);
+        return toDTO(mp);
+    }
+
+    /** Le manager renvoie au créateur une ligne revenue du client. */
+    public MediaPlanDTO renvoyerEmploye(Long id) {
+        if (!SecurityUtils.isAdmin() && !SecurityUtils.hasAnyAuthority("VALIDATE_MEDIA_PLAN")) {
+            throw new org.springframework.security.access.AccessDeniedException("Acces refuse");
+        }
+        MediaPlan mp = mediaPlanRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("MediaPlan", id));
+        if (!Boolean.TRUE.equals(mp.getRetourManager())) {
+            throw new RuntimeException("Cette ligne n'attend pas une décision du manager");
+        }
+        mp.setRetourManager(false);
+        mediaPlanRepository.save(mp);
+        if (mp.getCreateur() != null) {
+            notificationService.create(mp.getCreateur(), "MEDIA_PLAN_RECTIF",
+                    "Le client demande des rectifs sur '" + mp.getTitre() + "' : " + mp.getRectifs(), null);
+        }
+        return toDTO(mp);
+    }
+
+    private boolean employeeMayEdit(MediaPlan mp) {
+        return mp.getStatut() == StatutMediaPlan.DESAPPROUVE && !Boolean.TRUE.equals(mp.getRetourManager());
     }
 
     /**
@@ -809,6 +862,7 @@ public class MediaPlanService {
                 .shootingAuPlusTard(mp.getShootingAuPlusTard() != null ? mp.getShootingAuPlusTard().toString() : null)
                 .clientDoitValiderDate(Boolean.TRUE.equals(mp.getClientDoitValiderDate()))
                 .champsVisiblesClient(mp.getChampsVisiblesClient())
+                .retourManager(Boolean.TRUE.equals(mp.getRetourManager()))
                 .shootingTypeDeContenu(
                         mp.getShootingTypeDeContenu() != null ? mp.getShootingTypeDeContenu().name() : null)
                 .shootingStatus(mp.getShootingStatus() != null ? mp.getShootingStatus().name() : null)

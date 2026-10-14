@@ -711,6 +711,7 @@ export interface MediaPlan {
   shootingAuPlusTard: string | null;
   clientDoitValiderDate?: boolean;
   champsVisiblesClient?: string | null;
+  retourManager?: boolean;
   shootingTypeDeContenu: TypeContenuShooting | null;
   shootingStatus: StatutShooting | null;
   shootingStatusReason: string | null;

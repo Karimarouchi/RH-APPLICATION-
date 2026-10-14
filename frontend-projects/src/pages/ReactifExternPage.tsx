@@ -102,13 +102,11 @@ const ReactifExternPage: React.FC = () => {
             monthCounters[monthLabel] = (monthCounters[monthLabel] || 0) + 1;
             const batchId = event.lines[0].mediaPlanId || Math.random();
             const first = event.lines[0];
-            const latestDate = event.lines.reduce((acc, r) =>
-                new Date(r.dateReactif) > new Date(acc) ? r.dateReactif : acc, event.lines[0].dateReactif);
             return {
                 mpId: batchId,
                 monthLabel: `Mediaplan de ${monthLabel || '?'} ${monthCounters[monthLabel]}`,
                 clientNom: first.clientNom || '—',
-                reactifs: event.lines.map(l => ({ ...l, dateReactif: latestDate })) as ReactifInternDTO[],
+                reactifs: event.lines,
                 nbLignes: event.lines.length,
             };
         });
@@ -212,8 +210,8 @@ const ReactifExternPage: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <span className={`inline - flex h - 7 min - w - [28px] px - 2 items - center justify - center rounded - full text - xs font - bold ${refusCount >= 5 ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400' : refusCount >= 2 ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'}`}>{refusCount}</span>
-                                        <span className={`text - brand - 500 transition - transform duration - 200 ${isClientOpen ? 'rotate-90' : ''} `}>▶</span>
+                                        <span className={`inline-flex h-7 min-w-[28px] px-2 items-center justify-center rounded-full text-xs font-bold ${refusCount >= 5 ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400' : refusCount >= 2 ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'}`}>{refusCount}</span>
+                                        <span className={`text-brand-500 transition-transform duration-200 ${isClientOpen ? 'rotate-90' : ''}`}>▶</span>
                                     </div>
                                 </button>
 
@@ -258,6 +256,7 @@ const ReactifExternPage: React.FC = () => {
                                                                     </div>
                                                                     <div className="pl-3 border-l-[3px] border-red-300 dark:border-red-700/50">
                                                                         <p className="italic text-gray-700 dark:text-gray-300 text-xs sm:text-sm">"{r.contenu}"</p>
+                                                                        <p className="text-[11px] text-gray-500 mt-1">{fmtDt(r.dateReactif)} · client {r.clientNom || '—'} · employé {r.employePrenom || ''} {r.employeNom || ''} · fois {r.nombreFois}</p>
                                                                     </div>
                                                                 </div>
                                                             ))}

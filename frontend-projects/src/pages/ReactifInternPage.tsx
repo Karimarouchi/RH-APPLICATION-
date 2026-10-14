@@ -150,19 +150,12 @@ const ReactifInternPage: React.FC = () => {
             monthCounters[monthLabel] = (monthCounters[monthLabel] || 0) + 1;
             const batchId = event.lines[0].mediaPlanId || Math.random(); // unique key per event
             const first = event.lines[0];
-            const latestDate = event.lines.reduce((acc, r) =>
-                new Date(r.dateReactif) > new Date(acc) ? r.dateReactif : acc, event.lines[0].dateReactif);
             return {
                 mpId: batchId,
                 monthLabel: `Mediaplan de ${monthLabel || '?'} ${monthCounters[monthLabel]}`,
                 employeNom: `${first.employePrenom || ''} ${first.employeNom || ''}`.trim() || '—',
                 // Each "refusal event" = one entry in history with count of lines refused
-                reactifs: [{
-                    ...first,
-                    dateReactif: latestDate,
-                    contenu: first.contenu,
-                    // nbLignes is additional info we'll display
-                }] as ReactifInternDTO[],
+                reactifs: event.lines,
                 nbLignes: event.lines.length,
             };
         });
@@ -397,17 +390,18 @@ const ReactifInternPage: React.FC = () => {
                                                         </div>
                                                     </button>
 
-                                                    {/* Refusal reason preview */}
-                                                    {latest && (
-                                                        <div className="px-6 pb-3 pt-1">
-                                                            <div className="rounded-xl p-3 border text-sm bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800">
-                                                                <div className="flex items-center justify-between mb-1">
-                                                                    <span className="text-[11px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400">🔴 Motif de refus</span>
-                                                                    <span className="text-[11px] text-gray-400">{fmtDt(latest.dateReactif)}</span>
+                                                    {isBatchOpen && (
+                                                        <div className="px-6 pb-4 pt-1 space-y-2">
+                                                            {batch.reactifs.map((r, idx) => (
+                                                                <div key={r.id || idx} className="rounded-xl p-3 border text-sm bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800">
+                                                                    <div className="flex items-center justify-between gap-2 mb-1">
+                                                                        <span className="text-[12px] font-bold text-gray-800 dark:text-gray-200">{r.mediaPlanTitre || 'Ligne'}</span>
+                                                                        <span className="text-[11px] text-gray-500 whitespace-nowrap">{fmtDt(r.dateReactif)} · fois {r.nombreFois}</span>
+                                                                    </div>
+                                                                    <p className="italic text-gray-700 dark:text-gray-300">"{r.contenu}"</p>
+                                                                    <p className="text-[11px] text-gray-500 mt-1">Par {r.managerPrenom || '—'} {r.managerNom || ''} · employé {r.employePrenom || ''} {r.employeNom || ''}</p>
                                                                 </div>
-                                                                <p className="italic text-gray-700 dark:text-gray-300">"{latest.contenu}"</p>
-                                                                <p className="text-[11px] text-gray-500 mt-1">— {latest.managerPrenom} {latest.managerNom}</p>
-                                                            </div>
+                                                            ))}
                                                         </div>
                                                     )}
                                                 </div>

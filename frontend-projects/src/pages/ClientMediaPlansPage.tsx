@@ -11,7 +11,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { mediaPlanService } from '../api/mediaPlanService';
 import { clientService } from '../api/clientService';
-import { reactifService } from '../api/reactifService';
 import Modal from '../components/ui/Modal';
 import {
     MediaPlan,
@@ -317,10 +316,7 @@ const ClientMediaPlansPage: React.FC = () => {
         }
         setActionLoading(mp.id);
         try {
-            await mediaPlanService.clientDisapprove(mp.id);
-            await reactifService.createForMediaPlanExtern(mp.id, clientId, rectifs);
-            await mediaPlanService.updateRectifs(mp.id, rectifs);
-
+            await mediaPlanService.clientDisapprove(mp.id, rectifs);
             await loadPlans();
         } catch (e: any) {
             alert(e.response?.data?.message || 'Erreur lors du refus');
@@ -361,9 +357,7 @@ const ClientMediaPlansPage: React.FC = () => {
         try {
             for (const mp of pending) {
                 const rectifs = mp.rectifs?.trim() || '';
-                await mediaPlanService.clientDisapprove(mp.id);
-                await reactifService.createForMediaPlanExtern(mp.id, clientId, rectifs);
-                await mediaPlanService.updateRectifs(mp.id, rectifs);
+                await mediaPlanService.clientDisapprove(mp.id, rectifs);
             }
             await loadPlans();
         } catch (e: any) {

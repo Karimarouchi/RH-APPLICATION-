@@ -90,6 +90,11 @@ public class MediaPlanController {
         return ResponseEntity.ok(ApiResponse.ok("Ligne refusée", mediaPlanService.refuse(id, body.get("rectifs"))));
     }
 
+    @PatchMapping("/{id}/renvoyer-employe")
+    public ResponseEntity<ApiResponse<MediaPlanDTO>> renvoyerEmploye(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok("Ligne renvoyée à l'employé", mediaPlanService.renvoyerEmploye(id)));
+    }
+
     @GetMapping("/shootings/a-dater")
     public ResponseEntity<ApiResponse<List<MediaPlanDTO>>> shootingsADater() {
         return ResponseEntity.ok(ApiResponse.ok(mediaPlanService.shootingsEnAttenteDate()));
@@ -133,8 +138,10 @@ public class MediaPlanController {
     }
 
     @PatchMapping("/{id}/client-disapprove")
-    public ResponseEntity<ApiResponse<MediaPlanDTO>> clientDisapprove(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.ok("Désapprouvé par le client", mediaPlanService.clientDisapprove(id)));
+    public ResponseEntity<ApiResponse<MediaPlanDTO>> clientDisapprove(@PathVariable Long id,
+            @RequestBody(required = false) java.util.Map<String, String> body) {
+        String rectifs = body != null ? body.get("rectifs") : null;
+        return ResponseEntity.ok(ApiResponse.ok("Désapprouvé par le client", mediaPlanService.clientDisapprove(id, rectifs)));
     }
 
     @PatchMapping("/{id}/rectifs")

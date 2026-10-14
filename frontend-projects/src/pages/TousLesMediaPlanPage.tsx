@@ -15,7 +15,6 @@ import { mediaPlanService } from '../api/mediaPlanService';
 import { referentielService } from '../api/referentielService';
 import { clientService, ClientDTO } from '../api/clientService';
 import { mediaPlanAssignmentService } from '../api/mediaPlanAssignmentService';
-import { reactifService } from '../api/reactifService';
 import {
     MediaPlan,
     MediaPlanAssignment,
@@ -309,16 +308,17 @@ const TousLesMediaPlanPage: React.FC = () => {
     }, [mediaPlans, filterStatut, search, selectedMonthLabel]);
 
     const handleApproveBatch = async (batch: PlanBatch) => {
-        confirm(`Approuver les ${batch.plans.length} ligne(s) de ce plan ?`, async () => {
+        const pending = batch.plans.filter(mp => mp.statut === 'EN_ATTENTE' || mp.retourManager);
+        if (pending.length === 0) return alert('Aucune ligne en attente à valider');
+        confirm(`Valider les ${pending.length} ligne(s) en attente de ce média plan ?`, async () => {
             try {
-                for (const mp of batch.plans) {
-                    if (mp.statut !== 'APPROUVE') {
-                        await mediaPlanService.approve(mp.id, user?.employeId || 0);
-                    }
+                const champs = CLIENT_FIELDS.map(([key]) => key);
+                for (const mp of pending) {
+                    await mediaPlanService.accept(mp.id, champs);
                 }
                 if (selectedClientId) loadMediaPlans(selectedClientId);
             } catch (e: any) {
-                alert(e.response?.data?.message || 'Erreur lors de l\'approbation');
+                alert(e.response?.data?.message || 'Erreur lors de la validation');
             }
         });
     };
@@ -337,17 +337,22 @@ const TousLesMediaPlanPage: React.FC = () => {
     const [acceptFields, setAcceptFields] = useState<string[]>(CLIENT_FIELDS.map(([key]) => key));
     const [refuseLine, setRefuseLine] = useState<MediaPlan | null>(null);
     const [refuseText, setRefuseText] = useState('');
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [bulkAccept, setBulkAccept] = useState(false);
+    const [bulkRefuse, setBulkRefuse] = useState(false);
+    const [fixLine, setFixLine] = useState<MediaPlan | null>(null);
+    const [fixTitre, setFixTitre] = useState('');
+    const [fixTexte, setFixTexte] = useState('');
 
     const handleConfirmDisapprove = async () => {
-        if (!disapproveBatchData || !user?.employeId) return;
+        if (!disapproveBatchData) return;
         if (!reactifContenu.trim()) { setReactifError('Les rectifs sont obligatoires'); return; }
 
         setReactifLoading(true);
         try {
             for (const mp of disapproveBatchData.plans) {
-                if (mp.statut !== 'DESAPPROUVE') {
-                    await mediaPlanService.disapprove(mp.id);
-                    await reactifService.createForMediaPlanIntern(mp.id, user.employeId, reactifContenu.trim());
+                if (mp.statut === 'EN_ATTENTE') {
+                    await mediaPlanService.refuse(mp.id, reactifContenu.trim());
                 }
             }
             if (selectedClientId) loadMediaPlans(selectedClientId);
@@ -454,28 +459,67 @@ const TousLesMediaPlanPage: React.FC = () => {
     );
 
     const openAccept = (mp: MediaPlan) => {
+        setBulkAccept(false);
         setAcceptLine(mp);
         setAcceptFields(CLIENT_FIELDS.map(([key]) => key));
     };
     const openRefuse = (mp: MediaPlan) => {
+        setBulkRefuse(false);
         setRefuseLine(mp);
         setRefuseText('');
     };
+    const selectedPlans = () => (batches.find(b => b.key === selectedBatchKey)?.plans || []).filter(p => selectedIds.includes(p.id));
     const submitAccept = async () => {
-        if (!acceptLine || acceptFields.length === 0) return;
+        const targets = bulkAccept
+            ? selectedPlans().filter(p => p.statut === 'EN_ATTENTE' || p.retourManager)
+            : (acceptLine ? [acceptLine] : []);
+        if (targets.length === 0 || acceptFields.length === 0) return;
         try {
-            await mediaPlanService.accept(acceptLine.id, acceptFields);
+            for (const mp of targets) {
+                await mediaPlanService.accept(mp.id, acceptFields);
+            }
             setAcceptLine(null);
+            setBulkAccept(false);
+            setSelectedIds([]);
             if (selectedClientId) loadMediaPlans(selectedClientId);
         } catch (e: any) {
             alert(e.response?.data?.message || 'Erreur');
         }
     };
     const submitRefuse = async () => {
-        if (!refuseLine || !refuseText.trim()) return;
+        const targets = bulkRefuse
+            ? selectedPlans().filter(p => p.statut === 'EN_ATTENTE')
+            : (refuseLine ? [refuseLine] : []);
+        if (targets.length === 0 || !refuseText.trim()) return;
         try {
-            await mediaPlanService.refuse(refuseLine.id, refuseText.trim());
+            for (const mp of targets) {
+                await mediaPlanService.refuse(mp.id, refuseText.trim());
+            }
             setRefuseLine(null);
+            setBulkRefuse(false);
+            setRefuseText('');
+            setSelectedIds([]);
+            if (selectedClientId) loadMediaPlans(selectedClientId);
+        } catch (e: any) {
+            alert(e.response?.data?.message || 'Erreur');
+        }
+    };
+    const saveRectifAndRefuse = async (mp: MediaPlan, value: string) => {
+        const text = value.trim();
+        if (!text || text === (mp.rectifs || '').trim()) return;
+        try {
+            await mediaPlanService.refuse(mp.id, text);
+            if (selectedClientId) loadMediaPlans(selectedClientId);
+        } catch (e: any) {
+            alert(e.response?.data?.message || 'Erreur');
+        }
+    };
+    const submitFix = async () => {
+        if (!fixLine || !fixTitre.trim()) return;
+        try {
+            await mediaPlanService.update(fixLine.id, { titre: fixTitre.trim(), texteSurVisuel: fixTexte });
+            await mediaPlanService.accept(fixLine.id, CLIENT_FIELDS.map(([key]) => key));
+            setFixLine(null);
             if (selectedClientId) loadMediaPlans(selectedClientId);
         } catch (e: any) {
             alert(e.response?.data?.message || 'Erreur');
@@ -520,7 +564,18 @@ const TousLesMediaPlanPage: React.FC = () => {
                     <Badge variant="neutral">{EtatPublicationLabels[mp.etatPublication as keyof typeof EtatPublicationLabels] || mp.etatPublication || '-'}</Badge>
                 </td>
                 <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[11] }}>
-                    <span className={`${inputClass} truncate block`}>{renderCellValue(mp.rectifs)}</span>
+                    {canValidateMediaPlans && mp.statut === 'EN_ATTENTE' ? (
+                        <textarea
+                            key={`rectifs-${mp.id}-${mp.rectifs || ''}`}
+                            defaultValue={mp.rectifs || ''}
+                            rows={2}
+                            placeholder="Écrire ici refuse la ligne"
+                            onBlur={e => saveRectifAndRefuse(mp, e.target.value)}
+                            className="w-full rounded border border-gray-200 bg-white px-1 py-1 text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                        />
+                    ) : (
+                        <span className={`${inputClass} truncate block`}>{renderCellValue(mp.rectifs)}</span>
+                    )}
                 </td >
                 <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[12] }}>
                     <span className={`${inputClass} truncate block`}>{renderCellValue(mp.remarques)}</span>
@@ -531,11 +586,24 @@ const TousLesMediaPlanPage: React.FC = () => {
                     </div>
                 </td>
                 <td className="px-2 py-1 overflow-hidden" style={{ width: colWidths[14] }}>
+                    {canValidateMediaPlans && mp.statut === 'EN_ATTENTE' && (
+                        <label className="mb-1 flex items-center gap-1 text-[11px] text-gray-500">
+                            <input type="checkbox" checked={selectedIds.includes(mp.id)} onChange={() => setSelectedIds(prev => prev.includes(mp.id) ? prev.filter(id => id !== mp.id) : [...prev, mp.id])} />
+                            Sélection
+                        </label>
+                    )}
                     {getStatusBadge(mp)}
+                    {mp.retourManager && <div className="mt-1 text-[10px] font-semibold text-amber-600">Retour client</div>}
                     {canValidateMediaPlans && mp.statut === 'EN_ATTENTE' && (
                         <div className="mt-1 flex flex-col gap-1">
                             <button type="button" onClick={() => openAccept(mp)} className="text-[11px] px-2 py-1 rounded bg-green-600 text-white">Accepter</button>
                             <button type="button" onClick={() => openRefuse(mp)} className="text-[11px] px-2 py-1 rounded bg-red-600 text-white">Refuser</button>
+                        </div>
+                    )}
+                    {canValidateMediaPlans && mp.retourManager && (
+                        <div className="mt-1 flex flex-col gap-1">
+                            <button type="button" onClick={() => { setFixLine(mp); setFixTitre(mp.titre || ''); setFixTexte(mp.texteSurVisuel || ''); }} className="text-[11px] px-2 py-1 rounded bg-green-600 text-white">Corriger moi-même</button>
+                            <button type="button" onClick={async () => { try { await mediaPlanService.renvoyerEmploye(mp.id); if (selectedClientId) loadMediaPlans(selectedClientId); } catch (e: any) { alert(e.response?.data?.message || 'Erreur'); } }} className="text-[11px] px-2 py-1 rounded bg-amber-600 text-white">Renvoyer à l'employé</button>
                         </div>
                     )}
                 </td>
@@ -721,7 +789,7 @@ const TousLesMediaPlanPage: React.FC = () => {
                             {batches.map(batch => {
                                 const batchStatus = getStatusInfo(batch.plans);
                                 return (
-                                    <div key={batch.key} onClick={() => { setSelectedBatchKey(batch.key); setViewState('BATCH_DETAILS'); }}
+                                    <div key={batch.key} onClick={() => { setSelectedBatchKey(batch.key); setSelectedIds([]); setViewState('BATCH_DETAILS'); }}
                                         className="group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-[20px] border border-gray-200 bg-white p-5 shadow-sm transition-all hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:shadow-xl dark:hover:border-brand-500/50">
                                         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                                             <h3 className="line-clamp-2 flex-1 text-base font-semibold leading-snug text-gray-900 dark:text-gray-100">
@@ -776,16 +844,28 @@ const TousLesMediaPlanPage: React.FC = () => {
 
                                 return (
                                     <>
+                                        {canValidateMediaPlans && selectedIds.length > 0 && (
+                                            <>
+                                                <button onClick={() => { setBulkAccept(true); setAcceptFields(CLIENT_FIELDS.map(([key]) => key)); }}
+                                                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors">
+                                                    <HiOutlineCheck size={16} /> Valider la sélection ({selectedIds.length})
+                                                </button>
+                                                <button onClick={() => { setBulkRefuse(true); setRefuseText(''); }}
+                                                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors">
+                                                    <HiOutlineX size={16} /> Refuser la sélection ({selectedIds.length})
+                                                </button>
+                                            </>
+                                        )}
                                         {canValidateMediaPlans && !allApproved && (
                                             <button onClick={() => handleApproveBatch(activeBatch)}
                                                 className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors">
-                                                <HiOutlineCheck size={16} className="text-green-500" /> Approuver
+                                                <HiOutlineCheck size={16} className="text-green-500" /> Valider le média plan
                                             </button>
                                         )}
                                         {canValidateMediaPlans && !allDisapproved && (
                                             <button onClick={() => handleDisapproveBatch(activeBatch)}
                                                 className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg border border-red-200 bg-red-50 text-red-600 text-sm font-medium dark:bg-red-900/10 dark:border-red-900/50 dark:text-red-400 hover:bg-red-100 transition-colors">
-                                                <HiOutlineX size={16} /> Désapprouver
+                                                <HiOutlineX size={16} /> Refuser le média plan
                                             </button>
                                         )}
                                         {!allApproved && !activeBatch.plans.every(p => p.statut === 'EN_ATTENTE_CLIENT') && (
@@ -811,7 +891,7 @@ const TousLesMediaPlanPage: React.FC = () => {
                 </div>
             )}
 
-            <Modal isOpen={!!acceptLine} onClose={() => setAcceptLine(null)} title="Champs visibles par le client" size="md">
+            <Modal isOpen={!!acceptLine || bulkAccept} onClose={() => { setAcceptLine(null); setBulkAccept(false); }} title={bulkAccept ? `Valider ${selectedIds.length} ligne(s)` : 'Champs visibles par le client'} size="md">
                 <div className="space-y-2">
                     {CLIENT_FIELDS.map(([key, label]) => (
                         <label key={key} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
@@ -820,17 +900,17 @@ const TousLesMediaPlanPage: React.FC = () => {
                         </label>
                     ))}
                     <div className="flex justify-end gap-2 pt-3">
-                        <button type="button" onClick={() => setAcceptLine(null)} className="px-3 py-2 text-sm border rounded-lg">Annuler</button>
-                        <button type="button" onClick={submitAccept} disabled={acceptFields.length === 0} className="px-3 py-2 text-sm rounded-lg bg-green-600 text-white">Accepter la ligne</button>
+                        <button type="button" onClick={() => { setAcceptLine(null); setBulkAccept(false); }} className="px-3 py-2 text-sm border rounded-lg">Annuler</button>
+                        <button type="button" onClick={submitAccept} disabled={acceptFields.length === 0} className="px-3 py-2 text-sm rounded-lg bg-green-600 text-white">{bulkAccept ? 'Valider la sélection' : 'Accepter la ligne'}</button>
                     </div>
                 </div>
             </Modal>
-            <Modal isOpen={!!refuseLine} onClose={() => setRefuseLine(null)} title="Rectifs de la ligne" size="md">
+            <Modal isOpen={!!refuseLine || bulkRefuse} onClose={() => { setRefuseLine(null); setBulkRefuse(false); }} title={bulkRefuse ? `Refuser ${selectedIds.length} ligne(s)` : 'Rectifs de la ligne'} size="md">
                 <div className="space-y-3">
                     <textarea value={refuseText} onChange={e => setRefuseText(e.target.value)} rows={4} placeholder="Pourquoi cette ligne est refusée" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:bg-gray-900 dark:border-gray-600" />
                     <div className="flex justify-end gap-2">
-                        <button type="button" onClick={() => setRefuseLine(null)} className="px-3 py-2 text-sm border rounded-lg">Annuler</button>
-                        <button type="button" onClick={submitRefuse} disabled={!refuseText.trim()} className="px-3 py-2 text-sm rounded-lg bg-red-600 text-white">Refuser la ligne</button>
+                        <button type="button" onClick={() => { setRefuseLine(null); setBulkRefuse(false); }} className="px-3 py-2 text-sm border rounded-lg">Annuler</button>
+                        <button type="button" onClick={submitRefuse} disabled={!refuseText.trim()} className="px-3 py-2 text-sm rounded-lg bg-red-600 text-white">{bulkRefuse ? 'Refuser la sélection' : 'Refuser la ligne'}</button>
                     </div>
                 </div>
             </Modal>
@@ -880,6 +960,17 @@ const TousLesMediaPlanPage: React.FC = () => {
                     </button>
                 </div>
             </Modal >
+
+            <Modal isOpen={!!fixLine} onClose={() => setFixLine(null)} title="Corriger la ligne puis la renvoyer au client" size="md">
+                <div className="space-y-3">
+                    <input value={fixTitre} onChange={e => setFixTitre(e.target.value)} placeholder="Titre" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:bg-gray-900 dark:border-gray-600" />
+                    <textarea value={fixTexte} onChange={e => setFixTexte(e.target.value)} rows={4} placeholder="Texte / visuel" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:bg-gray-900 dark:border-gray-600" />
+                    <div className="flex justify-end gap-2">
+                        <button type="button" onClick={() => setFixLine(null)} className="px-3 py-2 text-sm border rounded-lg">Annuler</button>
+                        <button type="button" onClick={submitFix} disabled={!fixTitre.trim()} className="px-3 py-2 text-sm rounded-lg bg-green-600 text-white">Corriger et renvoyer au client</button>
+                    </div>
+                </div>
+            </Modal>
 
             <ConfirmDialog {...confirmState} onConfirm={handleConfirm} onCancel={handleCancel} />
 

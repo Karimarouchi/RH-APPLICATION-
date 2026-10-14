@@ -88,6 +88,11 @@ public class MediaPlan {
     @Column(columnDefinition = "TEXT")
     private String champsVisiblesClient;
 
+    /** Rectif client : la ligne est chez le manager, l'employé ne peut pas encore la modifier. */
+    @Builder.Default
+    @Column(columnDefinition = "boolean default false")
+    private Boolean retourManager = false;
+
     @Enumerated(EnumType.STRING)
     private TypeContenuShooting shootingTypeDeContenu;
 

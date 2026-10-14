@@ -32,6 +32,7 @@ public class MediaPlanDTO {
     private String shootingAuPlusTard;
     private Boolean clientDoitValiderDate;
     private String champsVisiblesClient;
+    private Boolean retourManager;
     private String shootingTypeDeContenu;
     private String shootingStatus;
     private String shootingStatusReason;

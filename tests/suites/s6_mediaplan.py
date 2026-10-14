@@ -43,8 +43,9 @@ def run(w):
     w.media_plans.append(m2)
     w.req('admin', 'PATCH', f'/api/media-plans/{m2}/approve')
     w.req('alice', 'PATCH', f'/api/media-plans/{m2}/request-client-validation')
-    c, j = call('PATCH', f'/api/media-plans/{m2}/client-disapprove', tok_a)
-    r.check(c == 200 and data_of(j)['statut'] == 'DESAPPROUVE', 'le client A desapprouve')
+    c, j = call('PATCH', f'/api/media-plans/{m2}/client-disapprove', tok_a, {'rectifs': 'changer la couleur'})
+    r.check(c == 200 and data_of(j)['statut'] == 'DESAPPROUVE' and data_of(j).get('retourManager') is True,
+            'le client A desapprouve et la ligne revient au manager')
     r.expect('le client A ajoute des rectifs', call('PATCH', f'/api/media-plans/{m2}/rectifs', tok_a, {'rectifs': 'changer la couleur'})[0], 200)
     r.expect('le client A cree un rectif externe',
              call('POST', f'/api/reactifs/mediaplan-extern/{m2}?clientId={cid_b}', tok_a, {'contenu': 'changer la couleur'})[0], 200)
@@ -52,6 +53,10 @@ def run(w):
     rect = data_of(j) if c == 200 else []
     r.check(rect and all(x.get('clientId') in (cid_a, None) for x in rect),
             "le rectif est rattache au client connecte (le clientId fourni dans l'URL est ignore)")
+    r.expect('l employe ne resoumet pas tant que le manager garde la ligne',
+             w.req('alice', 'PATCH', f'/api/media-plans/{m2}/resubmit')[0], 400)
+    r.expect('le manager renvoie la ligne a l employe',
+             w.req('admin', 'PATCH', f'/api/media-plans/{m2}/renvoyer-employe')[0], 200)
     r.expect('resoumission', w.req('alice', 'PATCH', f'/api/media-plans/{m2}/resubmit')[0], 200)
 
     r.section('Tournage et manager du departement Production')
@@ -136,6 +141,60 @@ def run(w):
     r.check(data_of(j).get('statut') == 'DESAPPROUVE' and data_of(j).get('rectifs') == 'changer le titre',
             'les rectifs restent sur cette ligne')
     r.check(notif_count('alice') > avant_refus, 'le createur est prevenu du refus')
+    r.expect('l employe ne modifie plus une ligne deja validee',
+             w.req('alice', 'PUT', f'/api/media-plans/{ok_id}', {'titre': 'modifie apres validation'})[0], 400)
+    r.expect('l employe corrige une ligne refusee par le manager',
+             w.req('alice', 'PUT', f'/api/media-plans/{no_id}', {'titre': 'titre corrige'})[0], 200)
+    c, j = w.req('admin', 'GET', '/api/reactifs/intern/mediaplans')
+    internes = [x for x in (data_of(j) or []) if x.get('mediaPlanId') == no_id] if c == 200 else []
+    r.check(len(internes) == 1 and internes[0].get('contenu') == 'changer le titre'
+            and internes[0].get('dateReactif') and internes[0].get('managerPrenom'),
+            'le refus du manager est compte : date, auteur, motif')
+
+    r.section('Selection : 3 validees et 4 refusees, puis rectif client')
+    ids = []
+    for i in range(7):
+        c, j = w.req('alice', 'POST', '/api/media-plans', {**mp, 'titre': f'Ligne lot {i}'})
+        r.expect(f'creation ligne lot {i}', c, 200, msg_of(j))
+        if c != 200:
+            return
+        ids.append(data_of(j)['id'])
+        w.media_plans.append(ids[-1])
+    for lid in ids[:3]:
+        c, j = w.req('admin', 'PATCH', f'/api/media-plans/{lid}/accept', {'champs': ['titre']})
+        r.expect(f'validation de la ligne {lid}', c, 200, msg_of(j))
+    motifs = ['photo floue', 'mauvais format', 'texte trop long', 'date incorrecte']
+    for lid, motif in zip(ids[3:], motifs):
+        c, j = w.req('admin', 'PATCH', f'/api/media-plans/{lid}/refuse', {'rectifs': motif})
+        r.expect(f'refus de la ligne {lid}', c, 200, msg_of(j))
+        r.check(data_of(j).get('statut') == 'DESAPPROUVE', 'ecrire un rectif refuse la ligne')
+    c, j = w.req('admin', 'GET', '/api/reactifs/intern/mediaplans')
+    lot = [x for x in (data_of(j) or []) if x.get('mediaPlanId') in ids[3:]] if c == 200 else []
+    r.check(len(lot) == 4 and {x.get('contenu') for x in lot} == set(motifs)
+            and all(x.get('dateReactif') and x.get('managerNom') and x.get('employeNom') for x in lot),
+            'les 4 rectifs internes sont comptes avec date, qui et pourquoi')
+    c, j = call('PATCH', f'/api/media-plans/{ids[0]}/client-disapprove', tok_a, {'rectifs': 'le client veut un autre visuel'})
+    r.check(c == 200 and data_of(j).get('retourManager') is True, 'le rectif client revient au manager')
+    r.expect('l employe ne touche pas la ligne revenue du client',
+             w.req('alice', 'PUT', f'/api/media-plans/{ids[0]}', {'titre': 'je corrige trop tot'})[0], 400)
+    c, j = w.req('admin', 'GET', '/api/reactifs/extern')
+    externes = [x for x in (data_of(j) or []) if x.get('mediaPlanId') == ids[0]] if c == 200 else []
+    r.check(len(externes) >= 1 and externes[0].get('contenu') == 'le client veut un autre visuel'
+            and externes[0].get('dateReactif') and externes[0].get('clientNom'),
+            'le rectif externe du client est compte avec date, client et motif')
+    c, j = call('PATCH', f'/api/media-plans/{ids[1]}/client-disapprove', tok_a, {'rectifs': 'changer le titre client'})
+    r.expect('second rectif client', c, 200, msg_of(j))
+    c, j = w.req('admin', 'PUT', f'/api/media-plans/{ids[1]}', {'titre': 'titre corrige par le manager'})
+    r.expect('le manager corrige lui-meme la ligne', c, 200, msg_of(j))
+    c, j = w.req('admin', 'PATCH', f'/api/media-plans/{ids[1]}/accept', {'champs': ['titre']})
+    r.expect('le manager renvoie sa correction au client', c, 200, msg_of(j))
+    r.check(data_of(j).get('statut') == 'EN_ATTENTE_CLIENT', 'la ligne corrigee repart chez le client')
+    r.expect('l employe ne modifie pas cette ligne renvoyee au client',
+             w.req('alice', 'PUT', f'/api/media-plans/{ids[1]}', {'titre': 'encore'})[0], 400)
+    r.expect('le manager renvoie l autre ligne a l employe',
+             w.req('admin', 'PATCH', f'/api/media-plans/{ids[0]}/renvoyer-employe')[0], 200)
+    r.expect('l employe corrige alors la ligne',
+             w.req('alice', 'PUT', f'/api/media-plans/{ids[0]}', {'titre': 'corrige par l employe'})[0], 200)
 
     r.section('Assignation reservee a la validation')
     body = {'clientId': cid_a, 'employeIds': [E('bob')]}

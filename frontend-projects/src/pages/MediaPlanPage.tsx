@@ -786,7 +786,7 @@ const MediaPlanPage: React.FC = () => {
     const handleBulkConfirm = async () => {
         if (!selectedClientId) return alert('Sélectionnez un client');
         const filledDrafts = draftRows.filter(isDraftFilled);
-        const resubmittableExisting = monthMediaPlans.filter(mp => mp.statut === 'DESAPPROUVE');
+        const resubmittableExisting = monthMediaPlans.filter(mp => mp.statut === 'DESAPPROUVE' && !mp.retourManager);
 
         if (filledDrafts.length === 0 && resubmittableExisting.length === 0) {
             return alert('Aucune ligne à envoyer');
@@ -874,7 +874,7 @@ const MediaPlanPage: React.FC = () => {
     };
 
     const handleBatchResubmit = (plans: MediaPlan[]) => {
-        const disapprovedLines = plans.filter(p => p.statut === 'DESAPPROUVE');
+        const disapprovedLines = plans.filter(p => p.statut === 'DESAPPROUVE' && !p.retourManager);
         if (disapprovedLines.length === 0) return;
 
         const invalidShootingExisting = disapprovedLines.find(mp => mp.isShooting && !mp.shootingAuPlusTard);
@@ -932,7 +932,7 @@ const MediaPlanPage: React.FC = () => {
         return <Badge variant={(variants[statut] || 'neutral') as any}>{labels[statut] || statut}</Badge>;
     };
 
-    const isReadOnly = (mp: MediaPlan) => mp.statut === 'EN_ATTENTE' || mp.statut === 'APPROUVE';
+    const isReadOnly = (mp: MediaPlan) => mp.statut !== 'DESAPPROUVE' || !!mp.retourManager;
 
     const inputClass = (ro?: boolean) =>
         `w-full bg-transparent border-0 text-sm text-gray-700 dark:text-gray-300 px-1 py-2.5 focus:outline-none focus:ring-1 focus:ring-brand-500 rounded ${ro ? 'cursor-default opacity-70' : 'hover:bg-gray-50 dark:hover:bg-gray-800 cursor-text'}`;
@@ -1092,7 +1092,10 @@ const MediaPlanPage: React.FC = () => {
                             />
                         </div>
                     </td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[14] }}>{getStatusBadge(mp.statut)}</td>
+                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[14] }}>
+                        {getStatusBadge(mp.statut)}
+                        {mp.retourManager && <div className="mt-1 text-[10px] font-semibold text-amber-600">Chez le manager</div>}
+                    </td>
                     <td className="px-2 py-1 h-[1px] overflow-hidden" style={{ width: colWidths[15] }}>
                         {!ro && (
                             <div className="flex gap-1">

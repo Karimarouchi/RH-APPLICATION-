@@ -186,7 +186,8 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.PATCH, "/api/media-plans/*/approve",
                                                                 "/api/media-plans/*/disapprove",
                                                                 "/api/media-plans/*/accept",
-                                                                "/api/media-plans/*/refuse")
+                                                                "/api/media-plans/*/refuse",
+                                                                "/api/media-plans/*/renvoyer-employe")
                                                 .hasAnyAuthority(ADMIN, "VALIDATE_MEDIA_PLAN")
                                                 // la date de shooting est posée par le manager Production, confirmée par l'employé
                                                 .requestMatchers(HttpMethod.GET, "/api/media-plans/shootings/a-dater")
