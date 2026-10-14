@@ -26,6 +26,7 @@ public class CompteService {
     private final CompteRepository compteRepository;
     private final EmployeRepository employeRepository;
     private final RoleRepository roleRepository;
+    private final PermissionRepository permissionRepository;
     private final AccessLogRepository accessLogRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
@@ -66,10 +67,7 @@ public class CompteService {
                 .map(Role::getNom)
                 .collect(Collectors.toSet());
 
-        Set<String> permissions = compte.getRoles().stream()
-                .flatMap(role -> role.getPermissions().stream())
-                .map(Permission::getPermission)
-                .collect(Collectors.toSet());
+        Set<String> permissions = effectivePermissions(compte);
 
         AuthPrincipal principal = AuthPrincipal.builder()
                 .principalType("EMPLOYEE")
@@ -164,6 +162,7 @@ public class CompteService {
                 .employe(employe)
                 .roles(roles)
                 .build();
+        applyPermissionOverrides(compte, request.getPermissionIdsAjoutees(), request.getPermissionIdsRetirees());
 
         Compte saved = compteRepository.save(compte);
 
@@ -193,8 +192,45 @@ public class CompteService {
             compte.getRoles().clear();
             compte.getRoles().addAll(rolesList);
         }
+        if (request.getPermissionIdsAjoutees() != null || request.getPermissionIdsRetirees() != null) {
+            applyPermissionOverrides(compte,
+                    request.getPermissionIdsAjoutees() != null ? request.getPermissionIdsAjoutees() : List.of(),
+                    request.getPermissionIdsRetirees() != null ? request.getPermissionIdsRetirees() : List.of());
+        }
 
         return toDTO(compteRepository.save(compte));
+    }
+
+    public CompteDTO getByEmploye(Long employeId) {
+        Compte compte = compteRepository.findByEmployeId(employeId)
+                .orElseThrow(() -> new RuntimeException("Compte non trouvé"));
+        return toDTO(compte);
+    }
+
+    /** Permissions du rôle, plus les ajouts de ce compte, moins les retraits de ce compte. */
+    static Set<String> effectivePermissions(Compte compte) {
+        Set<String> permissions = compte.getRoles().stream()
+                .flatMap(role -> role.getPermissions().stream())
+                .map(Permission::getPermission)
+                .collect(Collectors.toCollection(HashSet::new));
+        if (compte.getPermissionsAjoutees() != null) {
+            compte.getPermissionsAjoutees().forEach(p -> permissions.add(p.getPermission()));
+        }
+        if (compte.getPermissionsRetirees() != null) {
+            compte.getPermissionsRetirees().forEach(p -> permissions.remove(p.getPermission()));
+        }
+        return permissions;
+    }
+
+    private void applyPermissionOverrides(Compte compte, List<Long> ajoutees, List<Long> retirees) {
+        compte.getPermissionsAjoutees().clear();
+        compte.getPermissionsRetirees().clear();
+        if (ajoutees != null) {
+            compte.getPermissionsAjoutees().addAll(permissionRepository.findAllById(ajoutees));
+        }
+        if (retirees != null) {
+            compte.getPermissionsRetirees().addAll(permissionRepository.findAllById(retirees));
+        }
     }
 public CompteDTO toggleEnabled(Long id) {
         Compte compte = compteRepository.findById(id)
@@ -373,6 +409,11 @@ public CompteDTO toggleEnabled(Long id) {
                 .roles(compte.getRoles().stream()
                         .map(roleService::toDTO)
                         .collect(Collectors.toSet()))
+                .permissionsAjouteesIds(compte.getPermissionsAjoutees().stream()
+                        .map(Permission::getId).collect(Collectors.toSet()))
+                .permissionsRetireesIds(compte.getPermissionsRetirees().stream()
+                        .map(Permission::getId).collect(Collectors.toSet()))
+                .permissionsEffectives(effectivePermissions(compte))
                 .build();
     }
 

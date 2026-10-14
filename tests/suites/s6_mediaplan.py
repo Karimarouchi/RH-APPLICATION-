@@ -1,4 +1,4 @@
-"""Media plans : creation, validation interne, validation client, rectifs, tournage (Head Prod), suppression."""
+"""Media plans : creation, validation interne, validation client, rectifs, tournage (manager Production), suppression."""
 from lib import call, data_of, msg_of, workday
 from suites.s5_portail_client import make_client
 
@@ -54,28 +54,100 @@ def run(w):
             "le rectif est rattache au client connecte (le clientId fourni dans l'URL est ignore)")
     r.expect('resoumission', w.req('alice', 'PATCH', f'/api/media-plans/{m2}/resubmit')[0], 200)
 
-    r.section('Tournage et Head Prod')
+    r.section('Tournage et manager du departement Production')
+    c, j = w.req('admin', 'GET', f"/api/employes/{E('dave')}")
+    dave = data_of(j)
+    dave['departement'] = 'Production'
+    dave['managerDepartement'] = True
+    c, j = w.req('admin', 'PUT', f"/api/employes/{E('dave')}", dave)
+    r.expect('dave est designe manager du departement Production', c, 200, msg_of(j))
+    r.check(data_of(j).get('managerDepartement') is True, 'la case manager du departement est enregistree')
+
+    def notif_count(who):
+        return len(data_of(w.req('admin', 'GET', f"/api/notifications/employe/{E(who)}")[1]) or [])
+
     shoot = {**mp, 'titre': 'Shooting', 'isShooting': True, 'shootingDescription': 'Tournage produit',
-             'shootingLocalisation': 'Studio', 'shootingDate': workday(25), 'shootingTypeDeContenu': 'PHOTO'}
+             'shootingLocalisation': 'Studio', 'shootingAuPlusTard': workday(25),
+             'clientDoitValiderDate': False, 'shootingTypeDeContenu': 'PHOTO'}
     c, j = w.req('alice', 'POST', '/api/media-plans', shoot)
     r.expect('creation d\'un plan avec tournage', c, 200, msg_of(j))
     sid = data_of(j)['id']
     w.media_plans.append(sid)
-    # le serveur previent UN Head Prod (le premier trouve) : on compte chez tous ceux qui ont ce role
-    c, j = w.req('admin', 'GET', '/api/employes/by-role/Head%20Prod')
-    head_ids = [x['id'] for x in data_of(j)] if c == 200 else [E('dave')]
-
-    def notifs():
-        return sum(len(data_of(w.req('admin', 'GET', f'/api/notifications/employe/{i}')[1]) or []) for i in head_ids)
-
-    avant = notifs()
+    avant = notif_count('dave')
     c, j = w.req('admin', 'PATCH', f'/api/media-plans/{sid}/approve')
     r.expect("approbation d'un plan avec tournage", c, 200, msg_of(j))
-    r.check(notifs() > avant, 'un Head Prod recoit une notification de validation du tournage')
-    c, j = w.req('dave', 'GET', f"/api/notifications/employe/{E('dave')}")
-    r.expect('dave lit ses notifications', c, 200)
+    if c != 200:
+        return
+    r.check(data_of(j).get('shootingStatus') == 'EN_ATTENTE_DATE', 'le shooting attend une date de la Production')
+    r.check(notif_count('dave') > avant, 'le manager Production recoit la demande de date')
+    r.expect('alice ne peut pas poser la date',
+             w.req('alice', 'PATCH', f'/api/media-plans/{sid}/shooting-date', {'date': workday(20)})[0], 400)
+    r.expect('une date apres la limite est refusee',
+             w.req('dave', 'PATCH', f'/api/media-plans/{sid}/shooting-date', {'date': workday(40)})[0], 400)
+    c, j = w.req('dave', 'PATCH', f'/api/media-plans/{sid}/shooting-date', {'date': workday(20)})
+    r.expect('le manager Production pose la date', c, 200, msg_of(j))
+    r.check(data_of(j).get('shootingStatus') == 'VALIDE', 'sans validation client, la date est valide tout de suite')
     c, j = w.req('dave', 'GET', f'/api/calendrier-projets/between?startDate={workday(1)}&endDate={workday(60)}')
-    r.check(c == 200 and isinstance(data_of(j), list), 'calendrier de tournage lisible (avec un creneau existant)')
+    r.check(c == 200 and isinstance(data_of(j), list), 'calendrier de tournage lisible')
+
+    shoot_client = {**shoot, 'titre': 'Shooting client', 'shootingAuPlusTard': workday(50), 'clientDoitValiderDate': True}
+    c, j = w.req('alice', 'POST', '/api/media-plans', shoot_client)
+    r.expect('creation d\'un tournage a faire valider par le client', c, 200, msg_of(j))
+    sid2 = data_of(j)['id']
+    w.media_plans.append(sid2)
+    c, j = w.req('admin', 'PATCH', f'/api/media-plans/{sid2}/approve')
+    r.expect('approbation du tournage a valider', c, 200, msg_of(j))
+    avant_alice = notif_count('alice')
+    c, j = w.req('dave', 'PATCH', f'/api/media-plans/{sid2}/shooting-date', {'date': workday(30)})
+    r.expect('la Production propose une date', c, 200, msg_of(j))
+    r.check(data_of(j).get('shootingStatus') == 'EN_ATTENTE_CLIENT_DATE', 'la date attend le client')
+    r.check(notif_count('alice') > avant_alice, 'l employe est prevenu pour verifier avec le client')
+    r.expect('un autre employe ne confirme pas la date',
+             w.req('bob', 'PATCH', f'/api/media-plans/{sid2}/shooting-date-confirm', {'accepte': False})[0], 400)
+    c, j = w.req('alice', 'PATCH', f'/api/media-plans/{sid2}/shooting-date-confirm', {'accepte': False})
+    r.expect('l employe refuse la date proposee', c, 200, msg_of(j))
+    r.check(data_of(j).get('shootingStatus') == 'EN_ATTENTE_DATE', 'le shooting retourne a la Production')
+    c, j = w.req('dave', 'PATCH', f'/api/media-plans/{sid2}/shooting-date', {'date': workday(31)})
+    r.expect('la Production propose une autre date', c, 200, msg_of(j))
+    c, j = w.req('alice', 'PATCH', f'/api/media-plans/{sid2}/shooting-date-confirm', {'accepte': True})
+    r.expect('l employe accepte la nouvelle date', c, 200, msg_of(j))
+    r.check(data_of(j).get('shootingStatus') == 'VALIDE', 'la date confirmee est valide')
+
+    r.section('Acceptation et refus ligne par ligne')
+    c, j = w.req('alice', 'POST', '/api/media-plans', {**mp, 'titre': 'Ligne a accepter'})
+    ok_id = data_of(j)['id']
+    w.media_plans.append(ok_id)
+    c, j = w.req('alice', 'POST', '/api/media-plans', {**mp, 'titre': 'Ligne a refuser'})
+    no_id = data_of(j)['id']
+    w.media_plans.append(no_id)
+    r.expect('voir tous ne permet pas d accepter une ligne',
+             w.req('alice', 'PATCH', f'/api/media-plans/{ok_id}/accept', {'champs': ['titre']})[0], 403)
+    r.expect('accepter sans champ visible est refuse',
+             w.req('admin', 'PATCH', f'/api/media-plans/{ok_id}/accept', {'champs': []})[0], 400)
+    c, j = w.req('admin', 'PATCH', f'/api/media-plans/{ok_id}/accept', {'champs': ['titre', 'platforme']})
+    r.expect('la ligne acceptee part chez le client', c, 200, msg_of(j))
+    r.check(data_of(j).get('statut') == 'EN_ATTENTE_CLIENT', 'statut en attente client')
+    r.check(data_of(j).get('champsVisiblesClient') == 'titre,platforme', 'seuls les champs choisis sont visibles')
+    r.expect('refuser sans rectifs est refuse',
+             w.req('admin', 'PATCH', f'/api/media-plans/{no_id}/refuse', {'rectifs': '   '})[0], 400)
+    avant_refus = notif_count('alice')
+    c, j = w.req('admin', 'PATCH', f'/api/media-plans/{no_id}/refuse', {'rectifs': 'changer le titre'})
+    r.expect('la ligne est refusee avec des rectifs', c, 200, msg_of(j))
+    r.check(data_of(j).get('statut') == 'DESAPPROUVE' and data_of(j).get('rectifs') == 'changer le titre',
+            'les rectifs restent sur cette ligne')
+    r.check(notif_count('alice') > avant_refus, 'le createur est prevenu du refus')
+
+    r.section('Assignation reservee a la validation')
+    body = {'clientId': cid_a, 'employeIds': [E('bob')]}
+    r.expect('voir tous ne permet pas d assigner un client',
+             w.req('alice', 'POST', '/api/media-plan-assignments', body)[0], 403)
+    c, j = w.req('admin', 'POST', '/api/media-plan-assignments', body)
+    r.expect('le validateur assigne le client', c, 200, msg_of(j))
+    aid = data_of(j)[0]['id']
+    r.expect('voir tous ne retire pas l assignation',
+             w.req('alice', 'DELETE', f'/api/media-plan-assignments/{aid}')[0], 403)
+    r.expect('le validateur retire l assignation',
+             w.req('admin', 'DELETE', f'/api/media-plan-assignments/{aid}')[0], 200)
 
     r.section('Suppression')
     r.expect('un employe ne supprime pas un media plan', w.req('bob', 'DELETE', f'/api/media-plans/{m2}')[0], 403)

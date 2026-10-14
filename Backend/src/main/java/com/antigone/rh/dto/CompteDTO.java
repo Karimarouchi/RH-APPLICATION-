@@ -25,5 +25,8 @@ public class CompteDTO {
     private String employeEmail;
     private String employePoste;
     private Set<RoleDTO> roles;
+    private Set<Long> permissionsAjouteesIds;
+    private Set<Long> permissionsRetireesIds;
+    private Set<String> permissionsEffectives;
     private String generatedPassword; // Only set on creation
 }

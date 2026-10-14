@@ -26,7 +26,9 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -46,6 +48,11 @@ public class MediaPlanService {
     private final MediaPlanShootingWorkflowService mediaPlanShootingWorkflowService;
     private final com.antigone.rh.repository.ReactifInternRepository reactifInternRepository;
     private final com.antigone.rh.repository.CalendrierProjetRepository calendrierProjetRepository;
+    private final NotificationService notificationService;
+
+    private static final List<String> CHAMPS_CLIENT = List.of(
+            "datePublication", "heure", "format", "type", "titre", "texteSurVisuel",
+            "inspiration", "autresElements", "platforme", "lienDrive", "etatPublication");
 
     // =============================================
     // QUERIES
@@ -116,13 +123,17 @@ public class MediaPlanService {
                 .shootingDescription(request.getShootingDescription())
                 .shootingLocalisation(request.getShootingLocalisation())
                 .shootingDate(parseLocalDateOrNull(request.getShootingDate()))
+                .shootingAuPlusTard(parseLocalDateOrNull(request.getShootingAuPlusTard()))
+                .clientDoitValiderDate(Boolean.TRUE.equals(request.getClientDoitValiderDate()))
                 .shootingTypeDeContenu(parseTypeContenuOrNull(request.getShootingTypeDeContenu()))
                 .statut(StatutMediaPlan.EN_ATTENTE)
                 .client(client)
                 .createur(createur)
                 .build();
 
-        return toDTO(mediaPlanRepository.save(mp));
+        MediaPlan saved = mediaPlanRepository.save(mp);
+        notifyValidators("Le média plan '" + saved.getTitre() + "' a été envoyé pour validation.");
+        return toDTO(saved);
     }
 
     public List<MediaPlanDTO> createBulk(List<MediaPlanRequest> requests) {
@@ -210,6 +221,8 @@ public class MediaPlanService {
                     .shootingDescription(req.getShootingDescription())
                     .shootingLocalisation(req.getShootingLocalisation())
                     .shootingDate(parseLocalDateOrNull(req.getShootingDate()))
+                    .shootingAuPlusTard(parseLocalDateOrNull(req.getShootingAuPlusTard()))
+                    .clientDoitValiderDate(Boolean.TRUE.equals(req.getClientDoitValiderDate()))
                     .shootingTypeDeContenu(parseTypeContenuOrNull(req.getShootingTypeDeContenu()))
                     .statut(StatutMediaPlan.EN_ATTENTE)
                     .client(client)
@@ -224,6 +237,9 @@ public class MediaPlanService {
             }
         }
 
+        if (!savedPlans.isEmpty()) {
+            notifyValidators(savedPlans.size() + " ligne(s) de média plan ont été envoyées pour validation.");
+        }
         return savedPlans.stream().map(this::toDTO).collect(Collectors.toList());
     }
 
@@ -266,6 +282,8 @@ public class MediaPlanService {
                 mp.setShootingDescription(null);
                 mp.setShootingLocalisation(null);
                 mp.setShootingDate(null);
+                mp.setShootingAuPlusTard(null);
+                mp.setClientDoitValiderDate(false);
                 mp.setShootingTypeDeContenu(null);
                 mp.setShootingStatus(null);
                 mp.setShootingStatusReason(null);
@@ -277,6 +295,10 @@ public class MediaPlanService {
             mp.setShootingLocalisation(request.getShootingLocalisation());
         if (request.getShootingDate() != null)
             mp.setShootingDate(parseLocalDateOrNull(request.getShootingDate()));
+        if (request.getShootingAuPlusTard() != null)
+            mp.setShootingAuPlusTard(parseLocalDateOrNull(request.getShootingAuPlusTard()));
+        if (request.getClientDoitValiderDate() != null)
+            mp.setClientDoitValiderDate(Boolean.TRUE.equals(request.getClientDoitValiderDate()));
         if (request.getShootingTypeDeContenu() != null)
             mp.setShootingTypeDeContenu(parseTypeContenuOrNull(request.getShootingTypeDeContenu()));
 
@@ -387,6 +409,131 @@ public class MediaPlanService {
     }
 
     /**
+     * Accepte une seule ligne : elle part chez le client avec les champs choisis.
+     * Un shooting part ensuite au manager du département Production pour la date exacte.
+     */
+    public MediaPlanDTO accept(Long id, List<String> champs, Long approverId) {
+        MediaPlan mp = mediaPlanRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("MediaPlan", id));
+        if (mp.getStatut() != StatutMediaPlan.EN_ATTENTE) {
+            throw new RuntimeException("Seule une ligne en attente peut être acceptée");
+        }
+        Set<String> chosen = new LinkedHashSet<>();
+        if (champs != null) {
+            for (String champ : champs) {
+                if (CHAMPS_CLIENT.contains(champ)) {
+                    chosen.add(champ);
+                }
+            }
+        }
+        if (chosen.isEmpty()) {
+            throw new RuntimeException("Choisissez au moins un champ visible par le client");
+        }
+        mp.setChampsVisiblesClient(String.join(",", chosen));
+        mp.setRectifs(null);
+        mp.setStatut(StatutMediaPlan.EN_ATTENTE_CLIENT);
+        mediaPlanRepository.save(mp);
+
+        if (mp.isShooting()) {
+            mediaPlanShootingWorkflowService.onMediaPlanApproved(mp);
+        } else if (mp.getFormat() != null && mp.getFormat().toLowerCase().contains("video")) {
+            createVideoProject(mp, approverId);
+        }
+        return toDTO(mp);
+    }
+
+    public MediaPlanDTO refuse(Long id, String rectifs) {
+        if (rectifs == null || rectifs.isBlank()) {
+            throw new RuntimeException("Les rectifs sont obligatoires pour refuser une ligne");
+        }
+        MediaPlan mp = mediaPlanRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("MediaPlan", id));
+        if (mp.getStatut() != StatutMediaPlan.EN_ATTENTE) {
+            throw new RuntimeException("Seule une ligne en attente peut être refusée");
+        }
+        mp.setRectifs(rectifs.trim());
+        mp.setStatut(StatutMediaPlan.DESAPPROUVE);
+        mediaPlanRepository.save(mp);
+        if (mp.getCreateur() != null) {
+            notificationService.create(mp.getCreateur(), "MEDIA_PLAN_REFUS",
+                    "La ligne '" + mp.getTitre() + "' a été refusée. Rectifs : " + rectifs.trim(), null);
+        }
+        return toDTO(mp);
+    }
+
+    public MediaPlanDTO placeShootingDate(Long id, String date, Long actorId) {
+        MediaPlan mp = mediaPlanRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("MediaPlan", id));
+        mediaPlanShootingWorkflowService.placeShootingDate(mp, parseLocalDateOrNull(date), actorId);
+        return toDTO(mp);
+    }
+
+    public MediaPlanDTO confirmShootingDate(Long id, boolean accepte, Long actorId) {
+        MediaPlan mp = mediaPlanRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("MediaPlan", id));
+        mediaPlanShootingWorkflowService.confirmShootingDate(mp, accepte, actorId);
+        return toDTO(mp);
+    }
+
+    public List<MediaPlanDTO> shootingsEnAttenteDate() {
+        return mediaPlanRepository.findByShootingStatus(com.antigone.rh.enums.StatutShooting.EN_ATTENTE_DATE).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    private void notifyValidators(String message) {
+        for (Employe validateur : employeRepository.findByPermission("VALIDATE_MEDIA_PLAN")) {
+            notificationService.create(validateur, "MEDIA_PLAN", message, null);
+        }
+    }
+
+    private void createVideoProject(MediaPlan mp, Long managerId) {
+        if (managerId == null) {
+            return;
+        }
+        if (projetRepository.findFirstByMediaPlanLigneId(mp.getId()).isPresent()) {
+            return;
+        }
+        String projetNom = "👉 Mediaplan: " + (mp.getTitre() != null ? mp.getTitre() : "Sans titre");
+        ProjetRequest projetReq = new ProjetRequest();
+        projetReq.setNom(projetNom);
+        projetReq.setDateDebut(LocalDate.now());
+        projetReq.setTypeProjet("INDETERMINE");
+        projetReq.setStatut("PLANIFIE");
+        projetReq.setIsMediaPlanProject(true);
+        projetReq.setMediaPlanLigneId(mp.getId());
+        if (mp.getClient() != null) {
+            projetReq.setClientId(mp.getClient().getId());
+        }
+        List<Long> chefIds = new ArrayList<>();
+        chefIds.add(managerId);
+        Long departmentManagerId = findManagerByFormat(mp.getFormat());
+        if (departmentManagerId != null && !chefIds.contains(departmentManagerId)) {
+            chefIds.add(departmentManagerId);
+        }
+        projetReq.setChefDeProjetIds(chefIds);
+        projetReq.setCreateurId(managerId);
+        com.antigone.rh.dto.ProjetDTO pDTO = projetService.create(projetReq);
+        com.antigone.rh.entity.Projet createdProjet = projetRepository.findById(pDTO.getId()).orElse(null);
+        if (createdProjet == null) {
+            return;
+        }
+        String[] taskNames = {
+                "Tournage - " + (mp.getTitre() != null ? mp.getTitre() : "Vidéo"),
+                "Montage - " + (mp.getTitre() != null ? mp.getTitre() : "Vidéo"),
+                "Validation & Publication - " + (mp.getTitre() != null ? mp.getTitre() : "Vidéo")
+        };
+        for (String tName : taskNames) {
+            com.antigone.rh.entity.Tache t = new com.antigone.rh.entity.Tache();
+            t.setTitre(tName);
+            t.setStatut(com.antigone.rh.enums.StatutTache.TODO);
+            t.setProjet(createdProjet);
+            t.setUrgente(false);
+            tacheRepository.save(t);
+        }
+    }
+
+    /**
      * Re-submit a previously disapproved media plan line to the manager.
      * Sets status back to EN_ATTENTE and updates the submission timestamp.
      */
@@ -400,6 +547,7 @@ public class MediaPlanService {
 
         mp.setStatut(StatutMediaPlan.EN_ATTENTE);
         mp.setDateCreation(LocalDateTime.now());
+        notifyValidators("La ligne '" + mp.getTitre() + "' a été renvoyée pour validation.");
 
         // Reset shooting validation state so the new submission starts clean.
         mp.setShootingStatus(null);
@@ -658,6 +806,9 @@ public class MediaPlanService {
                 .shootingDescription(mp.getShootingDescription())
                 .shootingLocalisation(mp.getShootingLocalisation())
                 .shootingDate(mp.getShootingDate() != null ? mp.getShootingDate().toString() : null)
+                .shootingAuPlusTard(mp.getShootingAuPlusTard() != null ? mp.getShootingAuPlusTard().toString() : null)
+                .clientDoitValiderDate(Boolean.TRUE.equals(mp.getClientDoitValiderDate()))
+                .champsVisiblesClient(mp.getChampsVisiblesClient())
                 .shootingTypeDeContenu(
                         mp.getShootingTypeDeContenu() != null ? mp.getShootingTypeDeContenu().name() : null)
                 .shootingStatus(mp.getShootingStatus() != null ? mp.getShootingStatus().name() : null)

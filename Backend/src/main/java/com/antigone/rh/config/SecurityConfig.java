@@ -83,6 +83,10 @@ public class SecurityConfig {
                                                 // NOTE: doit venir avant la règle plus générale /api/comptes/**
                                                 // ci-dessous,
                                                 // car Spring Security applique la première règle qui correspond.
+                                                .requestMatchers(HttpMethod.GET, "/api/comptes/employe/*")
+                                                .hasAnyAuthority("ROLE_ADMIN", "VIEW_COMPTES", "VIEW_EMPLOYES")
+                                                .requestMatchers(HttpMethod.PUT, "/api/comptes/*")
+                                                .hasAnyAuthority("ROLE_ADMIN", "VIEW_COMPTES", "VIEW_EMPLOYES")
                                                 .requestMatchers(HttpMethod.GET, "/api/comptes")
                                                 .hasAnyAuthority(
                                                                 "ROLE_ADMIN",
@@ -180,8 +184,16 @@ public class SecurityConfig {
                                                 .hasAnyAuthority(ADMIN, "ROLE_CLIENT", "VIEW_MEDIA_PLAN", "VIEW_TOUS_MEDIA_PLAN")
                                                 // --- Media plans : validation interne reservee au droit dedie ---
                                                 .requestMatchers(HttpMethod.PATCH, "/api/media-plans/*/approve",
-                                                                "/api/media-plans/*/disapprove")
+                                                                "/api/media-plans/*/disapprove",
+                                                                "/api/media-plans/*/accept",
+                                                                "/api/media-plans/*/refuse")
                                                 .hasAnyAuthority(ADMIN, "VALIDATE_MEDIA_PLAN")
+                                                // la date de shooting est posée par le manager Production, confirmée par l'employé
+                                                .requestMatchers(HttpMethod.GET, "/api/media-plans/shootings/a-dater")
+                                                .authenticated()
+                                                .requestMatchers(HttpMethod.PATCH, "/api/media-plans/*/shooting-date",
+                                                                "/api/media-plans/*/shooting-date-confirm")
+                                                .authenticated()
                                                 // --- Media plans : ecriture interne ---
                                                 .requestMatchers(HttpMethod.POST, "/api/media-plans", "/api/media-plans/**")
                                                 .hasAnyAuthority(ADMIN, "VIEW_MEDIA_PLAN", "VIEW_TOUS_MEDIA_PLAN")
@@ -192,9 +204,9 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.DELETE, "/api/media-plans/**")
                                                 .hasAnyAuthority(ADMIN, "VIEW_MEDIA_PLAN", "VIEW_TOUS_MEDIA_PLAN")
                                                 .requestMatchers(HttpMethod.POST, "/api/media-plan-assignments")
-                                                .hasAnyAuthority(ADMIN, "VIEW_TOUS_MEDIA_PLAN")
+                                                .hasAnyAuthority(ADMIN, "VALIDATE_MEDIA_PLAN")
                                                 .requestMatchers(HttpMethod.DELETE, "/api/media-plan-assignments/*")
-                                                .hasAnyAuthority(ADMIN, "VIEW_TOUS_MEDIA_PLAN")
+                                                .hasAnyAuthority(ADMIN, "VALIDATE_MEDIA_PLAN")
                                                 // commentaires et rectifs : equipe interne et clients
                                                 .requestMatchers(HttpMethod.POST, "/api/mediaplan-comments", "/api/reactifs/**")
                                                 .hasAnyAuthority(ADMIN, "ROLE_CLIENT", "VIEW_MEDIA_PLAN", "VIEW_TOUS_MEDIA_PLAN",

@@ -81,6 +81,8 @@ interface DraftRow {
     shootingDescription: string;
     shootingLocalisation: string;
     shootingDate: string;
+    shootingAuPlusTard: string;
+    clientDoitValiderDate: boolean;
     shootingTypeDeContenu: TypeContenuShooting | '';
 }
 
@@ -104,6 +106,8 @@ const emptyDraft = (): DraftRow => ({
     shootingDescription: '',
     shootingLocalisation: '',
     shootingDate: '',
+    shootingAuPlusTard: '',
+    clientDoitValiderDate: false,
     shootingTypeDeContenu: '',
 });
 
@@ -119,7 +123,7 @@ interface CellFormat {
 const isDraftFilled = (d: DraftRow) => !!(
     d.titre || d.heure || d.format || d.type || d.texteSurVisuel || d.inspiration || d.autresElements ||
     d.platforme || d.lienDrive || d.etatPublication || d.rectifs || d.remarques ||
-    d.isShooting || d.shootingDescription || d.shootingLocalisation || d.shootingDate || d.shootingTypeDeContenu
+    d.isShooting || d.shootingDescription || d.shootingLocalisation || d.shootingAuPlusTard || d.shootingDate || d.shootingTypeDeContenu
 );
 
 // ── Expanded cell overlay ──
@@ -768,6 +772,8 @@ const MediaPlanPage: React.FC = () => {
                     shootingDescription: '',
                     shootingLocalisation: '',
                     shootingDate: '',
+                    shootingAuPlusTard: '',
+                    clientDoitValiderDate: false,
                     shootingTypeDeContenu: '',
                 };
             }
@@ -786,21 +792,14 @@ const MediaPlanPage: React.FC = () => {
             return alert('Aucune ligne à envoyer');
         }
 
-        const invalidShooting = filledDrafts.find(d => d.isShooting && (!d.shootingDate || !d.shootingTypeDeContenu));
+        const invalidShooting = filledDrafts.find(d => d.isShooting && !d.shootingAuPlusTard);
         if (invalidShooting) {
-            return alert('Veuillez remplir la Date de shooting et le Type de contenu pour les lignes Shooting.');
+            return alert('Indiquez la date au plus tard pour chaque ligne Shooting.');
         }
 
-        const invalidShootingExisting = resubmittableExisting.find(mp => mp.isShooting && (!mp.shootingDate || !mp.shootingTypeDeContenu));
+        const invalidShootingExisting = resubmittableExisting.find(mp => mp.isShooting && !mp.shootingAuPlusTard);
         if (invalidShootingExisting) {
-            return alert('Veuillez remplir la Date de shooting et le Type de contenu pour les lignes Shooting désapprouvées.');
-        }
-
-        if (isAvailabilityRestricted && !availabilityLoading && availableShootingDates.length > 0) {
-            const invalidExistingDate = resubmittableExisting.find(mp => mp.isShooting && mp.shootingDate && !availableShootingDates.includes(mp.shootingDate));
-            if (invalidExistingDate) {
-                return alert('Une ou plusieurs dates de shooting ne sont pas disponibles. Veuillez choisir une date disponible avant d\'envoyer.');
-            }
+            return alert('Indiquez la date au plus tard pour les lignes Shooting désapprouvées.');
         }
 
         const confirmMessage =
@@ -830,7 +829,8 @@ const MediaPlanPage: React.FC = () => {
                         isShooting: draft.isShooting,
                         shootingDescription: draft.isShooting ? (draft.shootingDescription || undefined) : undefined,
                         shootingLocalisation: draft.isShooting ? (draft.shootingLocalisation || undefined) : undefined,
-                        shootingDate: draft.isShooting ? (draft.shootingDate || undefined) : undefined,
+                        shootingAuPlusTard: draft.isShooting ? (draft.shootingAuPlusTard || undefined) : undefined,
+                        clientDoitValiderDate: draft.isShooting ? draft.clientDoitValiderDate : false,
                         shootingTypeDeContenu: draft.isShooting ? ((draft.shootingTypeDeContenu || undefined) as any) : undefined,
                         clientId: selectedClientId,
                         createurId: user?.employeId || 0,
@@ -858,8 +858,8 @@ const MediaPlanPage: React.FC = () => {
     const handleResubmit = (mp: MediaPlan) => {
         if (mp.statut !== 'DESAPPROUVE') return;
 
-        if (mp.isShooting && (!mp.shootingDate || !mp.shootingTypeDeContenu)) {
-            alert('Veuillez remplir la Date de shooting et le Type de contenu avant de confirmer et envoyer.');
+        if (mp.isShooting && !mp.shootingAuPlusTard) {
+            alert('Indiquez la date au plus tard avant de confirmer et envoyer.');
             return;
         }
 
@@ -877,18 +877,10 @@ const MediaPlanPage: React.FC = () => {
         const disapprovedLines = plans.filter(p => p.statut === 'DESAPPROUVE');
         if (disapprovedLines.length === 0) return;
 
-        const invalidShootingExisting = disapprovedLines.find(mp => mp.isShooting && (!mp.shootingDate || !mp.shootingTypeDeContenu));
+        const invalidShootingExisting = disapprovedLines.find(mp => mp.isShooting && !mp.shootingAuPlusTard);
         if (invalidShootingExisting) {
-            alert('Veuillez remplir la Date de shooting et le Type de contenu pour les lignes Shooting désapprouvées.');
+            alert('Indiquez la date au plus tard pour les lignes Shooting désapprouvées.');
             return;
-        }
-
-        if (isAvailabilityRestricted && !availabilityLoading && availableShootingDates.length > 0) {
-            const invalidExistingDate = disapprovedLines.find(mp => mp.isShooting && mp.shootingDate && !availableShootingDates.includes(mp.shootingDate));
-            if (invalidExistingDate) {
-                alert('Une ou plusieurs dates de shooting ne sont pas disponibles. Veuillez choisir une date disponible avant d\'envoyer.');
-                return;
-            }
         }
 
         confirm(`Confirmer et envoyer ${disapprovedLines.length} ligne(s) désapprouvée(s) au manager ?`, async () => {
@@ -1136,8 +1128,9 @@ const MediaPlanPage: React.FC = () => {
                                         <div className="mt-0.5">{mp.shootingLocalisation || '-'}</div>
                                     </div>
                                     <div>
-                                        <div className="text-[11px] text-gray-400 dark:text-gray-500">Date</div>
-                                        <div className="mt-0.5">{mp.shootingDate || '-'}</div>
+                                        <div className="text-[11px] text-gray-400 dark:text-gray-500">Au plus tard</div>
+                                        <div className="mt-0.5">{mp.shootingAuPlusTard || '-'}</div>
+                                        <div className="mt-1 text-[11px] text-gray-400">{mp.clientDoitValiderDate ? 'Le client valide la date' : 'Date validée sans le client'}</div>
                                     </div>
                                     <div>
                                         <div className="text-[11px] text-gray-400 dark:text-gray-500">Type de contenu</div>
@@ -1164,39 +1157,22 @@ const MediaPlanPage: React.FC = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Date</label>
+                                        <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Au plus tard</label>
                                         <input
                                             type="date"
-                                            value={mp.shootingDate || ''}
-                                            min={shootingMonthRange.start}
-                                            max={shootingMonthRange.end}
-                                            disabled={isAvailabilityRestricted && (availabilityLoading || availableShootingDates.length === 0)}
-                                            onChange={e => {
-                                                const next = e.target.value;
-                                                if (!next) {
-                                                    handleCellChange(mp, 'shootingDate', '');
-                                                    return;
-                                                }
-
-                                                if (isAvailabilityRestricted && !availabilityLoading) {
-                                                    if (!availableShootingDates.includes(next)) {
-                                                        alert('Cette date n\'est pas disponible pour le shooting.');
-                                                        handleCellChange(mp, 'shootingDate', '');
-                                                        return;
-                                                    }
-                                                }
-
-                                                handleCellChange(mp, 'shootingDate', next);
-                                            }}
+                                            value={mp.shootingAuPlusTard || ''}
+                                            onChange={e => handleCellChange(mp, 'shootingAuPlusTard', e.target.value)}
                                             className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
                                         />
-                                        {isAvailabilityRestricted && (
-                                            <div className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-                                                {availabilityLoading
-                                                    ? 'Chargement des dates disponibles…'
-                                                    : availableShootingDates.length === 0
-                                                        ? 'Aucune date disponible pour ce mois.'
-                                                        : 'Seules les dates disponibles sont acceptées.'}
+                                        <label className="mt-2 flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                                            <input type="checkbox" checked={!!mp.clientDoitValiderDate} onChange={e => handleCellChange(mp, 'clientDoitValiderDate', e.target.checked)} />
+                                            Le client doit valider la date
+                                        </label>
+                                        {mp.shootingDate && <p className="mt-1 text-[11px] text-gray-500">Date posée : {mp.shootingDate}</p>}
+                                        {mp.shootingStatus === 'EN_ATTENTE_CLIENT_DATE' && (
+                                            <div className="mt-2 flex gap-2">
+                                                <button type="button" onClick={() => mediaPlanService.confirmShootingDate(mp.id, true).then(() => loadData())} className="text-xs px-2 py-1 rounded bg-green-600 text-white">Le client accepte</button>
+                                                <button type="button" onClick={() => mediaPlanService.confirmShootingDate(mp.id, false).then(() => loadData())} className="text-xs px-2 py-1 rounded bg-red-600 text-white">Le client refuse</button>
                                             </div>
                                         )}
                                     </div>
@@ -1338,41 +1314,17 @@ const MediaPlanPage: React.FC = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Date</label>
+                                    <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Au plus tard</label>
                                     <input
                                         type="date"
-                                        value={draft.shootingDate}
-                                        min={shootingMonthRange.start}
-                                        max={shootingMonthRange.end}
-                                        disabled={isAvailabilityRestricted && (availabilityLoading || availableShootingDates.length === 0)}
-                                        onChange={e => {
-                                            const next = e.target.value;
-                                            if (!next) {
-                                                handleDraftChange(idx, 'shootingDate', '');
-                                                return;
-                                            }
-
-                                            if (isAvailabilityRestricted && !availabilityLoading) {
-                                                if (!availableShootingDates.includes(next)) {
-                                                    alert('Cette date n\'est pas disponible pour le shooting.');
-                                                    handleDraftChange(idx, 'shootingDate', '');
-                                                    return;
-                                                }
-                                            }
-
-                                            handleDraftChange(idx, 'shootingDate', next);
-                                        }}
+                                        value={draft.shootingAuPlusTard}
+                                        onChange={e => handleDraftChange(idx, 'shootingAuPlusTard', e.target.value)}
                                         className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
                                     />
-                                    {isAvailabilityRestricted && (
-                                        <div className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-                                            {availabilityLoading
-                                                ? 'Chargement des dates disponibles…'
-                                                : availableShootingDates.length === 0
-                                                    ? 'Aucune date disponible pour ce mois.'
-                                                    : 'Seules les dates disponibles sont acceptées.'}
-                                        </div>
-                                    )}
+                                    <label className="mt-2 flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                                        <input type="checkbox" checked={draft.clientDoitValiderDate} onChange={e => handleDraftChange(idx, 'clientDoitValiderDate', e.target.checked)} />
+                                        Le client doit valider la date
+                                    </label>
                                 </div>
                                 <div>
                                     <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Type de contenu</label>

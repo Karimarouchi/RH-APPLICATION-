@@ -76,6 +76,18 @@ public class MediaPlan {
 
     private LocalDate shootingDate;
 
+    /** Date limite. La date exacte est posée ensuite par le manager du département Production. */
+    private LocalDate shootingAuPlusTard;
+
+    /** Si vrai, le client doit accepter la date proposée. Sinon elle est validée dès qu'elle est posée. */
+    @Builder.Default
+    @Column(columnDefinition = "boolean default false")
+    private Boolean clientDoitValiderDate = false;
+
+    /** Champs que le client a le droit de voir, séparés par des virgules. */
+    @Column(columnDefinition = "TEXT")
+    private String champsVisiblesClient;
+
     @Enumerated(EnumType.STRING)
     private TypeContenuShooting shootingTypeDeContenu;
 

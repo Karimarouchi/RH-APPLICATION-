@@ -32,6 +32,20 @@ import { useConfirm } from '../hooks/useConfirm';
 
 const MONTH_NAMES = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 
+const CLIENT_FIELDS: Array<[string, string]> = [
+    ['datePublication', 'Date'],
+    ['heure', 'Heure'],
+    ['format', 'Format'],
+    ['type', 'Type'],
+    ['titre', 'Titre'],
+    ['texteSurVisuel', 'Texte / visuel'],
+    ['inspiration', 'Inspiration'],
+    ['autresElements', 'Autres éléments'],
+    ['platforme', 'Plateforme'],
+    ['lienDrive', 'Lien Drive'],
+    ['etatPublication', 'État de publication'],
+];
+
 const COLUMNS = [
     { key: 'datePublication', label: 'Date Pub.', defaultWidth: 130 },
     { key: 'heure', label: 'Heure', defaultWidth: 90 },
@@ -319,6 +333,10 @@ const TousLesMediaPlanPage: React.FC = () => {
     const [reactifContenu, setReactifContenu] = useState('');
     const [reactifLoading, setReactifLoading] = useState(false);
     const [reactifError, setReactifError] = useState<string | null>(null);
+    const [acceptLine, setAcceptLine] = useState<MediaPlan | null>(null);
+    const [acceptFields, setAcceptFields] = useState<string[]>(CLIENT_FIELDS.map(([key]) => key));
+    const [refuseLine, setRefuseLine] = useState<MediaPlan | null>(null);
+    const [refuseText, setRefuseText] = useState('');
 
     const handleConfirmDisapprove = async () => {
         if (!disapproveBatchData || !user?.employeId) return;
@@ -435,6 +453,35 @@ const TousLesMediaPlanPage: React.FC = () => {
         </thead>
     );
 
+    const openAccept = (mp: MediaPlan) => {
+        setAcceptLine(mp);
+        setAcceptFields(CLIENT_FIELDS.map(([key]) => key));
+    };
+    const openRefuse = (mp: MediaPlan) => {
+        setRefuseLine(mp);
+        setRefuseText('');
+    };
+    const submitAccept = async () => {
+        if (!acceptLine || acceptFields.length === 0) return;
+        try {
+            await mediaPlanService.accept(acceptLine.id, acceptFields);
+            setAcceptLine(null);
+            if (selectedClientId) loadMediaPlans(selectedClientId);
+        } catch (e: any) {
+            alert(e.response?.data?.message || 'Erreur');
+        }
+    };
+    const submitRefuse = async () => {
+        if (!refuseLine || !refuseText.trim()) return;
+        try {
+            await mediaPlanService.refuse(refuseLine.id, refuseText.trim());
+            setRefuseLine(null);
+            if (selectedClientId) loadMediaPlans(selectedClientId);
+        } catch (e: any) {
+            alert(e.response?.data?.message || 'Erreur');
+        }
+    };
+
     const renderRow = (mp: MediaPlan) => (
         <React.Fragment key={mp.id}>
             <tr className={`transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50 ${mp.statut === 'DESAPPROUVE' ? 'bg-red-50 dark:bg-red-900/10' : ''
@@ -485,6 +532,12 @@ const TousLesMediaPlanPage: React.FC = () => {
                 </td>
                 <td className="px-2 py-1 overflow-hidden" style={{ width: colWidths[14] }}>
                     {getStatusBadge(mp)}
+                    {canValidateMediaPlans && mp.statut === 'EN_ATTENTE' && (
+                        <div className="mt-1 flex flex-col gap-1">
+                            <button type="button" onClick={() => openAccept(mp)} className="text-[11px] px-2 py-1 rounded bg-green-600 text-white">Accepter</button>
+                            <button type="button" onClick={() => openRefuse(mp)} className="text-[11px] px-2 py-1 rounded bg-red-600 text-white">Refuser</button>
+                        </div>
+                    )}
                 </td>
             </tr >
 
@@ -594,10 +647,12 @@ const TousLesMediaPlanPage: React.FC = () => {
                             </h1>
                             <p className="text-sm text-gray-500 dark:text-gray-400">Groupes de la ligne de temps</p>
                         </div>
+                        {canValidateMediaPlans && (
                         <button onClick={openAssignModal}
                             className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 transition-colors">
                             <HiOutlineUserAdd size={18} /> Assigner Employé
                         </button>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -609,9 +664,11 @@ const TousLesMediaPlanPage: React.FC = () => {
                                 ) : existingAssignments.map(a => (
                                     <span key={a.id} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 text-xs font-semibold">
                                         {a.employePrenom} {a.employeNom}
+                                        {canValidateMediaPlans && (
                                         <button onClick={() => handleRemoveAssignment(a.id)} className="ml-1 hover:text-red-500 transition-colors" title="Retirer">
                                             <HiOutlineX size={14} />
                                         </button>
+                                        )}
                                     </span>
                                 ))}
                             </div>
@@ -753,6 +810,30 @@ const TousLesMediaPlanPage: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            <Modal isOpen={!!acceptLine} onClose={() => setAcceptLine(null)} title="Champs visibles par le client" size="md">
+                <div className="space-y-2">
+                    {CLIENT_FIELDS.map(([key, label]) => (
+                        <label key={key} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+                            <input type="checkbox" checked={acceptFields.includes(key)} onChange={() => setAcceptFields(prev => prev.includes(key) ? prev.filter(x => x !== key) : [...prev, key])} />
+                            {label}
+                        </label>
+                    ))}
+                    <div className="flex justify-end gap-2 pt-3">
+                        <button type="button" onClick={() => setAcceptLine(null)} className="px-3 py-2 text-sm border rounded-lg">Annuler</button>
+                        <button type="button" onClick={submitAccept} disabled={acceptFields.length === 0} className="px-3 py-2 text-sm rounded-lg bg-green-600 text-white">Accepter la ligne</button>
+                    </div>
+                </div>
+            </Modal>
+            <Modal isOpen={!!refuseLine} onClose={() => setRefuseLine(null)} title="Rectifs de la ligne" size="md">
+                <div className="space-y-3">
+                    <textarea value={refuseText} onChange={e => setRefuseText(e.target.value)} rows={4} placeholder="Pourquoi cette ligne est refusée" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:bg-gray-900 dark:border-gray-600" />
+                    <div className="flex justify-end gap-2">
+                        <button type="button" onClick={() => setRefuseLine(null)} className="px-3 py-2 text-sm border rounded-lg">Annuler</button>
+                        <button type="button" onClick={submitRefuse} disabled={!refuseText.trim()} className="px-3 py-2 text-sm rounded-lg bg-red-600 text-white">Refuser la ligne</button>
+                    </div>
+                </div>
+            </Modal>
 
             {/* Assign Employee Modal */}
             <Modal isOpen={showAssignModal} onClose={() => setShowAssignModal(false)} title="Assigner des employés Social Media" size="md">

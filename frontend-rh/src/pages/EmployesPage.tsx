@@ -234,7 +234,8 @@ import { documentEmployeService } from '../api/documentEmployeService';
 import { referentielService } from '../api/referentielService';
 import { roleService } from '../api/roleService';
 import { compteService } from '../api/compteService';
-import { Employe, Referentiel, RoleDTO, EmployeStatsDTO, CompetenceDTO, DocumentEmployeDTO } from '../types';
+import { Employe, Referentiel, RoleDTO, PermissionDTO, EmployeStatsDTO, CompetenceDTO, DocumentEmployeDTO } from '../types';
+import CompteDroitsEditor from '../components/CompteDroitsEditor';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
@@ -309,6 +310,7 @@ const EmployesPage: React.FC = () => {
   const [typesContrat, setTypesContrat] = useState<Referentiel[]>([]);
   const [genres, setGenres] = useState<Referentiel[]>([]);
   const [roles, setRoles] = useState<RoleDTO[]>([]);
+  const [allPermissions, setAllPermissions] = useState<PermissionDTO[]>([]);
   const [managers, setManagers] = useState<Employe[]>([]);
 
   const [formData, setFormData] = useState({
@@ -326,6 +328,9 @@ const EmployesPage: React.FC = () => {
   // Compte creation (only for new employee)
   const [createCompte, setCreateCompte] = useState(false);
   const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
+  const [permissionsAjoutees, setPermissionsAjoutees] = useState<number[]>([]);
+  const [permissionsRetirees, setPermissionsRetirees] = useState<number[]>([]);
+  const [existingCompteId, setExistingCompteId] = useState<number | null>(null);
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   const [credentials, setCredentials] = useState<{ username: string; password: string; email: string } | null>(null);
 
@@ -369,13 +374,14 @@ const EmployesPage: React.FC = () => {
 
   const loadAll = async () => {
     try {
-      const [empRes, depRes, postRes, contratRes, genreRes, rolesRes] = await Promise.all([
+      const [empRes, depRes, postRes, contratRes, genreRes, rolesRes, permsRes] = await Promise.all([
         employeService.getAll(),
         referentielService.getByType('DEPARTEMENT'),
         referentielService.getByType('POSTE'),
         referentielService.getByType('TYPE_CONTRAT'),
         referentielService.getByType('GENRE'),
         roleService.getAll(),
+        roleService.getAllPermissions(),
       ]);
       setEmployes(empRes.data.data || []);
       setDepartements((depRes.data.data || []).filter((r: Referentiel) => r.actif));
@@ -383,6 +389,7 @@ const EmployesPage: React.FC = () => {
       setTypesContrat((contratRes.data.data || []).filter((r: Referentiel) => r.actif));
       setGenres((genreRes.data.data || []).filter((r: Referentiel) => r.actif));
       setRoles(rolesRes.data.data || []);
+      setAllPermissions(permsRes.data.data || []);
       try {
         const managersRes = await employeService.getByRole('MANAGER');
         setManagers(managersRes.data.data || []);
@@ -430,6 +437,14 @@ const EmployesPage: React.FC = () => {
 
       if (editingEmploye) {
         await employeService.update(editingEmploye.id, payload);
+        if (existingCompteId && selectedRoleIds.length > 0) {
+          await compteService.update(existingCompteId, {
+            employeId: editingEmploye.id,
+            roleIds: selectedRoleIds,
+            permissionIdsAjoutees: permissionsAjoutees,
+            permissionIdsRetirees: permissionsRetirees,
+          });
+        }
         // Upload image if selected
         if (imageFile) {
           await employeService.uploadImage(editingEmploye.id, imageFile);
@@ -447,7 +462,12 @@ const EmployesPage: React.FC = () => {
         // If "create account" is checked, create a compte + assign role
         if (createCompte && selectedRoleIds.length > 0 && newEmploye?.id) {
           try {
-            const compteRes = await compteService.create({ employeId: newEmploye.id, roleIds: selectedRoleIds });
+            const compteRes = await compteService.create({
+              employeId: newEmploye.id,
+              roleIds: selectedRoleIds,
+              permissionIdsAjoutees: permissionsAjoutees,
+              permissionIdsRetirees: permissionsRetirees,
+            });
             const newCompte = compteRes.data.data;
             if (newCompte) {
               setCredentials({
@@ -491,7 +511,18 @@ const EmployesPage: React.FC = () => {
     });
     setCreateCompte(false);
     setSelectedRoleIds([]);
+    setPermissionsAjoutees([]);
+    setPermissionsRetirees([]);
+    setExistingCompteId(null);
     setShowModal(true);
+    compteService.getByEmploye(employe.id).then(res => {
+      const compte = res.data.data;
+      if (!compte) return;
+      setExistingCompteId(compte.id);
+      setSelectedRoleIds(compte.roles?.map(r => r.id) || []);
+      setPermissionsAjoutees(compte.permissionsAjouteesIds || []);
+      setPermissionsRetirees(compte.permissionsRetireesIds || []);
+    }).catch(() => setExistingCompteId(null));
   };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -535,6 +566,9 @@ const EmployesPage: React.FC = () => {
     });
     setCreateCompte(false);
     setSelectedRoleIds([]);
+    setPermissionsAjoutees([]);
+    setPermissionsRetirees([]);
+    setExistingCompteId(null);
     setImageFile(null);
     setImagePreview(null);
     setSubmitted(false);
@@ -1324,7 +1358,16 @@ const EmployesPage: React.FC = () => {
               className="mt-0.5"
               checked={!!formData.managerDepartement}
               disabled={!formData.departement}
-              onChange={(e) => setFormData({ ...formData, managerDepartement: e.target.checked })}
+              onChange={(e) => {
+                setFormData({ ...formData, managerDepartement: e.target.checked });
+                if (e.target.checked) {
+                  const managerRole = roles.find(r => r.nom === 'MANAGER');
+                  if (managerRole && !selectedRoleIds.includes(managerRole.id)) {
+                    setSelectedRoleIds(prev => [...prev, managerRole.id]);
+                  }
+                  if (!existingCompteId) setCreateCompte(true);
+                }
+              }}
             />
             <span>
               <span className="block text-theme-sm font-medium text-gray-700 dark:text-gray-300">Manager du département</span>
@@ -1367,46 +1410,32 @@ const EmployesPage: React.FC = () => {
             )}
           </div>
 
-        {/* Compte + Role assignment (only for new employee) */}
-        {!editingEmploye && (
+        {(existingCompteId || !editingEmploye) && (
           <div className="mt-5 p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-            <label className="flex items-center gap-3 cursor-pointer">
+            {!existingCompteId && (
+            <label className="flex items-center gap-3 cursor-pointer mb-3">
               <input
                 type="checkbox"
                 checked={createCompte}
-                onChange={(e) => { setCreateCompte(e.target.checked); if (!e.target.checked) setSelectedRoleIds([]); }}
+                onChange={(e) => { setCreateCompte(e.target.checked); if (!e.target.checked) { setSelectedRoleIds([]); setPermissionsAjoutees([]); setPermissionsRetirees([]); } }}
                 className="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600"
               />
               <span className="text-theme-sm font-medium text-gray-700 dark:text-gray-300">
                 Créer un compte utilisateur et lui affecter des rôles
               </span>
             </label>
-            {createCompte && (
-              <div className="mt-3">
-                <label className="block text-theme-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rôles à affecter *</label>
-                <div className="space-y-2 max-h-48 overflow-y-auto p-2 border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800">
-                  {roles.map((r: RoleDTO) => (
-                    <label key={r.id} className="flex items-center gap-2 cursor-pointer">
-                      <input 
-                        type="checkbox"
-                        checked={selectedRoleIds.includes(r.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedRoleIds(prev => [...prev, r.id]);
-                          } else {
-                            setSelectedRoleIds(prev => prev.filter(id => id !== r.id));
-                          }
-                        }}
-                        className="h-4 w-4 rounded text-brand-500 focus:ring-brand-500 border-gray-300"
-                      />
-                      <span className="text-theme-sm text-gray-700 dark:text-gray-300">{r.nom}</span>
-                    </label>
-                  ))}
-                </div>
-                <p className="text-theme-xs text-gray-400 mt-1">
-                  Le matricule (généré automatiquement à partir du département) sera utilisé comme login. Le mot de passe sera généré et envoyé par email.
-                </p>
-              </div>
+            )}
+            {(createCompte || existingCompteId) && (
+              <CompteDroitsEditor
+                roles={roles}
+                allPermissions={allPermissions}
+                roleIds={selectedRoleIds}
+                onRoleIds={setSelectedRoleIds}
+                ajoutees={permissionsAjoutees}
+                onAjoutees={setPermissionsAjoutees}
+                retirees={permissionsRetirees}
+                onRetirees={setPermissionsRetirees}
+              />
             )}
           </div>
         )}

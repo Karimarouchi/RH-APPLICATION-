@@ -23,7 +23,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -42,22 +41,55 @@ public class MediaPlanShootingWorkflowService {
         if (mp == null || !mp.isShooting()) {
             return;
         }
+        if (mp.getShootingAuPlusTard() == null && mp.getShootingDate() != null) {
+            mp.setShootingAuPlusTard(mp.getShootingDate());
+            mp.setShootingDate(null);
+        }
+        if (mp.getShootingAuPlusTard() == null) {
+            throw new RuntimeException("La date au plus tard du shooting est obligatoire");
+        }
 
-        validateShootingFields(mp);
+        Employe prod = findProductionManagerOrThrow();
+        mp.setShootingStatus(StatutShooting.EN_ATTENTE_DATE);
+        mp.setShootingStatusReason(null);
+        mediaPlanRepository.save(mp);
 
-        Employe headProd = findHeadProdOrThrow();
+        String creatorName = mp.getCreateur() != null
+                ? ((nullToEmpty(mp.getCreateur().getPrenom()) + " " + nullToEmpty(mp.getCreateur().getNom())).trim())
+                : "Un employé";
+        String message = creatorName + " a demandé un shooting '" + nullToEmpty(mp.getTitre())
+                + "' au plus tard le " + mp.getShootingAuPlusTard() + ". Posez la date dans le calendrier.";
+        notificationService.create(prod, "SHOOTING_DATE", message, null);
+    }
+
+    public void placeShootingDate(MediaPlan mp, LocalDate date, Long actorId) {
+        if (mp == null || !mp.isShooting()) {
+            throw new RuntimeException("Cette ligne n'est pas un shooting");
+        }
+        if (mp.getShootingStatus() != StatutShooting.EN_ATTENTE_DATE) {
+            throw new RuntimeException("Ce shooting n'attend pas de date");
+        }
+        if (date == null) {
+            throw new RuntimeException("Date de shooting obligatoire");
+        }
+        if (mp.getShootingAuPlusTard() != null && date.isAfter(mp.getShootingAuPlusTard())) {
+            throw new RuntimeException("La date doit être au plus tard le " + mp.getShootingAuPlusTard());
+        }
+
+        Employe prod = findProductionManagerOrThrow();
+        if (!com.antigone.rh.security.SecurityUtils.isAdmin()
+                && (actorId == null || !actorId.equals(prod.getId()))) {
+            throw new RuntimeException("Seul le manager du département Production peut poser la date");
+        }
 
         CalendrierProjet slot = calendrierProjetRepository.findByMediaPlanLigneId(mp.getId()).orElse(null);
         Long ignoreSlotId = slot != null ? slot.getId() : null;
-
-        ensureDateAvailable(headProd.getId(), mp.getShootingDate(), ignoreSlotId);
-
+        ensureDateAvailable(prod.getId(), date, ignoreSlotId);
         if (slot == null) {
             slot = new CalendrierProjet();
         }
-
-        slot.setDateSlot(mp.getShootingDate());
-        slot.setManager(headProd);
+        slot.setDateSlot(date);
+        slot.setManager(prod);
         slot.setSocialManager(mp.getCreateur());
         slot.setProjectName(buildProjectName(mp));
         slot.setDescription(mp.getShootingDescription());
@@ -65,24 +97,74 @@ public class MediaPlanShootingWorkflowService {
         slot.setTypeDeContenu(mp.getShootingTypeDeContenu());
         slot.setUrgent(false);
         slot.setType(CalendrierProjet.SlotType.BOOKED);
-        slot.setStatut(CalendrierProjet.SlotStatus.EN_ATTENTE);
         slot.setMediaPlanLigne(mp);
-
-        slot = calendrierProjetRepository.save(slot);
-
-        // Keep in-memory back reference for immediate DTO mapping
+        mp.setShootingDate(date);
         mp.setCalendrierProjet(slot);
-        mp.setShootingStatus(StatutShooting.EN_ATTENTE);
-        mp.setShootingStatusReason(null);
-        mediaPlanRepository.save(mp);
 
-        // Notify head prod to validate
-        String creatorName = mp.getCreateur() != null
-                ? ((nullToEmpty(mp.getCreateur().getPrenom()) + " " + nullToEmpty(mp.getCreateur().getNom())).trim())
-                : "Un Social Media Manager";
-        String message = creatorName + " a planifié un shooting '" + nullToEmpty(mp.getTitre()) + "' le "
-                + mp.getShootingDate() + ". Veuillez valider.";
-        notificationService.create(headProd, "PLANIFICATION_PROJET", message, null);
+        if (Boolean.TRUE.equals(mp.getClientDoitValiderDate())) {
+            slot.setStatut(CalendrierProjet.SlotStatus.EN_ATTENTE);
+            mp.setShootingStatus(StatutShooting.EN_ATTENTE_CLIENT_DATE);
+            mp.setShootingStatusReason(null);
+            calendrierProjetRepository.save(slot);
+            mediaPlanRepository.save(mp);
+            String msg = "La Production propose le " + date + " pour le shooting '" + nullToEmpty(mp.getTitre())
+                    + "'. Vérifiez avec le client si cette date lui convient.";
+            if (mp.getCreateur() != null) {
+                notificationService.create(mp.getCreateur(), "SHOOTING_DATE_CLIENT", msg, null);
+                if (mp.getCreateur().getManager() != null) {
+                    notificationService.create(mp.getCreateur().getManager(), "SHOOTING_DATE_CLIENT", msg, null);
+                }
+            }
+        } else {
+            slot.setStatut(CalendrierProjet.SlotStatus.VALIDE);
+            mp.setShootingStatus(StatutShooting.VALIDE);
+            mp.setShootingStatusReason(null);
+            calendrierProjetRepository.save(slot);
+            mediaPlanRepository.save(mp);
+            createShootingProjectIfMissing(mp, slot);
+            if (mp.getCreateur() != null) {
+                notificationService.create(mp.getCreateur(), "SHOOTING_DATE",
+                        "La date du shooting '" + nullToEmpty(mp.getTitre()) + "' est fixée au " + date + ".", null);
+            }
+        }
+    }
+
+    public void confirmShootingDate(MediaPlan mp, boolean accepte, Long actorId) {
+        if (mp == null || mp.getShootingStatus() != StatutShooting.EN_ATTENTE_CLIENT_DATE) {
+            throw new RuntimeException("Cette date n'attend pas de confirmation");
+        }
+        Employe createur = mp.getCreateur();
+        boolean allowed = com.antigone.rh.security.SecurityUtils.isAdmin()
+                || (createur != null && actorId != null && actorId.equals(createur.getId()))
+                || (createur != null && createur.getManager() != null && actorId != null
+                        && actorId.equals(createur.getManager().getId()));
+        if (!allowed) {
+            throw new RuntimeException("Seul l'employé du média plan ou son manager peut confirmer la date");
+        }
+        CalendrierProjet slot = calendrierProjetRepository.findByMediaPlanLigneId(mp.getId()).orElse(null);
+        if (accepte) {
+            if (slot != null) {
+                slot.setStatut(CalendrierProjet.SlotStatus.VALIDE);
+                calendrierProjetRepository.save(slot);
+                createShootingProjectIfMissing(mp, slot);
+            }
+            mp.setShootingStatus(StatutShooting.VALIDE);
+            mp.setShootingStatusReason(null);
+            mediaPlanRepository.save(mp);
+            return;
+        }
+        if (slot != null) {
+            calendrierProjetRepository.delete(slot);
+        }
+        mp.setShootingDate(null);
+        mp.setCalendrierProjet(null);
+        mp.setShootingStatus(StatutShooting.EN_ATTENTE_DATE);
+        mp.setShootingStatusReason("Date refusée par le client");
+        mediaPlanRepository.save(mp);
+        Employe prod = findProductionManagerOrThrow();
+        notificationService.create(prod, "SHOOTING_DATE",
+                "La date proposée pour '" + nullToEmpty(mp.getTitre()) + "' ne convient pas au client. Choisissez une autre date.",
+                null);
     }
 
     public void onCalendrierSlotStatusUpdated(CalendrierProjet slot) {
@@ -111,28 +193,16 @@ public class MediaPlanShootingWorkflowService {
         mediaPlanRepository.save(mp);
     }
 
-    private void validateShootingFields(MediaPlan mp) {
-        if (mp.getShootingDate() == null) {
-            throw new RuntimeException("Date de shooting obligatoire");
+    private Employe findProductionManagerOrThrow() {
+        List<Employe> managers = employeRepository.findAll().stream()
+                .filter(e -> !Boolean.TRUE.equals(e.getArchived()))
+                .filter(e -> Boolean.TRUE.equals(e.getManagerDepartement()))
+                .filter(e -> e.getDepartement() != null && e.getDepartement().toLowerCase().contains("prod"))
+                .collect(Collectors.toList());
+        if (managers.isEmpty()) {
+            throw new RuntimeException("Désignez le manager du département Production sur sa fiche employé");
         }
-        if (mp.getShootingTypeDeContenu() == null) {
-            throw new RuntimeException("Type de contenu shooting obligatoire");
-        }
-    }
-
-    private Employe findHeadProdOrThrow() {
-        List<Employe> managers1 = employeRepository.findByRoleName("Head Prod");
-        List<Employe> managers2 = employeRepository.findByRoleName("HEAD_PROD");
-
-        List<Employe> merged = Stream.concat(managers1.stream(), managers2.stream())
-                .collect(Collectors.toMap(Employe::getId, e -> e, (a, b) -> a))
-                .values().stream().collect(Collectors.toList());
-
-        if (merged.isEmpty()) {
-            throw new RuntimeException("Aucun Head Prod trouvé pour planifier le shooting");
-        }
-
-        return merged.get(0);
+        return managers.get(0);
     }
 
     private void ensureDateAvailable(Long managerId, LocalDate date, Long ignoreSlotId) {

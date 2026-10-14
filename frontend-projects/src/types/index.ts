@@ -683,6 +683,8 @@ export const TypeContenuShootingLabels: Record<TypeContenuShooting, string> = {
 
 export enum StatutShooting {
   EN_ATTENTE = 'EN_ATTENTE',
+  EN_ATTENTE_DATE = 'EN_ATTENTE_DATE',
+  EN_ATTENTE_CLIENT_DATE = 'EN_ATTENTE_CLIENT_DATE',
   VALIDE = 'VALIDE',
   REJETE = 'REJETE',
 }
@@ -706,6 +708,9 @@ export interface MediaPlan {
   shootingDescription: string | null;
   shootingLocalisation: string | null;
   shootingDate: string | null;
+  shootingAuPlusTard: string | null;
+  clientDoitValiderDate?: boolean;
+  champsVisiblesClient?: string | null;
   shootingTypeDeContenu: TypeContenuShooting | null;
   shootingStatus: StatutShooting | null;
   shootingStatusReason: string | null;
@@ -737,6 +742,8 @@ export interface MediaPlanRequest {
   shootingDescription?: string;
   shootingLocalisation?: string;
   shootingDate?: string;
+  shootingAuPlusTard?: string;
+  clientDoitValiderDate?: boolean;
   shootingTypeDeContenu?: TypeContenuShooting;
   clientId: number;
   createurId: number;

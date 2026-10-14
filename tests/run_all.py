@@ -26,6 +26,7 @@ SUITES = [
     ('portail', 'suites.s5_portail_client'),
     ('mediaplan', 'suites.s6_mediaplan'),
     ('manager', 'suites.s9_manager_departement'),
+    ('comptes', 'suites.s10_compte_droits'),
     ('auth', 'suites.s7_authentification'),
     ('balayage', 'suites.s8_balayage'),
 ]

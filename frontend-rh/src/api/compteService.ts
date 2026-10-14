@@ -4,6 +4,7 @@ import { ApiResponse, CompteDTO, CompteRequest, AccessLogDTO, ChangePasswordRequ
 export const compteService = {
   getAll: () => api.get<ApiResponse<CompteDTO[]>>('/comptes'),
   getById: (id: number) => api.get<ApiResponse<CompteDTO>>(`/comptes/${id}`),
+  getByEmploye: (employeId: number) => api.get<ApiResponse<CompteDTO>>(`/comptes/employe/${employeId}`),
   create: (data: CompteRequest) => api.post<ApiResponse<CompteDTO>>('/comptes', data),
   update: (id: number, data: CompteRequest) => api.put<ApiResponse<CompteDTO>>(`/comptes/${id}`, data),
   toggleEnabled: (id: number) => api.patch<ApiResponse<CompteDTO>>(`/comptes/${id}/toggle`),

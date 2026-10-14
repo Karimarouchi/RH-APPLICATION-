@@ -14,7 +14,8 @@ import { calendrierProjetService } from '../api/calendrierProjetService';
 import { projetService } from '../api/projetService';
 import { tacheService } from '../api/tacheService';
 import { useEffect } from 'react';
-import { StatutProjet, StatutTache, TypeContenuShooting, TypeContenuShootingLabels } from '../types';
+import { StatutProjet, StatutTache, TypeContenuShooting, TypeContenuShootingLabels, MediaPlan } from '../types';
+import { mediaPlanService } from '../api/mediaPlanService';
 import DeadlinesCalendar from './DeadlinesCalendar';
 import ReunionsCalendar from './ReunionsCalendar';
 
@@ -145,7 +146,7 @@ const CalendrierProjetsAdminPage: React.FC = () => {
   const roleBadge = canSwitch
     ? { label: 'Administrateur',         cls: 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 border-blue-200' }
     : canManagerMode
-      ? { label: 'Head Prod',            cls: 'bg-violet-50 text-violet-700 border-violet-200' }
+      ? { label: 'Production',            cls: 'bg-violet-50 text-violet-700 border-violet-200' }
       : { label: 'Social Media', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
 
   return (
@@ -197,20 +198,20 @@ const CalendrierCore: React.FC<CoreProps> = ({
 
   const [managers, setManagers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [shootingsADater, setShootingsADater] = useState<MediaPlan[]>([]);
+  const [dateDrafts, setDateDrafts] = useState<Record<number, string>>({});
   const { user } = useAuth();
 
+  const loadShootingsADater = () => {
+    mediaPlanService.shootingsADater().then(res => setShootingsADater(res.data.data || [])).catch(() => setShootingsADater([]));
+  };
+  useEffect(() => { loadShootingsADater(); }, []);
+
   useEffect(() => {
-    // Pour supporter les différentes façons d'écrire le rôle en base de données
-    Promise.all([
-      employeService.getByRole('Head Prod').catch(() => ({ data: { data: [] } })),
-      employeService.getByRole('HEAD_PROD').catch(() => ({ data: { data: [] } }))
-    ]).then(([res1, res2]) => {
-      const data1 = res1.data?.data || [];
-      const data2 = res2.data?.data || [];
-      const mergedData = [...data1, ...data2];
-      
-      // Dédoublonner par ID au cas où
-      const uniqueManagers = Array.from(new Map(mergedData.map((m: any) => [m.id, m])).values());
+    employeService.getAll().then(res => {
+      const uniqueManagers = (res.data?.data || []).filter((m: any) =>
+        m.managerDepartement && String(m.departement || '').toLowerCase().includes('prod') && !m.archived
+      );
 
       const mappers = uniqueManagers.map((m: any) => ({
         id: m.id,
@@ -220,7 +221,7 @@ const CalendrierCore: React.FC<CoreProps> = ({
       }));
       setManagers(mappers);
       if (mappers.length > 0) setManagerId(mappers[0].id);
-    });
+    }).catch(() => setManagers([]));
   }, []);
 
   useEffect(() => {
@@ -431,6 +432,28 @@ const CalendrierCore: React.FC<CoreProps> = ({
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gray-900 p-4 lg:p-6">
       <div className="max-w-6xl mx-auto space-y-5">
+        {shootingsADater.length > 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 space-y-3">
+            <p className="text-sm font-semibold text-gray-800 dark:text-white">Shootings à dater</p>
+            {shootingsADater.map(mp => (
+              <div key={mp.id} className="flex flex-wrap items-center gap-3 text-sm">
+                <span className="font-medium text-gray-800 dark:text-gray-100">{mp.titre}</span>
+                <span className="text-gray-500">au plus tard le {mp.shootingAuPlusTard || '-'}</span>
+                <input type="date" max={mp.shootingAuPlusTard || undefined} value={dateDrafts[mp.id] || ''} onChange={e => setDateDrafts(prev => ({ ...prev, [mp.id]: e.target.value }))} className="rounded border px-2 py-1 dark:bg-gray-900" />
+                <button type="button" className="px-3 py-1 rounded bg-brand-500 text-white" onClick={async () => {
+                  if (!dateDrafts[mp.id]) return;
+                  try {
+                    await mediaPlanService.placeShootingDate(mp.id, dateDrafts[mp.id]);
+                    showToast('Date enregistrée', 'success');
+                    loadShootingsADater();
+                  } catch (e: any) {
+                    showToast(e.response?.data?.message || 'Date refusée', 'error');
+                  }
+                }}>Poser la date</button>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Legacy Header Removed */}
 
@@ -441,7 +464,7 @@ const CalendrierCore: React.FC<CoreProps> = ({
 
             {/* Liste managers */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4">
-              <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Head Prod</p>
+              <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Manager Production</p>
               <div className="space-y-2">
                 {managers.map(m=>(
                   <button

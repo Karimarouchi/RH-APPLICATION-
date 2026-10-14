@@ -34,6 +34,7 @@ public class DemandeService {
     private final ReferentielRepository referentielRepository;
     private final HoraireTravailRepository horaireTravailRepository;
     private final NotificationService notificationService;
+    private final ValidationRepository validationRepository;
 
     private static final int DEFAULT_MAX_AUTORISATION_MINUTES = 120; // 2h par mois
 
@@ -114,7 +115,58 @@ public class DemandeService {
         demande.setEmploye(employe);
 
         Demande saved = demandeRepository.save(demande);
+        assignDepartmentHead(saved, employe);
         return toResponse(saved);
+    }
+
+    /**
+     * La demande d'une personne rattachée à un département part au chef coché de ce département.
+     */
+    private void assignDepartmentHead(Demande saved, Employe employe) {
+        Employe chef = findDepartmentHead(employe.getDepartement());
+        if (chef == null || chef.getId().equals(employe.getId())) {
+            return;
+        }
+        validationRepository.save(Validation.builder()
+                .demande(saved)
+                .validateur(chef)
+                .ordre(1)
+                .decision(DecisionValidation.EN_ATTENTE)
+                .build());
+        String nom = ((employe.getPrenom() != null ? employe.getPrenom() : "") + " "
+                + (employe.getNom() != null ? employe.getNom() : "")).trim();
+        notificationService.create(chef, "Demande à valider",
+                nom + " a envoyé une demande. Vous êtes le chef de son département.", saved);
+    }
+
+    private Employe findDepartmentHead(String departement) {
+        if (departement == null || departement.isBlank()) {
+            return null;
+        }
+        String key = departement.trim().toLowerCase();
+        return employeRepository.findAll().stream()
+                .filter(e -> !Boolean.TRUE.equals(e.getArchived()))
+                .filter(e -> Boolean.TRUE.equals(e.getManagerDepartement()))
+                .filter(e -> e.getDepartement() != null && e.getDepartement().trim().toLowerCase().equals(key))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /** Admin et RH valident tout. Sinon, seul le chef du département de l'employé. */
+    private void assertDepartmentValidator(Employe cible) {
+        if (SecurityUtils.isAdmin() || SecurityUtils.hasAnyAuthority("ROLE_RH")) {
+            return;
+        }
+        if (cible.getDepartement() == null || cible.getDepartement().isBlank()) {
+            return;
+        }
+        Long actorId = SecurityUtils.currentEmployeIdOrNull();
+        Employe chef = findDepartmentHead(cible.getDepartement());
+        if (chef != null && actorId != null && chef.getId().equals(actorId)) {
+            return;
+        }
+        throw new org.springframework.security.access.AccessDeniedException(
+                "Seul le chef de ce département peut valider cette demande");
     }
 
     private Conge createConge(DemandeRequest request, Employe employe) {
@@ -474,6 +526,7 @@ public class DemandeService {
         if (demande.getStatut() != StatutDemande.EN_ATTENTE) {
             throw new RuntimeException("Seules les demandes en attente peuvent être approuvées");
         }
+        assertDepartmentValidator(demande.getEmploye());
         if (!SecurityUtils.isAdmin() && demande.getEmploye().getId().equals(adminEmployeId)) {
             throw new org.springframework.security.access.AccessDeniedException("Auto-approbation interdite");
         }
@@ -517,6 +570,7 @@ public class DemandeService {
         if (demande.getStatut() != StatutDemande.EN_ATTENTE) {
             throw new RuntimeException("Seules les demandes en attente peuvent être refusées");
         }
+        assertDepartmentValidator(demande.getEmploye());
 
         StatutDemande ancien = demande.getStatut();
         demande.setStatut(StatutDemande.REFUSEE);

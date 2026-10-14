@@ -22,6 +22,8 @@ public class MediaPlanRequest {
     private String shootingDescription;
     private String shootingLocalisation;
     private String shootingDate;
+    private String shootingAuPlusTard;
+    private Boolean clientDoitValiderDate;
     private String shootingTypeDeContenu; // PHOTO | VIDEO | BOTH
     private Long clientId;
     private Long createurId;

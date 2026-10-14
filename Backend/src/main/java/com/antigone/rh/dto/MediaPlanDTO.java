@@ -29,6 +29,9 @@ public class MediaPlanDTO {
     private String shootingDescription;
     private String shootingLocalisation;
     private String shootingDate;
+    private String shootingAuPlusTard;
+    private Boolean clientDoitValiderDate;
+    private String champsVisiblesClient;
     private String shootingTypeDeContenu;
     private String shootingStatus;
     private String shootingStatusReason;

@@ -60,6 +60,30 @@ public class Compte {
     @EqualsAndHashCode.Exclude
     private Set<Role> roles = new HashSet<>();
 
+    /** Permissions en plus de celles des rôles, pour ce compte seulement. */
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "compte_permissions_ajoutees",
+            joinColumns = @JoinColumn(name = "compte_id"),
+            inverseJoinColumns = @JoinColumn(name = "permission_id")
+    )
+    @Builder.Default
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Set<Permission> permissionsAjoutees = new HashSet<>();
+
+    /** Permissions des rôles retirées pour ce compte seulement. */
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "compte_permissions_retirees",
+            joinColumns = @JoinColumn(name = "compte_id"),
+            inverseJoinColumns = @JoinColumn(name = "permission_id")
+    )
+    @Builder.Default
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Set<Permission> permissionsRetirees = new HashSet<>();
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

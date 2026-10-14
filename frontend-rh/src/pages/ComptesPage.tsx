@@ -3,7 +3,8 @@ import { HiOutlinePlus, HiOutlineSearch, HiOutlinePencil, HiOutlineEye, HiOutlin
 import { compteService } from '../api/compteService';
 import { roleService } from '../api/roleService';
 import { employeService } from '../api/employeService';
-import { CompteDTO, RoleDTO, Employe, AccessLogDTO } from '../types';
+import { CompteDTO, RoleDTO, PermissionDTO, Employe, AccessLogDTO } from '../types';
+import CompteDroitsEditor from '../components/CompteDroitsEditor';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import DataTable from '../components/ui/DataTable';
@@ -18,6 +19,7 @@ const ComptesPage: React.FC = () => {
   const canDelete = (user?.permissions ?? []).includes('DELETE_COMPTE');
   const [comptes, setComptes] = useState<CompteDTO[]>([]);
   const [roles, setRoles] = useState<RoleDTO[]>([]);
+  const [allPermissions, setAllPermissions] = useState<PermissionDTO[]>([]);
   const [employes, setEmployes] = useState<Employe[]>([]);
   const [search, setSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -29,8 +31,8 @@ const ComptesPage: React.FC = () => {
   const [accessLogs, setAccessLogs] = useState<AccessLogDTO[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [createForm, setCreateForm] = useState({ employeId: 0, roleIds: [] as number[] });
-  const [editForm, setEditForm] = useState({ roleIds: [] as number[] });
+  const [createForm, setCreateForm] = useState({ employeId: 0, roleIds: [] as number[], ajoutees: [] as number[], retirees: [] as number[] });
+  const [editForm, setEditForm] = useState({ roleIds: [] as number[], ajoutees: [] as number[], retirees: [] as number[] });
 
   useEffect(() => {
     loadData();
@@ -38,13 +40,15 @@ const ComptesPage: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [comptesRes, rolesRes, employesRes] = await Promise.all([
+      const [comptesRes, rolesRes, employesRes, permsRes] = await Promise.all([
         compteService.getAll(),
         roleService.getAll(),
         employeService.getAll(),
+        roleService.getAllPermissions(),
       ]);
       setComptes(comptesRes.data.data || []);
       setRoles(rolesRes.data.data || []);
+      setAllPermissions(permsRes.data.data || []);
       setEmployes(employesRes.data.data || []);
     } catch (err) {
       console.error('Erreur chargement:', err);
@@ -61,10 +65,15 @@ const ComptesPage: React.FC = () => {
   const handleCreate = async () => {
     if (!createForm.employeId || createForm.roleIds.length === 0) return;
     try {
-      const res = await compteService.create(createForm);
+      const res = await compteService.create({
+        employeId: createForm.employeId,
+        roleIds: createForm.roleIds,
+        permissionIdsAjoutees: createForm.ajoutees,
+        permissionIdsRetirees: createForm.retirees,
+      });
       const newCompte = res.data.data;
       setShowCreateModal(false);
-      setCreateForm({ employeId: 0, roleIds: [] });
+      setCreateForm({ employeId: 0, roleIds: [], ajoutees: [], retirees: [] });
       // Show credentials popup
       if (newCompte) {
         setCredentials({
@@ -82,14 +91,23 @@ const ComptesPage: React.FC = () => {
 
   const handleEdit = (compte: CompteDTO) => {
     setEditingCompte(compte);
-    setEditForm({ roleIds: compte.roles?.map(r => r.id) || [] });
+    setEditForm({
+      roleIds: compte.roles?.map(r => r.id) || [],
+      ajoutees: compte.permissionsAjouteesIds || [],
+      retirees: compte.permissionsRetireesIds || [],
+    });
     setShowEditModal(true);
   };
 
   const handleUpdate = async () => {
     if (!editingCompte) return;
     try {
-      await compteService.update(editingCompte.id, { employeId: editingCompte.employeId, roleIds: editForm.roleIds });
+      await compteService.update(editingCompte.id, {
+        employeId: editingCompte.employeId,
+        roleIds: editForm.roleIds,
+        permissionIdsAjoutees: editForm.ajoutees,
+        permissionIdsRetirees: editForm.retirees,
+      });
       setShowEditModal(false);
       setEditingCompte(null);
       loadData();
@@ -234,7 +252,7 @@ const ComptesPage: React.FC = () => {
           <h1 className="text-title-sm font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-[#683b77] dark:from-white dark:to-[#ab78c3]">Gestion des Comptes</h1>
           <p className="text-theme-sm text-gray-500 dark:text-gray-400 mt-1">Créer et gérer les comptes utilisateurs</p>
         </div>
-        <Button onClick={() => { setCreateForm({ employeId: 0, roleIds: [] }); setShowCreateModal(true); }}>
+        <Button onClick={() => { setCreateForm({ employeId: 0, roleIds: [], ajoutees: [], retirees: [] }); setShowCreateModal(true); }}>
           <HiOutlinePlus size={18} /> Créer un compte
         </Button>
       </div>
@@ -259,7 +277,7 @@ const ComptesPage: React.FC = () => {
       )}
 
       {/* Create Modal */}
-      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Créer un compte" size="md">
+      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Créer un compte" size="lg">
         <p className="text-theme-sm text-gray-500 dark:text-gray-400 mb-4">
           Le nom d'utilisateur et le mot de passe seront générés automatiquement et envoyés par email à l'employé.
         </p>
@@ -277,25 +295,16 @@ const ComptesPage: React.FC = () => {
               ))}
             </select>
           </div>
-          <div>
-            <label className="block text-theme-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rôles</label>
-            <div className="space-y-2 max-h-48 overflow-y-auto p-2 border border-gray-300 rounded-lg dark:border-gray-600 bg-white dark:bg-gray-800">
-              {roles.map((r) => (
-                <label key={r.id} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={createForm.roleIds.includes(r.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) setCreateForm({ ...createForm, roleIds: [...createForm.roleIds, r.id] });
-                      else setCreateForm({ ...createForm, roleIds: createForm.roleIds.filter(id => id !== r.id) });
-                    }}
-                    className="h-4 w-4 rounded text-brand-500 focus:ring-brand-500 border-gray-300"
-                  />
-                  <span className="text-theme-sm text-gray-700 dark:text-gray-300">{r.nom}</span>
-                </label>
-              ))}
-            </div>
-          </div>
+          <CompteDroitsEditor
+            roles={roles}
+            allPermissions={allPermissions}
+            roleIds={createForm.roleIds}
+            onRoleIds={ids => setCreateForm(prev => ({ ...prev, roleIds: ids }))}
+            ajoutees={createForm.ajoutees}
+            onAjoutees={ids => setCreateForm(prev => ({ ...prev, ajoutees: ids }))}
+            retirees={createForm.retirees}
+            onRetirees={ids => setCreateForm(prev => ({ ...prev, retirees: ids }))}
+          />
         </div>
         <div className="flex justify-end gap-3 mt-6">
           <Button variant="ghost" onClick={() => setShowCreateModal(false)}>Annuler</Button>
@@ -304,7 +313,7 @@ const ComptesPage: React.FC = () => {
       </Modal>
 
       {/* Edit Modal */}
-      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Modifier les rôles" size="md">
+      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Modifier le compte" size="lg">
         {editingCompte && (
           <>
             <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
@@ -315,25 +324,16 @@ const ComptesPage: React.FC = () => {
                 <span className="font-medium">Employé :</span> {editingCompte.employePrenom} {editingCompte.employeNom}
               </p>
             </div>
-            <div>
-              <label className="block text-theme-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nouveaux rôles</label>
-              <div className="space-y-2 max-h-48 overflow-y-auto p-2 border border-gray-300 rounded-lg dark:border-gray-600 bg-white dark:bg-gray-800">
-                {roles.map((r) => (
-                  <label key={r.id} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={editForm.roleIds.includes(r.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) setEditForm({ roleIds: [...editForm.roleIds, r.id] });
-                        else setEditForm({ roleIds: editForm.roleIds.filter(id => id !== r.id) });
-                      }}
-                      className="h-4 w-4 rounded text-brand-500 focus:ring-brand-500 border-gray-300"
-                    />
-                    <span className="text-theme-sm text-gray-700 dark:text-gray-300">{r.nom}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
+            <CompteDroitsEditor
+              roles={roles}
+              allPermissions={allPermissions}
+              roleIds={editForm.roleIds}
+              onRoleIds={ids => setEditForm(prev => ({ ...prev, roleIds: ids }))}
+              ajoutees={editForm.ajoutees}
+              onAjoutees={ids => setEditForm(prev => ({ ...prev, ajoutees: ids }))}
+              retirees={editForm.retirees}
+              onRetirees={ids => setEditForm(prev => ({ ...prev, retirees: ids }))}
+            />
             <div className="flex justify-end gap-3 mt-6">
               <Button variant="ghost" onClick={() => setShowEditModal(false)}>Annuler</Button>
               <Button onClick={handleUpdate}>Modifier</Button>

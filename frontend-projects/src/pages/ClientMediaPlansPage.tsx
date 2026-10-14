@@ -101,6 +101,11 @@ const ClientMediaPlansPage: React.FC = () => {
     const [selectedBatchKey, setSelectedBatchKey] = useState<string | null>(null);
     const [viewState, setViewState] = useState<'BATCHES' | 'BATCH_DETAILS'>('BATCHES');
 
+    const see = (mp: MediaPlan, key: string, value: React.ReactNode) => {
+        if (!mp.champsVisiblesClient) return value;
+        return mp.champsVisiblesClient.split(',').includes(key) ? value : '—';
+    };
+
     // Real KPIs
     const [totalPlansCount, setTotalPlansCount] = useState(0);
     const [lastUpdateDate, setLastUpdateDate] = useState<string | null>(null);
@@ -436,17 +441,17 @@ const ClientMediaPlansPage: React.FC = () => {
             <tr key={mp.id}
                 className={`transition-colors ${isDisapproved ? 'bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20' : 'hover:bg-yellow-50 dark:hover:bg-yellow-900/5'}`}
                 style={{ height: '80px' }}>
-                <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[0] }}><span className={inputClass}>{mp.datePublication || '-'}</span></td>
-                <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[1] }}><span className={inputClass}>{mp.heure || '-'}</span></td>
-                <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[2] }}><span className={inputClass}>{mp.format || '-'}</span></td>
-                <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[3] }}><span className={inputClass}>{mp.type || '-'}</span></td>
-                <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[4] }}><span className={`${inputClass} font-medium truncate block`}>{mp.titre || '-'}</span></td>
-                <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[5] }}><span className={`${inputClass} truncate block`}>{renderCellValue(mp.texteSurVisuel)}</span></td>
-                <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[6] }}><span className={`${inputClass} truncate block`}>{renderCellValue(mp.inspiration)}</span></td>
-                <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[7] }}><span className={inputClass}>{mp.platforme || '-'}</span></td>
-                <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[8] }}><span className={`${inputClass} truncate block`}>{renderCellValue(mp.lienDrive)}</span></td>
+                <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[0] }}><span className={inputClass}>{see(mp, 'datePublication', mp.datePublication || '-')}</span></td>
+                <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[1] }}><span className={inputClass}>{see(mp, 'heure', mp.heure || '-')}</span></td>
+                <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[2] }}><span className={inputClass}>{see(mp, 'format', mp.format || '-')}</span></td>
+                <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[3] }}><span className={inputClass}>{see(mp, 'type', mp.type || '-')}</span></td>
+                <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[4] }}><span className={`${inputClass} font-medium truncate block`}>{see(mp, 'titre', mp.titre || '-')}</span></td>
+                <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[5] }}><span className={`${inputClass} truncate block`}>{see(mp, 'texteSurVisuel', renderCellValue(mp.texteSurVisuel))}</span></td>
+                <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[6] }}><span className={`${inputClass} truncate block`}>{see(mp, 'inspiration', renderCellValue(mp.inspiration))}</span></td>
+                <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[7] }}><span className={inputClass}>{see(mp, 'platforme', mp.platforme || '-')}</span></td>
+                <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[8] }}><span className={`${inputClass} truncate block`}>{see(mp, 'lienDrive', renderCellValue(mp.lienDrive))}</span></td>
                 <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[9] }}>
-                    <Badge variant="neutral">{EtatPublicationLabels[mp.etatPublication as keyof typeof EtatPublicationLabels] || mp.etatPublication || '-'}</Badge>
+                    {see(mp, 'etatPublication', <Badge variant="neutral">{EtatPublicationLabels[mp.etatPublication as keyof typeof EtatPublicationLabels] || mp.etatPublication || '-'}</Badge>)}
                 </td>
                 <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: colWidths[10] }}>{getStatusBadge(mp)}</td>
                 {/* RECTIFS — editable for pending, read-only otherwise */}
@@ -499,17 +504,17 @@ const ClientMediaPlansPage: React.FC = () => {
 
     const renderApprovedRow = (mp: MediaPlan) => (
         <tr key={mp.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50" style={{ height: '80px' }}>
-            <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[0] }}><span className={inputClass}>{mp.datePublication || '-'}</span></td>
-            <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[1] }}><span className={inputClass}>{mp.heure || '-'}</span></td>
-            <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[2] }}><span className={inputClass}>{mp.format || '-'}</span></td>
-            <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[3] }}><span className={inputClass}>{mp.type || '-'}</span></td>
-            <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[4] }}><span className={`${inputClass} font-medium truncate block`}>{mp.titre || '-'}</span></td>
-            <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[5] }}><span className={`${inputClass} truncate block`}>{renderCellValue(mp.texteSurVisuel)}</span></td>
-            <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[6] }}><span className={`${inputClass} truncate block`}>{renderCellValue(mp.inspiration)}</span></td>
-            <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[7] }}><span className={inputClass}>{mp.platforme || '-'}</span></td>
-            <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[8] }}><span className={`${inputClass} truncate block`}>{renderCellValue(mp.lienDrive)}</span></td>
+            <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[0] }}><span className={inputClass}>{see(mp, 'datePublication', mp.datePublication || '-')}</span></td>
+            <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[1] }}><span className={inputClass}>{see(mp, 'heure', mp.heure || '-')}</span></td>
+            <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[2] }}><span className={inputClass}>{see(mp, 'format', mp.format || '-')}</span></td>
+            <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[3] }}><span className={inputClass}>{see(mp, 'type', mp.type || '-')}</span></td>
+            <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[4] }}><span className={`${inputClass} font-medium truncate block`}>{see(mp, 'titre', mp.titre || '-')}</span></td>
+            <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[5] }}><span className={`${inputClass} truncate block`}>{see(mp, 'texteSurVisuel', renderCellValue(mp.texteSurVisuel))}</span></td>
+            <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[6] }}><span className={`${inputClass} truncate block`}>{see(mp, 'inspiration', renderCellValue(mp.inspiration))}</span></td>
+            <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[7] }}><span className={inputClass}>{see(mp, 'platforme', mp.platforme || '-')}</span></td>
+            <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[8] }}><span className={`${inputClass} truncate block`}>{see(mp, 'lienDrive', renderCellValue(mp.lienDrive))}</span></td>
             <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[9] }}>
-                <Badge variant="neutral">{EtatPublicationLabels[mp.etatPublication as keyof typeof EtatPublicationLabels] || mp.etatPublication || '-'}</Badge>
+                {see(mp, 'etatPublication', <Badge variant="neutral">{EtatPublicationLabels[mp.etatPublication as keyof typeof EtatPublicationLabels] || mp.etatPublication || '-'}</Badge>)}
             </td>
             <td className="px-2 py-1 border-r border-gray-100 dark:border-gray-800" style={{ width: approvedColWidths[10] }}>{getStatusBadge(mp)}</td>
             <td className="px-2 py-1" style={{ width: approvedColWidths[11] }}>

@@ -22,6 +22,15 @@ public class CompteController {
         return ResponseEntity.ok(ApiResponse.ok("Liste des comptes", compteService.getAllComptes()));
     }
 
+    @GetMapping("/employe/{employeId}")
+    public ResponseEntity<ApiResponse<CompteDTO>> getByEmploye(@PathVariable Long employeId) {
+        try {
+            return ResponseEntity.ok(ApiResponse.ok("Compte trouvé", compteService.getByEmploye(employeId)));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(404).body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<CompteDTO>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok("Compte trouvé", compteService.getCompteById(id)));

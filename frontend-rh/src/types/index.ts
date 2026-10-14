@@ -147,12 +147,17 @@ export interface CompteDTO {
   employeEmail: string;
   employePoste: string;
   roles: RoleDTO[];
+  permissionsAjouteesIds?: number[];
+  permissionsRetireesIds?: number[];
+  permissionsEffectives?: string[];
   generatedPassword?: string;
 }
 
 export interface CompteRequest {
   employeId: number;
   roleIds: number[];
+  permissionIdsAjoutees?: number[];
+  permissionIdsRetirees?: number[];
 }
 
 export interface AccessLogDTO {

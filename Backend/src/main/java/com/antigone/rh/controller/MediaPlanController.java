@@ -73,6 +73,43 @@ public class MediaPlanController {
         return ResponseEntity.ok(ApiResponse.ok("Media plan désapprouvé", mediaPlanService.disapprove(id)));
     }
 
+    @PatchMapping("/{id}/accept")
+    public ResponseEntity<ApiResponse<MediaPlanDTO>> accept(@PathVariable Long id,
+            @RequestBody java.util.Map<String, Object> body) {
+        Long approver = SecurityUtils.currentEmployeIdOrNull();
+        @SuppressWarnings("unchecked")
+        java.util.List<String> champs = body.get("champs") instanceof java.util.List
+                ? (java.util.List<String>) body.get("champs")
+                : java.util.List.of();
+        return ResponseEntity.ok(ApiResponse.ok("Ligne acceptée", mediaPlanService.accept(id, champs, approver)));
+    }
+
+    @PatchMapping("/{id}/refuse")
+    public ResponseEntity<ApiResponse<MediaPlanDTO>> refuse(@PathVariable Long id,
+            @RequestBody java.util.Map<String, String> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Ligne refusée", mediaPlanService.refuse(id, body.get("rectifs"))));
+    }
+
+    @GetMapping("/shootings/a-dater")
+    public ResponseEntity<ApiResponse<List<MediaPlanDTO>>> shootingsADater() {
+        return ResponseEntity.ok(ApiResponse.ok(mediaPlanService.shootingsEnAttenteDate()));
+    }
+
+    @PatchMapping("/{id}/shooting-date")
+    public ResponseEntity<ApiResponse<MediaPlanDTO>> shootingDate(@PathVariable Long id,
+            @RequestBody java.util.Map<String, String> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Date de shooting posée",
+                mediaPlanService.placeShootingDate(id, body.get("date"), SecurityUtils.currentEmployeIdOrNull())));
+    }
+
+    @PatchMapping("/{id}/shooting-date-confirm")
+    public ResponseEntity<ApiResponse<MediaPlanDTO>> confirmShootingDate(@PathVariable Long id,
+            @RequestBody java.util.Map<String, Boolean> body) {
+        boolean accepte = Boolean.TRUE.equals(body.get("accepte"));
+        return ResponseEntity.ok(ApiResponse.ok(accepte ? "Date acceptée" : "Date refusée",
+                mediaPlanService.confirmShootingDate(id, accepte, SecurityUtils.currentEmployeIdOrNull())));
+    }
+
     @PatchMapping("/{id}/resubmit")
     public ResponseEntity<ApiResponse<MediaPlanDTO>> resubmit(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok("Media plan renvoyé", mediaPlanService.resubmit(id)));

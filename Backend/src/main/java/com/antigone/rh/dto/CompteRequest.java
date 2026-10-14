@@ -14,4 +14,8 @@ import java.util.List;
 public class CompteRequest {
     private Long employeId;
     private List<Long> roleIds;
+    /** Null à la modification = ne pas changer. */
+    private List<Long> permissionIdsAjoutees;
+    /** Null à la modification = ne pas changer. */
+    private List<Long> permissionIdsRetirees;
 }
