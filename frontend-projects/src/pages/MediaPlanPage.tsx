@@ -39,6 +39,7 @@ import {
 import Badge from '../components/ui/Badge';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useConfirm } from '../hooks/useConfirm';
+import './MediaPlanGrid.css';
 
 const HOURS = ['', ...Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`)];
 const MONTH_NAMES = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
@@ -46,22 +47,22 @@ const MIN_ROWS = 1;
 const PAGE_SIZE = 8;
 
 const COLUMNS = [
-    { key: 'datePublication', label: 'Date Pub.', defaultWidth: 128 },
-    { key: 'heure', label: 'Heure', defaultWidth: 88 },
-    { key: 'format', label: 'Format', defaultWidth: 120 },
-    { key: 'type', label: 'Type', defaultWidth: 110 },
-    { key: 'titre', label: 'Titre', defaultWidth: 180 },
-    { key: 'texteSurVisuel', label: 'Texte/Visuel', defaultWidth: 160 },
-    { key: 'inspiration', label: 'Inspiration', defaultWidth: 140 },
-    { key: 'autresElements', label: 'Autres', defaultWidth: 120 },
-    { key: 'platforme', label: 'Plateforme', defaultWidth: 120 },
-    { key: 'lienDrive', label: 'Lien Drive', defaultWidth: 140 },
-    { key: 'etatPublication', label: 'État Pub.', defaultWidth: 130 },
-    { key: 'rectifs', label: 'Rectifs', defaultWidth: 120 },
-    { key: 'remarques', label: 'Remarques', defaultWidth: 130 },
-    { key: 'shooting', label: 'Shooting', defaultWidth: 88 },
-    { key: 'statut', label: 'Statut', defaultWidth: 110 },
-    { key: 'actions', label: 'Actions', defaultWidth: 88 },
+    { key: 'datePublication', label: 'Date Pub.', defaultWidth: 148 },
+    { key: 'heure', label: 'Heure', defaultWidth: 104 },
+    { key: 'format', label: 'Format', defaultWidth: 136 },
+    { key: 'type', label: 'Type', defaultWidth: 128 },
+    { key: 'titre', label: 'Titre', defaultWidth: 220 },
+    { key: 'texteSurVisuel', label: 'Texte/Visuel', defaultWidth: 200 },
+    { key: 'inspiration', label: 'Inspiration', defaultWidth: 176 },
+    { key: 'autresElements', label: 'Autres', defaultWidth: 156 },
+    { key: 'platforme', label: 'Plateforme', defaultWidth: 144 },
+    { key: 'lienDrive', label: 'Lien Drive', defaultWidth: 188 },
+    { key: 'etatPublication', label: 'État Pub.', defaultWidth: 140 },
+    { key: 'rectifs', label: 'Rectifs', defaultWidth: 140 },
+    { key: 'remarques', label: 'Remarques', defaultWidth: 150 },
+    { key: 'shooting', label: 'Shooting', defaultWidth: 96 },
+    { key: 'statut', label: 'Statut', defaultWidth: 124 },
+    { key: 'actions', label: 'Actions', defaultWidth: 96 },
 ];
 
 const rowMatchesSearch = (obj: object, query: string) =>
@@ -72,20 +73,18 @@ const TablePager: React.FC<{ page: number; pageCount: number; total: number; onP
 }) => {
     if (total === 0) return null;
     return (
-        <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-t border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/60">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+        <div className="mp-pager">
+            <p className="text-xs font-medium text-[var(--text-3)]">
                 {total} ligne{total > 1 ? 's' : ''}
             </p>
             <div className="flex items-center gap-2">
-                <button type="button" disabled={page <= 0} onClick={() => onPage(page - 1)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-white dark:hover:bg-gray-700">
+                <button type="button" disabled={page <= 0} onClick={() => onPage(page - 1)} className="mp-pager-btn">
                     <HiChevronLeft size={16} />
                 </button>
-                <span className="text-xs font-medium text-gray-600 dark:text-gray-300 min-w-[72px] text-center">
+                <span className="text-xs font-semibold text-[var(--text-2)] min-w-[64px] text-center">
                     {page + 1} / {pageCount}
                 </span>
-                <button type="button" disabled={page >= pageCount - 1} onClick={() => onPage(page + 1)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-white dark:hover:bg-gray-700">
+                <button type="button" disabled={page >= pageCount - 1} onClick={() => onPage(page + 1)} className="mp-pager-btn">
                     <HiChevronRight size={16} />
                 </button>
             </div>
@@ -353,7 +352,7 @@ const MediaPlanPage: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
 
     // ── Row heights ──
-    const DEFAULT_ROW_HEIGHT = 48;
+    const DEFAULT_ROW_HEIGHT = 56;
     const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
     const rowResizeStart = useRef<{ key: string; startY: number; startH: number } | null>(null);
 
@@ -763,17 +762,17 @@ const MediaPlanPage: React.FC = () => {
 
     const monthTabClass = (monthKey: string) => {
         const status = getMonthStatus(monthKey);
-        const base = 'px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-all duration-200 cursor-pointer border ';
-        if (monthKey === selectedMonth) {
-            if (status === 'approved') return base + 'bg-green-500 text-white border-green-600 shadow-md';
-            if (status === 'declined') return base + 'bg-red-500 text-white border-red-600 shadow-md';
-            if (status === 'pending') return base + 'bg-warning-500 text-white border-warning-600 shadow-md';
-            return base + 'bg-brand-500 text-white border-brand-600 shadow-md';
+        const active = monthKey === selectedMonth;
+        if (active) {
+            if (status === 'approved') return 'mp-month-pill active-ok';
+            if (status === 'declined') return 'mp-month-pill active-bad';
+            if (status === 'pending') return 'mp-month-pill active-warn';
+            return 'mp-month-pill active';
         }
-        if (status === 'approved') return base + 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800 hover:bg-green-100';
-        if (status === 'declined') return base + 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800 hover:bg-red-100';
-        if (status === 'pending') return base + 'bg-warning-50 text-warning-700 border-warning-200 dark:bg-warning-900/20 dark:text-warning-400 dark:border-warning-800 hover:bg-warning-100';
-        return base + 'bg-white text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700';
+        if (status === 'approved') return 'mp-month-pill ok';
+        if (status === 'declined') return 'mp-month-pill bad';
+        if (status === 'pending') return 'mp-month-pill warn';
+        return 'mp-month-pill';
     };
 
     const handleGoogleAuth = async () => {
@@ -1012,11 +1011,8 @@ const MediaPlanPage: React.FC = () => {
 
     const isReadOnly = (mp: MediaPlan) => mp.statut !== 'DESAPPROUVE' || !!mp.retourManager;
 
-    const inputClass = (ro?: boolean) =>
-        `w-full bg-transparent border-0 text-sm text-gray-700 dark:text-gray-300 px-1 py-2.5 focus:outline-none focus:ring-1 focus:ring-brand-500 rounded ${ro ? 'cursor-default opacity-70' : 'hover:bg-gray-50 dark:hover:bg-gray-800 cursor-text'}`;
-
-    const selectClass = (ro?: boolean) =>
-        `w-full bg-transparent border-0 text-sm text-gray-700 dark:text-gray-300 px-0 py-2.5 focus:outline-none focus:ring-1 focus:ring-brand-500 rounded ${ro ? 'cursor-default opacity-70 pointer-events-none' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`;
+    const inputClass = (ro?: boolean) => `mp-field ${ro ? 'mp-field-ro' : ''}`;
+    const selectClass = (ro?: boolean) => `mp-field ${ro ? 'mp-field-ro pointer-events-none' : ''}`;
 
     // ── Text cell with formatting + right-click comment support ──
     const TextCell: React.FC<{
@@ -1054,24 +1050,23 @@ const MediaPlanPage: React.FC = () => {
             >
                 {readOnly ? (
                     <div
-                        className={`${inputClass(true)} cursor-pointer overflow-hidden`}
-                        style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', whiteSpace: 'normal', wordBreak: 'break-word', ...cellStyle }}
+                        className="mp-textcell cursor-pointer overflow-hidden"
+                        style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', whiteSpace: 'normal', wordBreak: 'break-word', ...cellStyle }}
                         title="Double-cliquez pour voir"
                     >
-                        {hasLink ? renderCellValue(cellValue) : (cellValue || '-')}
+                        {hasLink ? renderCellValue(cellValue) : (cellValue || <span className="mp-placeholder">—</span>)}
                     </div>
                 ) : (
                     <div
                         onClick={() => openExpanded(cellValue, false, onSave)}
-                        className={`${inputClass(false)} overflow-hidden cursor-text ${isSelected ? 'ring-2 ring-brand-500' : ''}`}
-                        style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', whiteSpace: 'normal', wordBreak: 'break-word', ...cellStyle, height: "100%" }}
+                        className={`mp-textcell overflow-hidden ${isSelected ? 'selected' : ''}`}
+                        style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', whiteSpace: 'normal', wordBreak: 'break-word', ...cellStyle }}
                     >
-                        {cellValue || <span className="text-gray-400">{placeholder}</span>}
+                        {cellValue || <span className="mp-placeholder">{placeholder || 'Saisir…'}</span>}
                     </div>
                 )}
-                {/* Comment indicator dot */}
                 {hasComments && (
-                    <div className="absolute top-0 right-0 w-2.5 h-2.5 rounded-bl-sm bg-amber-400" title={`${cellComments.length} commentaire(s)`} />
+                    <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400" title={`${cellComments.length} commentaire(s)`} />
                 )}
             </div>
         );
@@ -1097,12 +1092,12 @@ const MediaPlanPage: React.FC = () => {
     // ── RENDER TABLE (reusable for both sent & drafts) ──
     // ══════════════════════════════════════════════════
     const renderTableHeader = () => (
-        <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-20 shadow-sm">
+        <thead>
             <tr>
                 {COLUMNS.map((col, ci) => (
                     <th key={col.key}
-                        className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 whitespace-nowrap border-r border-gray-200 dark:border-gray-700 relative select-none"
-                        style={{ width: colWidths[ci], minWidth: 50, overflow: 'hidden' }}>
+                        className={ci === 0 ? 'mp-td-sticky' : ''}
+                        style={{ width: colWidths[ci], minWidth: 72 }}>
                         {col.label}
                         {ci < COLUMNS.length - 1 && (
                             <div style={hoveredHandle === ci || resizingCol === ci ? resizeHandleHoverStyle : resizeHandleStyle}
@@ -1121,45 +1116,45 @@ const MediaPlanPage: React.FC = () => {
         const rowH = rowHeights[`mp-${mp.id}`] || DEFAULT_ROW_HEIGHT;
         return (
             <React.Fragment key={mp.id}>
-                <tr className={`transition-colors relative ${ro ? 'bg-gray-50/50 dark:bg-gray-800/30' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'}`} style={{ height: rowH }}>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[0] }}><input type="date" value={mp.datePublication || ''} readOnly={ro} onChange={e => handleCellChange(mp, 'datePublication', e.target.value)} className={inputClass(ro)} /></td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[1] }}>
+                <tr className={`mp-row ${ro ? 'mp-row-locked' : ''}`} style={{ height: rowH }}>
+                    <td className="mp-td mp-td-sticky" style={{ width: colWidths[0] }}><input type="date" value={mp.datePublication || ''} readOnly={ro} onChange={e => handleCellChange(mp, 'datePublication', e.target.value)} className={inputClass(ro)} /></td>
+                    <td className="mp-td" style={{ width: colWidths[1] }}>
                         <select value={mp.heure || ''} disabled={ro} onChange={e => handleCellChange(mp, 'heure', e.target.value)} className={selectClass(ro)}>
                             {HOURS.map(h => <option key={h} value={h}>{h || '-'}</option>)}
                         </select>
                     </td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[2] }}>
+                    <td className="mp-td" style={{ width: colWidths[2] }}>
                         <select value={mp.format || ''} disabled={ro} onChange={e => handleCellChange(mp, 'format', e.target.value)} className={selectClass(ro)}>
                             <option value="">-</option>
                             {formats.map(f => <option key={f.id} value={f.libelle}>{f.libelle}</option>)}
                         </select>
                     </td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[3] }}>
+                    <td className="mp-td" style={{ width: colWidths[3] }}>
                         <select value={mp.type || ''} disabled={ro} onChange={e => handleCellChange(mp, 'type', e.target.value)} className={selectClass(ro)}>
                             <option value="">-</option>
                             {types.map(t => <option key={t.id} value={t.libelle}>{t.libelle}</option>)}
                         </select>
                     </td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[4] }}><TextCell cellKey={`mp-${mp.id}-titre`} rowId={`mp-${mp.id}`} columnKey="titre" mediaPlanId={mp.id} value={mp.titre} readOnly={ro} onSave={v => handleCellChange(mp, 'titre', v)} className="font-medium" /></td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[5] }}><TextCell cellKey={`mp-${mp.id}-texte`} rowId={`mp-${mp.id}`} columnKey="texte" mediaPlanId={mp.id} value={mp.texteSurVisuel || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'texteSurVisuel', v)} /></td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[6] }}><TextCell cellKey={`mp-${mp.id}-inspiration`} rowId={`mp-${mp.id}`} columnKey="inspiration" mediaPlanId={mp.id} value={mp.inspiration || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'inspiration', v)} /></td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[7] }}><TextCell cellKey={`mp-${mp.id}-autres`} rowId={`mp-${mp.id}`} columnKey="autres" mediaPlanId={mp.id} value={mp.autresElements || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'autresElements', v)} /></td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[8] }}>
+                    <td className="mp-td" style={{ width: colWidths[4] }}><TextCell cellKey={`mp-${mp.id}-titre`} rowId={`mp-${mp.id}`} columnKey="titre" mediaPlanId={mp.id} value={mp.titre} readOnly={ro} onSave={v => handleCellChange(mp, 'titre', v)} className="font-medium" /></td>
+                    <td className="mp-td" style={{ width: colWidths[5] }}><TextCell cellKey={`mp-${mp.id}-texte`} rowId={`mp-${mp.id}`} columnKey="texte" mediaPlanId={mp.id} value={mp.texteSurVisuel || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'texteSurVisuel', v)} /></td>
+                    <td className="mp-td" style={{ width: colWidths[6] }}><TextCell cellKey={`mp-${mp.id}-inspiration`} rowId={`mp-${mp.id}`} columnKey="inspiration" mediaPlanId={mp.id} value={mp.inspiration || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'inspiration', v)} /></td>
+                    <td className="mp-td" style={{ width: colWidths[7] }}><TextCell cellKey={`mp-${mp.id}-autres`} rowId={`mp-${mp.id}`} columnKey="autres" mediaPlanId={mp.id} value={mp.autresElements || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'autresElements', v)} /></td>
+                    <td className="mp-td" style={{ width: colWidths[8] }}>
                         <select value={mp.platforme || ''} disabled={ro} onChange={e => handleCellChange(mp, 'platforme', e.target.value)} className={selectClass(ro)}>
                             <option value="">-</option>
                             {platformes.map(p => <option key={p.id} value={p.libelle}>{p.libelle}</option>)}
                         </select>
                     </td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[9] }}><TextCell cellKey={`mp-${mp.id}-lien`} rowId={`mp-${mp.id}`} columnKey="lien" mediaPlanId={mp.id} value={mp.lienDrive || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'lienDrive', v)} /></td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[10] }}>
+                    <td className="mp-td" style={{ width: colWidths[9] }}><TextCell cellKey={`mp-${mp.id}-lien`} rowId={`mp-${mp.id}`} columnKey="lien" mediaPlanId={mp.id} value={mp.lienDrive || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'lienDrive', v)} /></td>
+                    <td className="mp-td" style={{ width: colWidths[10] }}>
                         <select value={mp.etatPublication || ''} disabled={ro} onChange={e => handleCellChange(mp, 'etatPublication', e.target.value)} className={selectClass(ro)}>
                             <option value="">-</option>
                             {Object.values(EtatPublication).map(ep => <option key={ep} value={ep}>{EtatPublicationLabels[ep]}</option>)}
                         </select>
                     </td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[11] }}><TextCell cellKey={`mp-${mp.id}-rectifs`} rowId={`mp-${mp.id}`} columnKey="rectifs" mediaPlanId={mp.id} value={mp.rectifs || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'rectifs', v)} /></td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[12] }}><TextCell cellKey={`mp-${mp.id}-remarques`} rowId={`mp-${mp.id}`} columnKey="remarques" mediaPlanId={mp.id} value={mp.remarques || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'remarques', v)} /></td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[13] }}>
+                    <td className="mp-td" style={{ width: colWidths[11] }}><TextCell cellKey={`mp-${mp.id}-rectifs`} rowId={`mp-${mp.id}`} columnKey="rectifs" mediaPlanId={mp.id} value={mp.rectifs || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'rectifs', v)} /></td>
+                    <td className="mp-td" style={{ width: colWidths[12] }}><TextCell cellKey={`mp-${mp.id}-remarques`} rowId={`mp-${mp.id}`} columnKey="remarques" mediaPlanId={mp.id} value={mp.remarques || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'remarques', v)} /></td>
+                    <td className="mp-td" style={{ width: colWidths[13] }}>
                         <div className="flex items-center justify-center">
                             <input
                                 type="checkbox"
@@ -1170,11 +1165,11 @@ const MediaPlanPage: React.FC = () => {
                             />
                         </div>
                     </td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[14] }}>
+                    <td className="mp-td" style={{ width: colWidths[14] }}>
                         {getStatusBadge(mp.statut)}
                         {mp.retourManager && <div className="mt-1 text-[10px] font-semibold text-amber-600">Chez le manager</div>}
                     </td>
-                    <td className="px-2 py-1 h-[1px] overflow-hidden" style={{ width: colWidths[15] }}>
+                    <td className="mp-td" style={{ width: colWidths[15] }}>
                         {!ro && (
                             <div className="flex gap-1">
                                 {mp.statut === 'DESAPPROUVE' && (
@@ -1186,7 +1181,7 @@ const MediaPlanPage: React.FC = () => {
                                         <HiOutlineCheck size={15} />
                                     </button>
                                 )}
-                                <button onClick={() => handleClearRow(mp)} className="p-1 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Vider la ligne">
+                                <button onClick={() => handleClearRow(mp)} className="mp-icon-btn" title="Vider la ligne">
                                     <HiOutlineTrash size={15} />
                                 </button>
                             </div>
@@ -1195,9 +1190,10 @@ const MediaPlanPage: React.FC = () => {
                 </tr>
 
                 {mp.isShooting && (
-                    <tr className="bg-brand-50/20 dark:bg-brand-900/10">
-                        <td colSpan={COLUMNS.length} className="px-3 py-3 border-b border-gray-100 dark:border-gray-800">
-                            <div className="text-xs font-semibold text-gray-600 dark:text-gray-300">SHOOTING</div>
+                    <tr>
+                        <td colSpan={COLUMNS.length} className="!p-2 !bg-transparent border-0">
+                            <div className="mp-shooting-panel">
+                            <div className="text-xs font-semibold tracking-wider text-[var(--text-2)]">SHOOTING</div>
                             {ro ? (
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-2 text-sm text-gray-700 dark:text-gray-200">
                                     <div>
@@ -1282,15 +1278,13 @@ const MediaPlanPage: React.FC = () => {
                                     )}
                                 </div>
                             )}
+                            </div>
                         </td>
                     </tr>
                 )}
 
-                {/* ── Row resize strip ── */}
-                <tr>
+                <tr className="mp-row-resizer">
                     <td colSpan={COLUMNS.length}
-                        style={{ height: '5px', padding: 0, cursor: 'row-resize', backgroundColor: 'transparent', borderBottom: '1px solid transparent' }}
-                        className="hover:bg-brand-400/30 transition-colors"
                         onMouseDown={e => startRowResize(`mp-${mp.id}`, rowH, e)}
                         title="Faire glisser pour redimensionner la ligne"
                     />
@@ -1305,45 +1299,45 @@ const MediaPlanPage: React.FC = () => {
         const rowH = rowHeights[draft._key] || DEFAULT_ROW_HEIGHT;
         return (
             <React.Fragment key={draft._key}>
-                <tr className="bg-brand-50/30 dark:bg-brand-900/5 hover:bg-brand-50/60 dark:hover:bg-brand-900/10 transition-colors" style={{ height: rowH }}>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[0] }}><input type="date" value={draft.datePublication} onChange={e => handleDraftChange(idx, 'datePublication', e.target.value)} className={inputClass()} /></td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[1] }}>
+                <tr className="mp-row mp-row-draft" style={{ height: rowH }}>
+                    <td className="mp-td mp-td-sticky" style={{ width: colWidths[0] }}><input type="date" value={draft.datePublication} onChange={e => handleDraftChange(idx, 'datePublication', e.target.value)} className={inputClass()} /></td>
+                    <td className="mp-td" style={{ width: colWidths[1] }}>
                         <select value={draft.heure} onChange={e => handleDraftChange(idx, 'heure', e.target.value)} className={selectClass()}>
                             {HOURS.map(h => <option key={h} value={h}>{h || '-'}</option>)}
                         </select>
                     </td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[2] }}>
+                    <td className="mp-td" style={{ width: colWidths[2] }}>
                         <select value={draft.format} onChange={e => handleDraftChange(idx, 'format', e.target.value)} className={selectClass()}>
                             <option value="">-</option>
                             {formats.map(f => <option key={f.id} value={f.libelle}>{f.libelle}</option>)}
                         </select>
                     </td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[3] }}>
+                    <td className="mp-td" style={{ width: colWidths[3] }}>
                         <select value={draft.type} onChange={e => handleDraftChange(idx, 'type', e.target.value)} className={selectClass()}>
                             <option value="">-</option>
                             {types.map(t => <option key={t.id} value={t.libelle}>{t.libelle}</option>)}
                         </select>
                     </td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[4] }}><TextCell cellKey={`${draft._key}-titre`} rowId={draft._key} columnKey="titre" draftKey={draft._key} value={draft.titre} placeholder="Titre..." onSave={v => handleDraftChange(idx, 'titre', v)} className="font-medium" /></td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[5] }}><TextCell cellKey={`${draft._key}-texte`} rowId={draft._key} columnKey="texte" draftKey={draft._key} value={draft.texteSurVisuel} placeholder="..." onSave={v => handleDraftChange(idx, 'texteSurVisuel', v)} /></td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[6] }}><TextCell cellKey={`${draft._key}-inspiration`} rowId={draft._key} columnKey="inspiration" draftKey={draft._key} value={draft.inspiration} placeholder="..." onSave={v => handleDraftChange(idx, 'inspiration', v)} /></td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[7] }}><TextCell cellKey={`${draft._key}-autres`} rowId={draft._key} columnKey="autres" draftKey={draft._key} value={draft.autresElements} placeholder="..." onSave={v => handleDraftChange(idx, 'autresElements', v)} /></td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[8] }}>
+                    <td className="mp-td" style={{ width: colWidths[4] }}><TextCell cellKey={`${draft._key}-titre`} rowId={draft._key} columnKey="titre" draftKey={draft._key} value={draft.titre} placeholder="Nom du post" onSave={v => handleDraftChange(idx, 'titre', v)} className="font-medium" /></td>
+                    <td className="mp-td" style={{ width: colWidths[5] }}><TextCell cellKey={`${draft._key}-texte`} rowId={draft._key} columnKey="texte" draftKey={draft._key} value={draft.texteSurVisuel} placeholder="Texte visuel" onSave={v => handleDraftChange(idx, 'texteSurVisuel', v)} /></td>
+                    <td className="mp-td" style={{ width: colWidths[6] }}><TextCell cellKey={`${draft._key}-inspiration`} rowId={draft._key} columnKey="inspiration" draftKey={draft._key} value={draft.inspiration} placeholder="Référence" onSave={v => handleDraftChange(idx, 'inspiration', v)} /></td>
+                    <td className="mp-td" style={{ width: colWidths[7] }}><TextCell cellKey={`${draft._key}-autres`} rowId={draft._key} columnKey="autres" draftKey={draft._key} value={draft.autresElements} placeholder="Notes" onSave={v => handleDraftChange(idx, 'autresElements', v)} /></td>
+                    <td className="mp-td" style={{ width: colWidths[8] }}>
                         <select value={draft.platforme} onChange={e => handleDraftChange(idx, 'platforme', e.target.value)} className={selectClass()}>
                             <option value="">-</option>
                             {platformes.map(p => <option key={p.id} value={p.libelle}>{p.libelle}</option>)}
                         </select>
                     </td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[9] }}><TextCell cellKey={`${draft._key}-lien`} rowId={draft._key} columnKey="lien" draftKey={draft._key} value={draft.lienDrive} placeholder="https://..." onSave={v => handleDraftChange(idx, 'lienDrive', v)} /></td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[10] }}>
+                    <td className="mp-td" style={{ width: colWidths[9] }}><TextCell cellKey={`${draft._key}-lien`} rowId={draft._key} columnKey="lien" draftKey={draft._key} value={draft.lienDrive} placeholder="Lien Drive" onSave={v => handleDraftChange(idx, 'lienDrive', v)} /></td>
+                    <td className="mp-td" style={{ width: colWidths[10] }}>
                         <select value={draft.etatPublication} onChange={e => handleDraftChange(idx, 'etatPublication', e.target.value)} className={selectClass()}>
                             <option value="">-</option>
                             {Object.values(EtatPublication).map(ep => <option key={ep} value={ep}>{EtatPublicationLabels[ep]}</option>)}
                         </select>
                     </td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[11] }}><TextCell cellKey={`${draft._key}-rectifs`} rowId={draft._key} columnKey="rectifs" draftKey={draft._key} value={draft.rectifs} placeholder="..." onSave={v => handleDraftChange(idx, 'rectifs', v)} /></td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[12] }}><TextCell cellKey={`${draft._key}-remarques`} rowId={draft._key} columnKey="remarques" draftKey={draft._key} value={draft.remarques} placeholder="..." onSave={v => handleDraftChange(idx, 'remarques', v)} /></td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[13] }}>
+                    <td className="mp-td" style={{ width: colWidths[11] }}><TextCell cellKey={`${draft._key}-rectifs`} rowId={draft._key} columnKey="rectifs" draftKey={draft._key} value={draft.rectifs} placeholder="Rectifs" onSave={v => handleDraftChange(idx, 'rectifs', v)} /></td>
+                    <td className="mp-td" style={{ width: colWidths[12] }}><TextCell cellKey={`${draft._key}-remarques`} rowId={draft._key} columnKey="remarques" draftKey={draft._key} value={draft.remarques} placeholder="Remarques" onSave={v => handleDraftChange(idx, 'remarques', v)} /></td>
+                    <td className="mp-td" style={{ width: colWidths[13] }}>
                         <div className="flex items-center justify-center">
                             <input
                                 type="checkbox"
@@ -1353,8 +1347,8 @@ const MediaPlanPage: React.FC = () => {
                             />
                         </div>
                     </td>
-                    <td className="px-2 py-1 h-[1px] border-r border-gray-100 dark:border-gray-800 overflow-hidden" style={{ width: colWidths[14] }}><Badge variant="light">Brouillon</Badge></td>
-                    <td className="px-2 py-1 h-[1px] overflow-hidden" style={{ width: colWidths[15] }}>
+                    <td className="mp-td" style={{ width: colWidths[14] }}><Badge variant="light">Brouillon</Badge></td>
+                    <td className="mp-td" style={{ width: colWidths[15] }}>
                         <div className="flex gap-1">
                             <button onClick={() => {
                                 const { year, month } = parseMonthKey(selectedMonth);
@@ -1364,10 +1358,10 @@ const MediaPlanPage: React.FC = () => {
                                     if (selectedClientId) saveDraftsToStorage(selectedClientId, selectedMonth, updated);
                                     return updated;
                                 });
-                            }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors" title="Vider les champs">
+                            }} className="mp-icon-btn" title="Vider les champs">
                                 <HiOutlineRefresh size={15} />
                             </button>
-                            <button onClick={() => removeDraft(idx)} className="p-1 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Supprimer la ligne">
+                            <button onClick={() => removeDraft(idx)} className="mp-icon-btn" title="Supprimer la ligne">
                                 <HiOutlineTrash size={15} />
                             </button>
                         </div>
@@ -1375,9 +1369,10 @@ const MediaPlanPage: React.FC = () => {
                 </tr>
 
                 {draft.isShooting && (
-                    <tr className="bg-brand-50/20 dark:bg-brand-900/10">
-                        <td colSpan={COLUMNS.length} className="px-3 py-3 border-b border-gray-100 dark:border-gray-800">
-                            <div className="text-xs font-semibold text-gray-600 dark:text-gray-300">SHOOTING</div>
+                    <tr>
+                        <td colSpan={COLUMNS.length} className="!p-2 !bg-transparent border-0">
+                            <div className="mp-shooting-panel">
+                            <div className="text-xs font-semibold tracking-wider text-[var(--text-2)]">SHOOTING</div>
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-2">
                                 <div>
                                     <label className="block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Description</label>
@@ -1423,15 +1418,13 @@ const MediaPlanPage: React.FC = () => {
                                     </select>
                                 </div>
                             </div>
+                            </div>
                         </td>
                     </tr>
                 )}
 
-                {/* ── Draft row resize strip ── */}
-                <tr>
+                <tr className="mp-row-resizer">
                     <td colSpan={COLUMNS.length}
-                        style={{ height: '5px', padding: 0, cursor: 'row-resize', backgroundColor: 'transparent', borderBottom: '1px solid transparent' }}
-                        className="hover:bg-brand-400/30 transition-colors"
                         onMouseDown={e => startRowResize(draft._key, rowH, e)}
                         title="Faire glisser pour redimensionner la ligne"
                     />
@@ -1441,6 +1434,43 @@ const MediaPlanPage: React.FC = () => {
     };
 
     const tableWidth = colWidths.reduce((s, w) => s + w, 0);
+
+    const renderFormatToolbar = (actions?: React.ReactNode) => (
+        <div className="mp-toolbar">
+            <button
+                type="button"
+                onClick={() => updateFormat({ bold: !selectedFormat.bold })}
+                title="Gras"
+                className={`mp-tool ${selectedFormat.bold ? 'active' : ''}`}
+            >B</button>
+            <div className="mp-size">
+                <button type="button" onClick={() => updateFormat({ fontSize: Math.max(8, (selectedFormat.fontSize || 14) - 1) })}>−</button>
+                <span className="w-6 text-center text-xs font-semibold text-[var(--text-2)]">{selectedFormat.fontSize || 14}</span>
+                <button type="button" onClick={() => updateFormat({ fontSize: Math.min(32, (selectedFormat.fontSize || 14) + 1) })}>+</button>
+            </div>
+            <label className="mp-tool relative overflow-hidden" title="Couleur du texte">
+                <span style={{ color: selectedFormat.textColor || undefined, fontWeight: 800 }}>A</span>
+                <input type="color" value={selectedFormat.textColor || '#374151'} onChange={e => updateFormat({ textColor: e.target.value })} className="absolute inset-0 opacity-0 cursor-pointer" />
+            </label>
+            <label className="mp-tool relative overflow-hidden" title="Couleur de fond">
+                <span className="w-3.5 h-3.5 rounded-sm border border-gray-300" style={{ background: selectedFormat.fillColor || '#fff' }} />
+                <input type="color" value={selectedFormat.fillColor || '#ffffff'} onChange={e => updateFormat({ fillColor: e.target.value })} className="absolute inset-0 opacity-0 cursor-pointer" />
+            </label>
+            {selectedCellKey && (
+                <button type="button" onClick={() => { if (selectedCellKey) setCellFormats(prev => { const n = { ...prev }; delete n[selectedCellKey]; return n; }); }} className="mp-tool" title="Effacer la mise en forme">✕</button>
+            )}
+            <div className="mp-sep" />
+            <button type="button" onClick={exportToCSV} className="mp-tool" title="Exporter" style={{ width: 'auto', padding: '0 10px', gap: 6, fontWeight: 650 }}>
+                <HiOutlineDownload size={14} /> Exporter
+            </button>
+            <div className="mp-search">
+                <HiOutlineSearch size={15} className="text-[var(--text-3)]" />
+                <input type="text" placeholder="Rechercher une ligne…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                {searchQuery && <button type="button" onClick={() => setSearchQuery('')} className="text-[var(--text-3)]"><HiOutlineX size={12} /></button>}
+            </div>
+            {actions && <div className="mp-actions">{actions}</div>}
+        </div>
+    );
 
     // ══════════════════════════════════════════════════
     // ── RENDER ──
@@ -1477,34 +1507,25 @@ const MediaPlanPage: React.FC = () => {
     }
 
     return (
-        <div className="space-y-4">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div className="mp-page">
+            <div className="mp-hero">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Media Plan</h1>
-                    <div className="flex items-center gap-4 mt-1">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                            Client : <span className="text-brand-500 font-medium">{clientName}</span>
-                        </p>
-                        <div
-                            className={`text-xs flex items-center gap-1.5 px-2 py-1 rounded ${isGoogleAuthorized
-                                ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-                                : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
-                                }`}
-                        >
-                            <SiGoogledrive size={14} className={isGoogleAuthorized ? 'text-green-600' : 'text-brand-500'} />
-                            {isGoogleAuthorized === null ? 'Vérification...' : isGoogleAuthorized ? 'Drive (Bot Connecté)' : 'Drive (Non configuré)'}
-                        </div>
+                    <h1>Media Plan</h1>
+                    <div className="mp-hero-meta">
+                        <span className="mp-chip mp-chip-brand">Client : {clientName}</span>
+                        <span className={`mp-chip ${isGoogleAuthorized ? 'mp-chip-ok' : 'mp-chip-warn'}`}>
+                            <SiGoogledrive size={13} />
+                            {isGoogleAuthorized === null ? 'Vérification Drive…' : isGoogleAuthorized ? 'Drive connecté' : 'Drive non configuré'}
+                        </span>
                     </div>
                 </div>
             </div>
 
-            {/* ── Month tabs ── */}
-            <div className="flex items-center gap-2 rounded-xl bg-gray-100 dark:bg-gray-800 p-2">
+            <div className="mp-months">
                 <button type="button"
                     disabled={selectedMonthIndex <= 0}
                     onClick={() => selectedMonthIndex > 0 && setSelectedMonth(monthList[selectedMonthIndex - 1].key)}
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-600">
+                    className="mp-month-nav">
                     <HiChevronLeft size={18} />
                 </button>
                 <div className="flex gap-2 overflow-x-auto flex-1 pb-0.5 scrollbar-hide">
@@ -1517,7 +1538,7 @@ const MediaPlanPage: React.FC = () => {
                 <button type="button"
                     disabled={selectedMonthIndex < 0 || selectedMonthIndex >= monthList.length - 1}
                     onClick={() => selectedMonthIndex < monthList.length - 1 && setSelectedMonth(monthList[selectedMonthIndex + 1].key)}
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-600">
+                    className="mp-month-nav">
                     <HiChevronRight size={18} />
                 </button>
             </div>
@@ -1581,10 +1602,10 @@ const MediaPlanPage: React.FC = () => {
                                 </div>
 
                                 {isOpen && (
-                                    <div className="overflow-auto max-h-[min(60vh,560px)] border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-                                        <table className="divide-y divide-gray-200 dark:divide-gray-700" style={{ tableLayout: 'fixed', width: tableWidth }}>
+                                    <div className="mp-scroll">
+                                        <table className="mp-table" style={{ tableLayout: 'fixed', width: tableWidth }}>
                                             {renderTableHeader()}
-                                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                                            <tbody>
                                                 {batch.plans.map(mp => renderExistingRow(mp))}
                                             </tbody>
                                         </table>
@@ -1605,90 +1626,32 @@ const MediaPlanPage: React.FC = () => {
 
                     {/* ── New plan accordion (draft table) ── */}
                     {newPlanOpen && (
-                        <div className="rounded-xl border-2 border-brand-200 dark:border-brand-800 overflow-hidden">
-                            <div className="flex items-center justify-between px-5 py-3 bg-brand-50 dark:bg-brand-900/20 border-b border-brand-200 dark:border-brand-800">
+                        <div className="mp-shell">
+                            <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)] bg-[#fff8f3]">
                                 <div className="flex items-center gap-3">
                                     <HiOutlineChevronDown size={20} className="text-brand-500" />
-                                    <span className="text-base font-semibold text-brand-700 dark:text-brand-400">Nouveau plan média</span>
+                                    <span className="text-base font-semibold text-[var(--text-1)]">Nouveau plan média</span>
                                     <Badge variant="light">Brouillon</Badge>
                                 </div>
-                                <div className="flex gap-2">
-                                    <button onClick={handleAddRow}
-                                        className="flex items-center gap-1 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-600 transition-colors">
-                                        <HiOutlinePlus size={14} /> Ajouter ligne
-                                    </button>
-                                    <button onClick={handleBulkConfirm}
-                                        className="flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 transition-colors">
-                                        <HiOutlineCheck size={14} /> Confirmer et envoyer
-                                    </button>
-                                    <button onClick={() => { setNewPlanOpen(false); setDraftRows([]); }}
-                                        className="flex items-center gap-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                                        <HiOutlineX size={14} /> Fermer
-                                    </button>
-                                </div>
+                                <button onClick={() => { setNewPlanOpen(false); setDraftRows([]); }}
+                                    className="mp-icon-btn" title="Fermer">
+                                    <HiOutlineX size={16} />
+                                </button>
                             </div>
-                            {/* ── Excel toolbar + Search ── */}
-                            <div className="flex flex-wrap items-center gap-3 px-4 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                                {/* Bold */}
-                                <button
-                                    onClick={() => updateFormat({ bold: !selectedFormat.bold })}
-                                    title="Gras"
-                                    className={`flex items-center justify-center w-7 h-7 rounded font-bold text-sm border transition-colors ${selectedFormat.bold
-                                        ? 'bg-brand-500 text-white border-brand-500'
-                                        : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                        }`}
-                                >B</button>
-                                {/* Font size */}
-                                <div className="flex items-center gap-1">
-                                    <button onClick={() => updateFormat({ fontSize: Math.max(8, (selectedFormat.fontSize || 14) - 1) })} className="w-5 h-5 flex items-center justify-center rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-xs">-</button>
-                                    <span className="w-7 text-center text-xs font-medium text-gray-700 dark:text-gray-300">{selectedFormat.fontSize || 14}</span>
-                                    <button onClick={() => updateFormat({ fontSize: Math.min(32, (selectedFormat.fontSize || 14) + 1) })} className="w-5 h-5 flex items-center justify-center rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-xs">+</button>
-                                </div>
-                                {/* Text color */}
-                                <label className="flex items-center gap-1 cursor-pointer" title="Couleur du texte">
-                                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400" style={{ color: selectedFormat.textColor || undefined }}>A</span>
-                                    <input type="color" value={selectedFormat.textColor || '#374151'} onChange={e => updateFormat({ textColor: e.target.value })} className="w-6 h-6 rounded cursor-pointer border-0 p-0" />
-                                </label>
-                                {/* Fill color */}
-                                <label className="flex items-center gap-1 cursor-pointer" title="Couleur de fond">
-                                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400">🎨</span>
-                                    <input type="color" value={selectedFormat.fillColor || '#ffffff'} onChange={e => updateFormat({ fillColor: e.target.value })} className="w-6 h-6 rounded cursor-pointer border-0 p-0" />
-                                </label>
-                                {/* Clear formatting */}
-                                {selectedCellKey && (
-                                    <button onClick={() => { if (selectedCellKey) setCellFormats(prev => { const n = { ...prev }; delete n[selectedCellKey]; return n; }); }} className="text-xs text-gray-500 hover:text-red-500 dark:text-gray-400 px-2 py-1 rounded border border-gray-200 dark:border-gray-600 hover:border-red-300 transition-colors" title="Effacer la mise en forme">✕</button>
-                                )}
-                                <div className="w-px h-5 bg-gray-300 dark:bg-gray-600" />
-
-                                <div className="flex items-center gap-3 ml-auto">
-                                    {/* Export */}
-                                    <button
-                                        onClick={exportToCSV}
-                                        className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded transition-colors border border-transparent hover:border-brand-200 dark:hover:border-brand-800"
-                                    >
-                                        <HiOutlineDownload size={14} /> Exporter
+                            {renderFormatToolbar(
+                                <>
+                                    <button type="button" onClick={handleAddRow} className="mp-btn mp-btn-brand">
+                                        <HiOutlinePlus size={16} /> Ajouter ligne
                                     </button>
-
-                                    <div className="w-px h-5 bg-gray-300 dark:bg-gray-600" />
-
-                                    {/* Search */}
-                                    <div className="flex items-center gap-1.5">
-                                        <HiOutlineSearch size={14} className="text-gray-400" />
-                                        <input
-                                            type="text"
-                                            placeholder="Rechercher..."
-                                            value={searchQuery}
-                                            onChange={e => setSearchQuery(e.target.value)}
-                                            className="h-7 w-40 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 text-xs text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                                        />
-                                        {searchQuery && <button onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-gray-600"><HiOutlineX size={12} /></button>}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="overflow-auto max-h-[min(62vh,620px)] bg-white dark:bg-gray-900">
-                                <table className="divide-y divide-gray-200 dark:divide-gray-700" style={{ tableLayout: 'fixed', width: tableWidth }}>
+                                    <button type="button" onClick={handleBulkConfirm} className="mp-btn mp-btn-ok">
+                                        <HiOutlineCheck size={16} /> Confirmer et envoyer
+                                    </button>
+                                </>
+                            )}
+                            <div className="mp-scroll">
+                                <table className="mp-table" style={{ tableLayout: 'fixed', width: tableWidth }}>
                                     {renderTableHeader()}
-                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                                    <tbody>
                                         {pagedNewPlanDrafts.draftSlice.map((draft) => renderDraftRow(draft))}
                                     </tbody>
                                 </table>
@@ -1708,95 +1671,33 @@ const MediaPlanPage: React.FC = () => {
             {/* CASE 2: Month not sent yet → original table with drafts */}
             {/* ══════════════════════════════════════════════════ */}
             {!isMonthSent && (
-                <>
-                    {/* ── Excel toolbar + Search ── */}
-                    <div className="flex flex-wrap items-center gap-3 px-4 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                        {/* Bold */}
-                        <button
-                            onClick={() => updateFormat({ bold: !selectedFormat.bold })}
-                            title="Gras"
-                            className={`flex items-center justify-center w-7 h-7 rounded font-bold text-sm border transition-colors ${selectedFormat.bold
-                                ? 'bg-brand-500 text-white border-brand-500'
-                                : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                }`}
-                        >B</button>
-                        {/* Font size */}
-                        <div className="flex items-center gap-1">
-                            <button onClick={() => updateFormat({ fontSize: Math.max(8, (selectedFormat.fontSize || 14) - 1) })} className="w-5 h-5 flex items-center justify-center rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-xs">-</button>
-                            <span className="w-7 text-center text-xs font-medium text-gray-700 dark:text-gray-300">{selectedFormat.fontSize || 14}</span>
-                            <button onClick={() => updateFormat({ fontSize: Math.min(32, (selectedFormat.fontSize || 14) + 1) })} className="w-5 h-5 flex items-center justify-center rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-xs">+</button>
-                        </div>
-                        {/* Text color */}
-                        <label className="flex items-center gap-1 cursor-pointer" title="Couleur du texte">
-                            <span className="text-xs font-medium text-gray-600 dark:text-gray-400" style={{ color: selectedFormat.textColor || undefined }}>A</span>
-                            <input type="color" value={selectedFormat.textColor || '#374151'} onChange={e => updateFormat({ textColor: e.target.value })} className="w-6 h-6 rounded cursor-pointer border-0 p-0" />
-                        </label>
-                        {/* Fill color */}
-                        <label className="flex items-center gap-1 cursor-pointer" title="Couleur de fond">
-                            <span className="text-xs font-medium text-gray-600 dark:text-gray-400">🎨</span>
-                            <input type="color" value={selectedFormat.fillColor || '#ffffff'} onChange={e => updateFormat({ fillColor: e.target.value })} className="w-6 h-6 rounded cursor-pointer border-0 p-0" />
-                        </label>
-                        {/* Clear formatting */}
-                        {selectedCellKey && (
-                            <button onClick={() => { if (selectedCellKey) setCellFormats(prev => { const n = { ...prev }; delete n[selectedCellKey]; return n; }); }} className="text-xs text-gray-500 hover:text-red-500 dark:text-gray-400 px-2 py-1 rounded border border-gray-200 dark:border-gray-600 hover:border-red-300 transition-colors" title="Effacer la mise en forme">✕</button>
-                        )}
-                        <div className="w-px h-5 bg-gray-300 dark:bg-gray-600" />
-
-                        <div className="flex items-center gap-3 ml-auto">
-                            {/* Export */}
-                            <button
-                                onClick={exportToCSV}
-                                className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded transition-colors border border-transparent hover:border-brand-200 dark:hover:border-brand-800"
-                            >
-                                <HiOutlineDownload size={14} /> Exporter
+                <div className="mp-shell">
+                    {renderFormatToolbar(
+                        <>
+                            <button type="button" onClick={handleAddRow} className="mp-btn mp-btn-brand">
+                                <HiOutlinePlus size={16} /> Ajouter ligne
                             </button>
-
-                            <div className="w-px h-5 bg-gray-300 dark:bg-gray-600" />
-
-                            {/* Search */}
-                            <div className="flex items-center gap-1.5">
-                                <HiOutlineSearch size={14} className="text-gray-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Rechercher..."
-                                    value={searchQuery}
-                                    onChange={e => setSearchQuery(e.target.value)}
-                                    className="h-7 w-44 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 text-xs text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                                />
-                                {searchQuery && <button onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-gray-600"><HiOutlineX size={12} /></button>}
-                            </div>
-                        </div>
+                            <button type="button" onClick={handleBulkConfirm} className="mp-btn mp-btn-ok">
+                                <HiOutlineCheck size={16} /> Confirmer et envoyer
+                            </button>
+                        </>
+                    )}
+                    <div className="mp-scroll">
+                        <table className="mp-table" style={{ tableLayout: 'fixed', width: tableWidth }}>
+                            {renderTableHeader()}
+                            <tbody>
+                                {pagedUnsent.existingSlice.map(mp => renderExistingRow(mp))}
+                                {pagedUnsent.draftSlice.map((draft) => renderDraftRow(draft))}
+                            </tbody>
+                        </table>
                     </div>
-                    {/* ── Action buttons ── */}
-                    <div className="flex gap-2 items-center justify-end">
-                        <button onClick={handleAddRow}
-                            className="flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-600 transition-colors">
-                            <HiOutlinePlus size={16} /> Ajouter ligne
-                        </button>
-                        <button onClick={handleBulkConfirm}
-                            className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 transition-colors">
-                            <HiOutlineCheck size={16} /> Confirmer et envoyer
-                        </button>
-                    </div>
-
-                    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
-                        <div className="overflow-auto max-h-[min(62vh,640px)]">
-                            <table className="divide-y divide-gray-200 dark:divide-gray-700" style={{ tableLayout: 'fixed', width: tableWidth }}>
-                                {renderTableHeader()}
-                                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                    {pagedUnsent.existingSlice.map(mp => renderExistingRow(mp))}
-                                    {pagedUnsent.draftSlice.map((draft) => renderDraftRow(draft))}
-                                </tbody>
-                            </table>
-                        </div>
-                        <TablePager
-                            page={pagedUnsent.page}
-                            pageCount={pagedUnsent.pageCount}
-                            total={pagedUnsent.total}
-                            onPage={setTablePage}
-                        />
-                    </div>
-                </>
+                    <TablePager
+                        page={pagedUnsent.page}
+                        pageCount={pagedUnsent.pageCount}
+                        total={pagedUnsent.total}
+                        onPage={setTablePage}
+                    />
+                </div>
             )}
 
             {/* Expanded cell overlay */}
