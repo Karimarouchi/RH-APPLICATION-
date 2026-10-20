@@ -10,7 +10,7 @@ const MainLayout: React.FC = () => {
   return (
     <div className="min-h-screen bg-[var(--bg)] dark:bg-gray-950">
       <Sidebar />
-      <div className={`transition-all duration-300 ease-in-out ${isRailVisible ? 'lg:ml-[80px]' : 'lg:ml-0'}`}>
+      <div className={`transition-all duration-300 ease-in-out ${isRailVisible ? 'lg:ml-[var(--sidebar-w)]' : 'lg:ml-0'}`}>
         <main className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
           <Outlet />
         </main>

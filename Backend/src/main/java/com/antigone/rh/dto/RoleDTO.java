@@ -14,5 +14,6 @@ import java.util.Set;
 public class RoleDTO {
     private Long id;
     private String nom;
+    private boolean accesTotal;
     private Set<PermissionDTO> permissions;
 }

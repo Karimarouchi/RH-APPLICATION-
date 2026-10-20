@@ -10,6 +10,7 @@ import {
     HiOutlineBriefcase,
     HiOutlineArrowLeft,
 } from 'react-icons/hi';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { mediaPlanService } from '../api/mediaPlanService';
 import { referentielService } from '../api/referentielService';
@@ -110,8 +111,8 @@ const getBatchLabel = (batch: PlanBatch) => {
 
 const TousLesMediaPlanPage: React.FC = () => {
     const { user } = useAuth();
-    const canValidateMediaPlans = (user?.permissions ?? []).includes('VALIDATE_MEDIA_PLAN')
-        || (user?.roles ?? []).includes('ADMIN');
+    const navigate = useNavigate();
+    const canValidateMediaPlans = (user?.permissions ?? []).includes('VALIDATE_MEDIA_PLAN');
     const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
 
     const [clients, setClients] = useState<ClientDTO[]>([]);
@@ -781,8 +782,20 @@ const TousLesMediaPlanPage: React.FC = () => {
 
                     {/* Batch Cards Grid */}
                     {batches.length === 0 ? (
-                        <div className="py-12 text-center text-gray-400 dark:text-gray-500 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
-                            Aucun media plan pour ce client
+                        <div className="py-12 text-center bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-6">
+                            <p className="text-gray-700 dark:text-gray-200 font-medium">Aucun media plan enregistré pour ce client</p>
+                            <p className="mt-2 text-sm text-gray-400 dark:text-gray-500 max-w-md mx-auto">
+                                Assigner un employé ne crée pas de lignes. Les plans apparaissent ici une fois saisis et enregistrés depuis Media Plan.
+                            </p>
+                            {selectedClientId && (
+                                <button
+                                    type="button"
+                                    onClick={() => navigate(`/media-plan/${selectedClientId}`)}
+                                    className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
+                                >
+                                    Ouvrir Media Plan
+                                </button>
+                            )}
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-2">

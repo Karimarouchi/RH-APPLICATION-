@@ -3,11 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { HiChevronLeft, HiChevronRight } from 'react-icons/hi';
 import { useAuth } from '../../context/AuthContext';
 import { relayAuthSnapshotForSwitch } from '../../utils/authStorage';
-
-const resolveAppKind = (): 'projects' | 'rh' => {
-  const appKind = (import.meta.env.VITE_APP_KIND as string | undefined)?.trim().toLowerCase();
-  return appKind === 'rh' ? 'rh' : 'projects';
-};
+import { APP_KIND, PROJECTS_APP_URL, RH_APP_URL } from '../../config/apps';
 
 type AppKind = 'projects' | 'rh';
 
@@ -19,15 +15,13 @@ const AppSwitchButton: React.FC = () => {
 
   if (!isAuthenticated) return null;
 
-  const appKind = resolveAppKind();
+  const appKind = APP_KIND;
   const targetLabel = appKind === 'projects' ? 'RH' : 'Projets';
 
   const switchTo = (targetApp: AppKind) => {
     if (targetApp === appKind) return;
 
-    const targetUrl = targetApp === 'rh'
-      ? (import.meta.env.VITE_RH_APP_URL as string | undefined)?.trim()
-      : (import.meta.env.VITE_PROJECTS_APP_URL as string | undefined)?.trim();
+    const targetUrl = targetApp === 'rh' ? RH_APP_URL : PROJECTS_APP_URL;
 
     const fallbackPath = targetApp === 'rh' ? '/dashboard-rh' : '/dashboard';
 

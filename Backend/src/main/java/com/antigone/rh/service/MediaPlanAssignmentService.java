@@ -73,13 +73,11 @@ public class MediaPlanAssignmentService {
     }
 
     /**
-     * Get all employees from the "social media" department (case-insensitive).
+     * Employés assignables aux clients média plan : permission VIEW_MEDIA_PLAN
+     * donnée explicitement (les rôles à accès total ne remplissent pas cette liste).
      */
     public List<Employe> getSocialMediaEmployees() {
-        return employeRepository.findAll().stream()
-                .filter(e -> e.getDepartement() != null
-                        && e.getDepartement().toLowerCase().contains("social media"))
-                .collect(Collectors.toList());
+        return employeRepository.findByPermissionExplicite("VIEW_MEDIA_PLAN");
     }
 
     private MediaPlanAssignmentDTO toDTO(MediaPlanAssignment a) {

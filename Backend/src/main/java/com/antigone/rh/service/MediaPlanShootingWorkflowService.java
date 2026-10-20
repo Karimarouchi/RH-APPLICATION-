@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -49,7 +48,7 @@ public class MediaPlanShootingWorkflowService {
             throw new RuntimeException("La date au plus tard du shooting est obligatoire");
         }
 
-        Employe prod = findProductionManagerOrThrow();
+        List<Employe> validators = findShootingValidators();
         mp.setShootingStatus(StatutShooting.EN_ATTENTE_DATE);
         mp.setShootingStatusReason(null);
         mediaPlanRepository.save(mp);
@@ -59,7 +58,9 @@ public class MediaPlanShootingWorkflowService {
                 : "Un employé";
         String message = creatorName + " a demandé un shooting '" + nullToEmpty(mp.getTitre())
                 + "' au plus tard le " + mp.getShootingAuPlusTard() + ". Posez la date dans le calendrier.";
-        notificationService.create(prod, "SHOOTING_DATE", message, null);
+        for (Employe validator : validators) {
+            notificationService.create(validator, "SHOOTING_DATE", message, null);
+        }
     }
 
     public void placeShootingDate(MediaPlan mp, LocalDate date, Long actorId) {
@@ -76,11 +77,8 @@ public class MediaPlanShootingWorkflowService {
             throw new RuntimeException("La date doit être au plus tard le " + mp.getShootingAuPlusTard());
         }
 
-        Employe prod = findProductionManagerOrThrow();
-        if (!com.antigone.rh.security.SecurityUtils.isAdmin()
-                && (actorId == null || !actorId.equals(prod.getId()))) {
-            throw new RuntimeException("Seul le manager du département Production peut poser la date");
-        }
+        requireShootingValidator();
+        Employe prod = resolveShootingCalendarOwner(actorId);
 
         CalendrierProjet slot = calendrierProjetRepository.findByMediaPlanLigneId(mp.getId()).orElse(null);
         Long ignoreSlotId = slot != null ? slot.getId() : null;
@@ -161,10 +159,11 @@ public class MediaPlanShootingWorkflowService {
         mp.setShootingStatus(StatutShooting.EN_ATTENTE_DATE);
         mp.setShootingStatusReason("Date refusée par le client");
         mediaPlanRepository.save(mp);
-        Employe prod = findProductionManagerOrThrow();
-        notificationService.create(prod, "SHOOTING_DATE",
-                "La date proposée pour '" + nullToEmpty(mp.getTitre()) + "' ne convient pas au client. Choisissez une autre date.",
-                null);
+        String retryMsg = "La date proposée pour '" + nullToEmpty(mp.getTitre())
+                + "' ne convient pas au client. Choisissez une autre date.";
+        for (Employe validator : findShootingValidators()) {
+            notificationService.create(validator, "SHOOTING_DATE", retryMsg, null);
+        }
     }
 
     public void onCalendrierSlotStatusUpdated(CalendrierProjet slot) {
@@ -193,16 +192,40 @@ public class MediaPlanShootingWorkflowService {
         mediaPlanRepository.save(mp);
     }
 
-    private Employe findProductionManagerOrThrow() {
-        List<Employe> managers = employeRepository.findAll().stream()
-                .filter(e -> !Boolean.TRUE.equals(e.getArchived()))
-                .filter(e -> Boolean.TRUE.equals(e.getManagerDepartement()))
-                .filter(e -> e.getDepartement() != null && e.getDepartement().toLowerCase().contains("prod"))
-                .collect(Collectors.toList());
-        if (managers.isEmpty()) {
-            throw new RuntimeException("Désignez le manager du département Production sur sa fiche employé");
+    private static void requireShootingValidator() {
+        if (!com.antigone.rh.security.SecurityUtils.isAdmin()
+                && !com.antigone.rh.security.SecurityUtils.hasAnyAuthority("VALIDATE_SHOOTING")) {
+            throw new RuntimeException("Seul un responsable tournage peut poser la date");
         }
-        return managers.get(0);
+    }
+
+    /**
+     * Personnes désignées pour le tournage : permission VALIDATE_SHOOTING donnée
+     * explicitement (pas seulement via un rôle à accès total).
+     */
+    private List<Employe> findShootingValidators() {
+        List<Employe> explicit = employeRepository.findByPermissionExplicite("VALIDATE_SHOOTING");
+        if (!explicit.isEmpty()) {
+            return explicit;
+        }
+        List<Employe> any = employeRepository.findByPermission("VALIDATE_SHOOTING");
+        if (any.isEmpty()) {
+            throw new RuntimeException(
+                    "Attribuez la permission « Responsable tournage » (VALIDATE_SHOOTING) à au moins un rôle");
+        }
+        return any;
+    }
+
+    private Employe resolveShootingCalendarOwner(Long actorId) {
+        List<Employe> validators = findShootingValidators();
+        if (actorId != null) {
+            for (Employe validator : validators) {
+                if (actorId.equals(validator.getId())) {
+                    return validator;
+                }
+            }
+        }
+        return validators.get(0);
     }
 
     private void ensureDateAvailable(Long managerId, LocalDate date, Long ignoreSlotId) {

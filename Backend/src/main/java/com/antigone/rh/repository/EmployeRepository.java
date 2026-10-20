@@ -35,6 +35,15 @@ public interface EmployeRepository extends JpaRepository<Employe, Long> {
             + "AND NOT EXISTS (SELECT 1 FROM c.permissionsRetirees pr WHERE pr.permission = :code)))")
     List<Employe> findByPermission(@Param("code") String code);
 
+    /** Comme findByPermission, sans compter les roles a acces total (qui ont tout par defaut). */
+    @Query("SELECT DISTINCT e FROM Employe e JOIN e.compte c "
+            + "WHERE (e.archived = false OR e.archived IS NULL) AND ("
+            + "EXISTS (SELECT 1 FROM c.permissionsAjoutees pa WHERE pa.permission = :code) "
+            + "OR (EXISTS (SELECT 1 FROM c.roles r JOIN r.permissions p WHERE p.permission = :code "
+            + "AND (r.accesTotal = false OR r.accesTotal IS NULL)) "
+            + "AND NOT EXISTS (SELECT 1 FROM c.permissionsRetirees pr WHERE pr.permission = :code)))")
+    List<Employe> findByPermissionExplicite(@Param("code") String code);
+
     @Query("SELECT e FROM Employe e WHERE e.dateFinContrat IS NOT NULL AND e.dateFinContrat = :date")
     List<Employe> findByDateFinContrat(@Param("date") LocalDate date);
 

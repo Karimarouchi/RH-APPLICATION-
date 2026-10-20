@@ -115,7 +115,7 @@ const ProjetsPage: React.FC = () => {
 
       const [pResult, managersResult, demandesResult, clientsResult] = await Promise.allSettled([
         canManageAllProjets ? projetService.getAll() : (userId ? projetService.getByEmploye(userId) : projetService.getAll()),
-        employeService.getByRole('MANAGER'),
+        employeService.getDepartmentManagers(),
         demandeService.getByStatut(StatutDemande.APPROUVEE),
         clientService.getAllClients(),
       ]);

@@ -39,6 +39,7 @@ import { mediaPlanAssignmentService } from '../../api/mediaPlanAssignmentService
 import { notificationService } from '../../api/notificationService';
 import { NotificationResponse, Projet } from '../../types';
 import { relayAuthSnapshotForSwitch } from '../../utils/authStorage';
+import { RH_APP_URL } from '../../config/apps';
 import './SidebarCanva.css';
 import { getNotificationTarget, shouldDisplayNotification } from '../../utils/notificationRules';
 
@@ -340,9 +341,10 @@ const Sidebar: React.FC = () => {
   const [notifications, setNotifications] = useState<NotificationResponse[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [activePanelMode, setActivePanelMode] = useState<'projets' | 'calendrier' | 'media-plan' | 'projects-analytics' | null>(null);
+  const lastAutoSubmenuKey = useRef<string | null>(null);
   const notifMenuRef = useRef<HTMLDivElement>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
-  const rhAppUrl = (import.meta.env.VITE_RH_APP_URL as string | undefined)?.trim();
+  const rhAppUrl = RH_APP_URL;
   const isClient = !!user?.isClient;
   const canViewValidations = userPermissions.includes('VIEW_VALIDATIONS');
 
@@ -571,6 +573,22 @@ const Sidebar: React.FC = () => {
   }, [activePanelMode, location.pathname, visibleRailMain, visibleRailSecondary]);
 
   const userInitials = `${user?.prenom?.[0] ?? ''}${user?.nom?.[0] ?? ''}`.toUpperCase() || 'SA';
+
+  useEffect(() => {
+    const matchKey = panelGroupsTemplate
+      .filter((group) => !activePanelMode || group.modes.includes(activePanelMode))
+      .flatMap((group) => group.items)
+      .find((item) =>
+        item.children?.some((child) =>
+          panelRouteMatches(location.pathname, location.search, child.path),
+        ),
+      )?.key ?? null;
+
+    if (matchKey && matchKey !== lastAutoSubmenuKey.current) {
+      setOpenSubmenu(matchKey);
+    }
+    lastAutoSubmenuKey.current = matchKey;
+  }, [activePanelMode, location.pathname, location.search, setOpenSubmenu]);
 
   const openPanelIfNeeded = () => {
     if (!isExpanded) toggleSidebar();
@@ -1077,7 +1095,7 @@ const PanelItem: React.FC<{
   const navigate = useNavigate();
   const active = panelRouteMatches(currentPath, currentSearch, item.path);
   const childActive = item.children?.some((child) => panelRouteMatches(currentPath, currentSearch, child.path)) ?? false;
-  const isOpen = openSubmenu === item.key || childActive;
+  const isOpen = openSubmenu === item.key;
 
   if (item.children && item.children.length > 0) {
     return (
@@ -1088,7 +1106,7 @@ const PanelItem: React.FC<{
             event.stopPropagation();
             setOpenSubmenu(isOpen ? null : item.key);
 
-            if (item.key !== 'mes-projets') {
+            if (!isOpen && item.key !== 'mes-projets') {
               navigate(item.path);
             }
           }}

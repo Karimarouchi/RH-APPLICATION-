@@ -12,6 +12,8 @@ import {
     HiOutlineDownload,
     HiOutlineChatAlt,
     HiOutlineShieldCheck,
+    HiChevronLeft,
+    HiChevronRight,
 } from 'react-icons/hi';
 import { SiGoogledrive } from 'react-icons/si';
 import { useAuth } from '../context/AuthContext';
@@ -20,6 +22,7 @@ import { referentielService } from '../api/referentielService';
 import { mediaPlanAssignmentService } from '../api/mediaPlanAssignmentService';
 import { mediaPlanCommentService, MediaPlanCommentDTO } from '../api/mediaPlanCommentService';
 import { employeService } from '../api/employeService';
+import { clientService } from '../api/clientService';
 import { calendrierProjetService } from '../api/calendrierProjetService';
 import {
     MediaPlan,
@@ -39,26 +42,56 @@ import { useConfirm } from '../hooks/useConfirm';
 
 const HOURS = ['', ...Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`)];
 const MONTH_NAMES = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-const MIN_ROWS = 14;
+const MIN_ROWS = 1;
+const PAGE_SIZE = 8;
 
 const COLUMNS = [
-    { key: 'datePublication', label: 'Date Pub.', defaultWidth: 130 },
-    { key: 'heure', label: 'Heure', defaultWidth: 90 },
-    { key: 'format', label: 'Format', defaultWidth: 110 },
+    { key: 'datePublication', label: 'Date Pub.', defaultWidth: 128 },
+    { key: 'heure', label: 'Heure', defaultWidth: 88 },
+    { key: 'format', label: 'Format', defaultWidth: 120 },
     { key: 'type', label: 'Type', defaultWidth: 110 },
-    { key: 'titre', label: 'Titre', defaultWidth: 140 },
-    { key: 'texteSurVisuel', label: 'Texte/Visuel', defaultWidth: 130 },
-    { key: 'inspiration', label: 'Inspiration', defaultWidth: 120 },
-    { key: 'autresElements', label: 'Autres', defaultWidth: 110 },
-    { key: 'platforme', label: 'Platforme', defaultWidth: 110 },
-    { key: 'lienDrive', label: 'Lien Drive', defaultWidth: 120 },
-    { key: 'etatPublication', label: 'État Pub.', defaultWidth: 110 },
-    { key: 'rectifs', label: 'Rectifs', defaultWidth: 110 },
-    { key: 'remarques', label: 'Remarques', defaultWidth: 120 },
-    { key: 'shooting', label: 'Shooting', defaultWidth: 90 },
-    { key: 'statut', label: 'Statut', defaultWidth: 100 },
-    { key: 'actions', label: 'Actions', defaultWidth: 80 },
+    { key: 'titre', label: 'Titre', defaultWidth: 180 },
+    { key: 'texteSurVisuel', label: 'Texte/Visuel', defaultWidth: 160 },
+    { key: 'inspiration', label: 'Inspiration', defaultWidth: 140 },
+    { key: 'autresElements', label: 'Autres', defaultWidth: 120 },
+    { key: 'platforme', label: 'Plateforme', defaultWidth: 120 },
+    { key: 'lienDrive', label: 'Lien Drive', defaultWidth: 140 },
+    { key: 'etatPublication', label: 'État Pub.', defaultWidth: 130 },
+    { key: 'rectifs', label: 'Rectifs', defaultWidth: 120 },
+    { key: 'remarques', label: 'Remarques', defaultWidth: 130 },
+    { key: 'shooting', label: 'Shooting', defaultWidth: 88 },
+    { key: 'statut', label: 'Statut', defaultWidth: 110 },
+    { key: 'actions', label: 'Actions', defaultWidth: 88 },
 ];
+
+const rowMatchesSearch = (obj: object, query: string) =>
+    !query || Object.values(obj).some((v) => typeof v === 'string' && v.toLowerCase().includes(query.toLowerCase()));
+
+const TablePager: React.FC<{ page: number; pageCount: number; total: number; onPage: (page: number) => void }> = ({
+    page, pageCount, total, onPage,
+}) => {
+    if (total === 0) return null;
+    return (
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-t border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/60">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+                {total} ligne{total > 1 ? 's' : ''}
+            </p>
+            <div className="flex items-center gap-2">
+                <button type="button" disabled={page <= 0} onClick={() => onPage(page - 1)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-white dark:hover:bg-gray-700">
+                    <HiChevronLeft size={16} />
+                </button>
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300 min-w-[72px] text-center">
+                    {page + 1} / {pageCount}
+                </span>
+                <button type="button" disabled={page >= pageCount - 1} onClick={() => onPage(page + 1)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-white dark:hover:bg-gray-700">
+                    <HiChevronRight size={16} />
+                </button>
+            </div>
+        </div>
+    );
+};
 
 // ── Draft row ──
 interface DraftRow {
@@ -271,9 +304,11 @@ const MediaPlanPage: React.FC = () => {
 
     const [mediaPlans, setMediaPlans] = useState<MediaPlan[]>([]);
     const [assignments, setAssignments] = useState<MediaPlanAssignment[]>([]);
+    const [clientLabel, setClientLabel] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isForbidden, setIsForbidden] = useState(false);
     const [draftRows, setDraftRows] = useState<DraftRow[]>([]);
+    const [tablePage, setTablePage] = useState(0);
 
     // Expanded cell
     const [expandedCell, setExpandedCell] = useState<{
@@ -318,7 +353,7 @@ const MediaPlanPage: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
 
     // ── Row heights ──
-    const DEFAULT_ROW_HEIGHT = 104;
+    const DEFAULT_ROW_HEIGHT = 48;
     const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
     const rowResizeStart = useRef<{ key: string; startY: number; startH: number } | null>(null);
 
@@ -421,16 +456,21 @@ const MediaPlanPage: React.FC = () => {
     useEffect(() => { loadData(); }, [selectedClientId]);
 
     useEffect(() => {
+        if (!selectedClientId) {
+            setClientLabel(null);
+            return;
+        }
+        clientService.getClientById(selectedClientId)
+            .then((res) => setClientLabel(res.data.data?.nom || null))
+            .catch(() => setClientLabel(null));
+    }, [selectedClientId]);
+
+    useEffect(() => {
         const fetchHeadProd = async () => {
             try {
-                const [res1, res2] = await Promise.all([
-                    employeService.getByRole('Head Prod').catch(() => ({ data: { data: [] } } as any)),
-                    employeService.getByRole('HEAD_PROD').catch(() => ({ data: { data: [] } } as any)),
-                ]);
-                const data1 = res1.data?.data || [];
-                const data2 = res2.data?.data || [];
-                const merged = [...data1, ...data2];
-                const unique = Array.from(new Map(merged.map((m: any) => [m.id, m])).values());
+                const res = await employeService.getByPermission('VALIDATE_SHOOTING', true)
+                    .catch(() => ({ data: { data: [] } } as any));
+                const unique = res.data?.data || [];
                 setHeadProdId(unique.length > 0 ? unique[0].id : null);
             } catch (e) {
                 setHeadProdId(null);
@@ -474,7 +514,7 @@ const MediaPlanPage: React.FC = () => {
 
     // Fetch comments when month or client changes
     useEffect(() => {
-        if (!selectedClientId) return;
+        if (!selectedClientId || !user) return;
         const fetchComments = async () => {
             try {
                 const res = await mediaPlanCommentService.getByClientIdAndMonthKey(selectedClientId, selectedMonth);
@@ -484,7 +524,7 @@ const MediaPlanPage: React.FC = () => {
             }
         };
         fetchComments();
-    }, [selectedClientId, selectedMonth]);
+    }, [selectedClientId, selectedMonth, user]);
 
     // ── Column resize ──
     const handleMouseMove = useCallback((e: MouseEvent) => {
@@ -533,8 +573,7 @@ const MediaPlanPage: React.FC = () => {
             setIsForbidden(false);
             if (!user?.employeId) return;
 
-            const roles = (user as any).roles || [];
-            const isAdmin = roles.includes('ADMIN') || roles.includes('MANAGER');
+            const isAdmin = (user?.permissions || []).includes('VIEW_TOUS_MEDIA_PLAN');
 
             if (selectedClientId) {
                 if (!isAdmin) {
@@ -579,11 +618,12 @@ const MediaPlanPage: React.FC = () => {
 
     const clientName = useMemo(() => {
         if (!selectedClientId) return null;
+        if (clientLabel) return clientLabel;
         const fromPlan = mediaPlans.find(mp => mp.clientId === selectedClientId);
         if (fromPlan?.clientNom) return fromPlan.clientNom;
         const fromAssign = assignments.find(a => a.clientId === selectedClientId);
         return fromAssign?.clientNom || `Client #${selectedClientId}`;
-    }, [selectedClientId, mediaPlans, assignments]);
+    }, [selectedClientId, clientLabel, mediaPlans, assignments]);
 
     // ── Month list ──
     const monthList = useMemo(() => {
@@ -643,31 +683,68 @@ const MediaPlanPage: React.FC = () => {
         return batches;
     }, [monthMediaPlans, isMonthSent]);
 
+    const pagedUnsent = useMemo(() => {
+        const existing = monthMediaPlans.filter((mp) => rowMatchesSearch(mp, searchQuery));
+        const drafts = draftRows.filter((d) => rowMatchesSearch(d, searchQuery));
+        const total = existing.length + drafts.length;
+        const pageCount = Math.max(1, Math.ceil(Math.max(total, 1) / PAGE_SIZE));
+        const page = Math.min(tablePage, pageCount - 1);
+        const start = page * PAGE_SIZE;
+        const end = start + PAGE_SIZE;
+        const existingSlice = existing.slice(start, end);
+        const draftStart = Math.max(0, start - existing.length);
+        const draftEnd = Math.max(0, end - existing.length);
+        return {
+            existingSlice,
+            draftSlice: drafts.slice(draftStart, draftEnd),
+            total,
+            pageCount,
+            page,
+        };
+    }, [monthMediaPlans, draftRows, searchQuery, tablePage]);
+
+    const pagedNewPlanDrafts = useMemo(() => {
+        const drafts = draftRows.filter((d) => rowMatchesSearch(d, searchQuery));
+        const pageCount = Math.max(1, Math.ceil(Math.max(drafts.length, 1) / PAGE_SIZE));
+        const page = Math.min(tablePage, pageCount - 1);
+        const start = page * PAGE_SIZE;
+        return {
+            draftSlice: drafts.slice(start, start + PAGE_SIZE),
+            total: drafts.length,
+            pageCount,
+            page,
+        };
+    }, [draftRows, searchQuery, tablePage]);
+
+    const selectedMonthIndex = monthList.findIndex((m) => m.key === selectedMonth);
+
     // ── Load drafts ──
     useEffect(() => {
         if (!selectedClientId) return;
-        // If month is sent and new plan is not open, clear drafts
         if (isMonthSent && !newPlanOpen) {
             setDraftRows([]);
             return;
         }
         const saved = loadDraftsFromStorage(selectedClientId, selectedMonth);
-        const totalExisting = (isMonthSent ? 0 : monthMediaPlans.length) + saved.length;
-        const needed = Math.max(0, MIN_ROWS - totalExisting);
+        if (saved.length > 0) {
+            setDraftRows(saved);
+            return;
+        }
         const { year, month } = parseMonthKey(selectedMonth);
-        const emptyPad = Array.from({ length: needed }, () => {
-            const d = emptyDraft();
-            d.datePublication = `${year}-${String(month + 1).padStart(2, '0')}-01`;
-            return d;
-        });
-        setDraftRows([...saved, ...emptyPad]);
-    }, [selectedMonth, monthMediaPlans.length, selectedClientId, isMonthSent]);
+        const d = emptyDraft();
+        d.datePublication = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+        setDraftRows([d]);
+    }, [selectedMonth, monthMediaPlans.length, selectedClientId, isMonthSent, newPlanOpen]);
 
-    // Reset accordion states on month change
     useEffect(() => {
         setOpenBatches(new Set());
         setNewPlanOpen(false);
+        setTablePage(0);
     }, [selectedMonth]);
+
+    useEffect(() => {
+        setTablePage(0);
+    }, [searchQuery]);
 
     // ── Month status for tab coloring ──
     const getMonthStatus = (monthKey: string): 'approved' | 'declined' | 'pending' | 'empty' => {
@@ -757,6 +834,7 @@ const MediaPlanPage: React.FC = () => {
         setDraftRows(prev => {
             const next = [...prev, draft];
             if (selectedClientId) saveDraftsToStorage(selectedClientId, selectedMonth, next);
+            setTablePage(Math.floor((monthMediaPlans.filter((mp) => rowMatchesSearch(mp, searchQuery)).length + next.length - 1) / PAGE_SIZE));
             return next;
         });
     };
@@ -1005,25 +1083,25 @@ const MediaPlanPage: React.FC = () => {
         // Load or create draft rows for the new plan
         if (!selectedClientId) return;
         const saved = loadDraftsFromStorage(selectedClientId, selectedMonth);
-        const needed = Math.max(0, MIN_ROWS - saved.length);
+        if (saved.length > 0) {
+            setDraftRows(saved);
+            return;
+        }
         const { year, month } = parseMonthKey(selectedMonth);
-        const emptyPad = Array.from({ length: needed }, () => {
-            const d = emptyDraft();
-            d.datePublication = `${year}-${String(month + 1).padStart(2, '0')}-01`;
-            return d;
-        });
-        setDraftRows([...saved, ...emptyPad]);
+        const d = emptyDraft();
+        d.datePublication = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+        setDraftRows([d]);
     };
 
     // ══════════════════════════════════════════════════
     // ── RENDER TABLE (reusable for both sent & drafts) ──
     // ══════════════════════════════════════════════════
     const renderTableHeader = () => (
-        <thead className="bg-gray-50 dark:bg-gray-800">
+        <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-20 shadow-sm">
             <tr>
                 {COLUMNS.map((col, ci) => (
                     <th key={col.key}
-                        className="px-2 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 whitespace-nowrap border-r border-gray-200 dark:border-gray-700 relative select-none"
+                        className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 whitespace-nowrap border-r border-gray-200 dark:border-gray-700 relative select-none"
                         style={{ width: colWidths[ci], minWidth: 50, overflow: 'hidden' }}>
                         {col.label}
                         {ci < COLUMNS.length - 1 && (
@@ -1221,7 +1299,9 @@ const MediaPlanPage: React.FC = () => {
         );
     };
 
-    const renderDraftRow = (draft: DraftRow, idx: number) => {
+    const renderDraftRow = (draft: DraftRow) => {
+        const idx = draftRows.findIndex((row) => row._key === draft._key);
+        if (idx < 0) return null;
         const rowH = rowHeights[draft._key] || DEFAULT_ROW_HEIGHT;
         return (
             <React.Fragment key={draft._key}>
@@ -1420,14 +1500,26 @@ const MediaPlanPage: React.FC = () => {
             </div>
 
             {/* ── Month tabs ── */}
-            <div className="overflow-x-auto pb-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-2">
-                <div className="flex gap-2 min-w-max">
+            <div className="flex items-center gap-2 rounded-xl bg-gray-100 dark:bg-gray-800 p-2">
+                <button type="button"
+                    disabled={selectedMonthIndex <= 0}
+                    onClick={() => selectedMonthIndex > 0 && setSelectedMonth(monthList[selectedMonthIndex - 1].key)}
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-600">
+                    <HiChevronLeft size={18} />
+                </button>
+                <div className="flex gap-2 overflow-x-auto flex-1 pb-0.5 scrollbar-hide">
                     {monthList.map(m => (
                         <button key={m.key} onClick={() => setSelectedMonth(m.key)} className={monthTabClass(m.key)}>
                             {m.label}
                         </button>
                     ))}
                 </div>
+                <button type="button"
+                    disabled={selectedMonthIndex < 0 || selectedMonthIndex >= monthList.length - 1}
+                    onClick={() => selectedMonthIndex < monthList.length - 1 && setSelectedMonth(monthList[selectedMonthIndex + 1].key)}
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-600">
+                    <HiChevronRight size={18} />
+                </button>
             </div>
 
             {/* ══════════════════════════════════════════════════ */}
@@ -1489,7 +1581,7 @@ const MediaPlanPage: React.FC = () => {
                                 </div>
 
                                 {isOpen && (
-                                    <div className="overflow-x-auto border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                                    <div className="overflow-auto max-h-[min(60vh,560px)] border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
                                         <table className="divide-y divide-gray-200 dark:divide-gray-700" style={{ tableLayout: 'fixed', width: tableWidth }}>
                                             {renderTableHeader()}
                                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -1593,16 +1685,20 @@ const MediaPlanPage: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
-                            <div className="overflow-x-auto bg-white dark:bg-gray-900">
+                            <div className="overflow-auto max-h-[min(62vh,620px)] bg-white dark:bg-gray-900">
                                 <table className="divide-y divide-gray-200 dark:divide-gray-700" style={{ tableLayout: 'fixed', width: tableWidth }}>
                                     {renderTableHeader()}
                                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                        {draftRows
-                                            .filter(d => !searchQuery || Object.values(d).some(v => typeof v === 'string' && v.toLowerCase().includes(searchQuery.toLowerCase())))
-                                            .map((draft, idx) => renderDraftRow(draft, idx))}
+                                        {pagedNewPlanDrafts.draftSlice.map((draft) => renderDraftRow(draft))}
                                     </tbody>
                                 </table>
                             </div>
+                            <TablePager
+                                page={pagedNewPlanDrafts.page}
+                                pageCount={pagedNewPlanDrafts.pageCount}
+                                total={pagedNewPlanDrafts.total}
+                                onPage={setTablePage}
+                            />
                         </div>
                     )}
                 </>
@@ -1683,18 +1779,22 @@ const MediaPlanPage: React.FC = () => {
                         </button>
                     </div>
 
-                    <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm">
-                        <table className="divide-y divide-gray-200 dark:divide-gray-700" style={{ tableLayout: 'fixed', width: tableWidth }}>
-                            {renderTableHeader()}
-                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                {monthMediaPlans
-                                    .filter(mp => !searchQuery || Object.values(mp).some(v => typeof v === 'string' && v.toLowerCase().includes(searchQuery.toLowerCase())))
-                                    .map(mp => renderExistingRow(mp))}
-                                {draftRows
-                                    .filter(d => !searchQuery || Object.values(d).some(v => typeof v === 'string' && v.toLowerCase().includes(searchQuery.toLowerCase())))
-                                    .map((draft, idx) => renderDraftRow(draft, idx))}
-                            </tbody>
-                        </table>
+                    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
+                        <div className="overflow-auto max-h-[min(62vh,640px)]">
+                            <table className="divide-y divide-gray-200 dark:divide-gray-700" style={{ tableLayout: 'fixed', width: tableWidth }}>
+                                {renderTableHeader()}
+                                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                                    {pagedUnsent.existingSlice.map(mp => renderExistingRow(mp))}
+                                    {pagedUnsent.draftSlice.map((draft) => renderDraftRow(draft))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <TablePager
+                            page={pagedUnsent.page}
+                            pageCount={pagedUnsent.pageCount}
+                            total={pagedUnsent.total}
+                            onPage={setTablePage}
+                        />
                     </div>
                 </>
             )}

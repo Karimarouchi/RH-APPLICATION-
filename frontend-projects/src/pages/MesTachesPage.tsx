@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { tacheService } from '../api/tacheService';
 import { demandeService } from '../api/demandeService';
-import { compteService } from '../api/compteService';
+import { employeService } from '../api/employeService';
 import { projetService } from '../api/projetService';
 import { mediaPlanService } from '../api/mediaPlanService';
 import { useAuth } from '../context/AuthContext';
@@ -171,10 +171,10 @@ const MesTachesPage: React.FC = () => {
         }
         try {
             const today = new Date().toISOString().split('T')[0];
-            const [res, demandesRes, comptesRes] = await Promise.allSettled([
+            const [res, demandesRes, managersRes] = await Promise.allSettled([
                 tacheService.getByAssignee(user.employeId),
                 demandeService.getByStatut(StatutDemande.APPROUVEE),
-                compteService.getAll(),
+                employeService.getDepartmentManagers(),
             ]);
             if (res.status === 'fulfilled') {
                 const tachesData = res.value.data.data || [];
@@ -194,16 +194,10 @@ const MesTachesPage: React.FC = () => {
                 });
                 setProjetDetails(pMap);
             }
-            // Build set of employeIds with the MANAGER role
-            if (comptesRes.status === 'fulfilled') {
-                const comptes = comptesRes.value.data.data || [];
-                const mgrIds = new Set<number>();
-                comptes.forEach((c: any) => {
-                    const hasManagerRole = (c.roles || []).some((r: any) =>
-                        r.nom?.toUpperCase() === 'MANAGER'
-                    );
-                    if (hasManagerRole && c.employeId) mgrIds.add(c.employeId);
-                });
+            if (managersRes.status === 'fulfilled') {
+                const mgrIds = new Set<number>(
+                    (managersRes.value.data.data || []).map((m: { id: number }) => m.id)
+                );
                 setManagerEmpIds(mgrIds);
             }
             if (demandesRes.status === 'fulfilled') {

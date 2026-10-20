@@ -45,7 +45,7 @@ public class CompteService {
 
     // ─── Login ───────────────────────────────────────────────────
     public LoginResponse login(LoginRequest request, String ipAddress) {
-        Compte compte = compteRepository.findByUsername(request.getUsername())
+        Compte compte = findCompteForLogin(request.getUsername())
                 .orElseThrow(() -> new RuntimeException("Identifiants invalides"));
 
         if (!passwordEncoder.matches(request.getPassword(), compte.getPasswordHash())) {
@@ -76,6 +76,7 @@ public class CompteService {
                 .username(compte.getUsername())
                 .roles(roles)
                 .permissions(permissions)
+                .superAdmin(hasAccesTotal(compte))
                 .build();
 
         String token = jwtService.generateToken(principal);
@@ -90,6 +91,9 @@ public class CompteService {
                 .email(employe.getEmail())
                 .roles(roles)
                 .permissions(permissions)
+                .superAdmin(hasAccesTotal(compte))
+                .departement(employe.getDepartement())
+                .managerDepartement(Boolean.TRUE.equals(employe.getManagerDepartement()))
                 .mustChangePassword(compte.getMustChangePassword())
                 .genre(employe.getGenre())
                 .message("Connexion réussie")
@@ -98,6 +102,16 @@ public class CompteService {
                 .tokenExpiresAt(tokenExpiresAt)
                 .toursVus(parseTours(compte.getToursVus()))
                 .build();
+    }
+
+    private Optional<Compte> findCompteForLogin(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Optional.empty();
+        }
+        String login = raw.trim();
+        return compteRepository.findByUsernameIgnoreCase(login)
+                .or(() -> compteRepository.findByEmploye_EmailIgnoreCase(login))
+                .or(() -> compteRepository.findByEmploye_MatriculeIgnoreCase(login));
     }
 
     private static List<String> parseTours(String raw) {
@@ -189,6 +203,10 @@ public class CompteService {
             if (rolesList.isEmpty()) {
                 throw new RuntimeException("Aucun rôle valide trouvé");
             }
+            if (rolesList.stream().noneMatch(r -> Boolean.TRUE.equals(r.getAccesTotal()))) {
+                requireOtherSuperAdmin(compteRepository, compte,
+                        "Impossible de retirer l'accès total au dernier compte administrateur");
+            }
             compte.getRoles().clear();
             compte.getRoles().addAll(rolesList);
         }
@@ -207,8 +225,32 @@ public class CompteService {
         return toDTO(compte);
     }
 
+    static boolean hasAccesTotal(Compte compte) {
+        return compte.getRoles().stream().anyMatch(r -> Boolean.TRUE.equals(r.getAccesTotal()));
+    }
+
+    /** Refuse de retirer le dernier compte actif ayant l'accès total. */
+    static void requireOtherSuperAdmin(CompteRepository compteRepository, Compte compte, String message) {
+        if (!hasAccesTotal(compte)) {
+            return;
+        }
+        long autres = compteRepository.findAll().stream()
+                .filter(c -> !c.getId().equals(compte.getId()))
+                .filter(c -> Boolean.TRUE.equals(c.getEnabled()))
+                .filter(CompteService::hasAccesTotal)
+                .count();
+        if (autres == 0) {
+            throw new RuntimeException(message);
+        }
+    }
+
     /** Permissions du rôle, plus les ajouts de ce compte, moins les retraits de ce compte. */
-    static Set<String> effectivePermissions(Compte compte) {
+    Set<String> effectivePermissions(Compte compte) {
+        if (hasAccesTotal(compte)) {
+            return permissionRepository.findAll().stream()
+                    .map(Permission::getPermission)
+                    .collect(Collectors.toCollection(HashSet::new));
+        }
         Set<String> permissions = compte.getRoles().stream()
                 .flatMap(role -> role.getPermissions().stream())
                 .map(Permission::getPermission)
@@ -235,6 +277,9 @@ public class CompteService {
 public CompteDTO toggleEnabled(Long id) {
         Compte compte = compteRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Compte non trouvé"));
+        if (Boolean.TRUE.equals(compte.getEnabled())) {
+            requireOtherSuperAdmin(compteRepository, compte, "Impossible de désactiver le dernier compte administrateur");
+        }
         compte.setEnabled(!compte.getEnabled());
         
         if (!compte.getEnabled()) {
@@ -272,15 +317,7 @@ public CompteDTO toggleEnabled(Long id) {
             throw new RuntimeException("Vous ne pouvez pas supprimer votre propre compte");
         }
 
-        boolean isAdmin = compte.getRoles().stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getNom()));
-        if (isAdmin) {
-            long admins = compteRepository.findAll().stream()
-                    .filter(c -> c.getRoles().stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getNom())))
-                    .count();
-            if (admins <= 1) {
-                throw new RuntimeException("Impossible de supprimer le dernier compte administrateur");
-            }
-        }
+        requireOtherSuperAdmin(compteRepository, compte, "Impossible de supprimer le dernier compte administrateur");
 
         accessLogRepository.deleteAll(accessLogRepository.findByCompteIdOrderByDateAccesDesc(id));
         accessLogRepository.flush();

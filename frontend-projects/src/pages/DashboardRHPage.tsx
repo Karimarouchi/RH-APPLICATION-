@@ -35,6 +35,7 @@ import {
   EmployeStatsDTO, DemandeResponse, Projet, Equipe, StatutDemande, StatutProjet,
   CompteDTO, Tache, StatutTache, DashboardEmployeStatus,
 } from '../types';
+import { formatGenreChartLabel } from '../utils/genre';
 
 const COLORS = {
   brand: '#f36904',
@@ -170,7 +171,7 @@ const DashboardRHPage: React.FC = () => {
   // -- Genre --
   const genreData = stats?.parGenre
     ? Object.entries(stats.parGenre).map(([genre, count], i) => ({
-        name: genre === 'HOMME' ? 'Hommes' : genre === 'FEMME' ? 'Femmes' : genre,
+        name: formatGenreChartLabel(genre),
         value: count, color: i === 0 ? COLORS.blue : COLORS.pink,
       }))
     : [];

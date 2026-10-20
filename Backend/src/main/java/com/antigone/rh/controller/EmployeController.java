@@ -42,6 +42,23 @@ public class EmployeController {
         return ResponseEntity.ok(ApiResponse.ok(employeService.findAll()));
     }
 
+    @GetMapping("/by-role/{roleName}")
+    public ResponseEntity<ApiResponse<List<EmployeDTO>>> getByRole(@PathVariable String roleName) {
+        return ResponseEntity.ok(ApiResponse.ok(employeService.findByRoleName(roleName)));
+    }
+
+    @GetMapping("/by-permission/{code}")
+    public ResponseEntity<ApiResponse<List<EmployeDTO>>> getByPermission(
+            @PathVariable String code,
+            @RequestParam(name = "explicit", defaultValue = "false") boolean explicit) {
+        return ResponseEntity.ok(ApiResponse.ok(employeService.findByPermission(code, explicit)));
+    }
+
+    @GetMapping("/department-managers")
+    public ResponseEntity<ApiResponse<List<EmployeDTO>>> getDepartmentManagers() {
+        return ResponseEntity.ok(ApiResponse.ok(employeService.findDepartmentManagers()));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<EmployeDTO>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(employeService.findById(id)));
@@ -55,11 +72,6 @@ public class EmployeController {
     @GetMapping("/{id}/subordinates")
     public ResponseEntity<ApiResponse<List<EmployeDTO>>> getSubordinates(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(employeService.findSubordinates(id)));
-    }
-
-    @GetMapping("/by-role/{roleName}")
-    public ResponseEntity<ApiResponse<List<EmployeDTO>>> getByRole(@PathVariable String roleName) {
-        return ResponseEntity.ok(ApiResponse.ok(employeService.findByRoleName(roleName)));
     }
 
     @PostMapping

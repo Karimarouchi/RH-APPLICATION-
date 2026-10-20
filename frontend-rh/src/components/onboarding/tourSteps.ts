@@ -10,6 +10,8 @@
 // Les etapes affichees dependent des PERMISSIONS de la personne (pas du nom de son role) :
 // un role cree plus tard par un administrateur obtient donc automatiquement le bon guide.
 
+import { APP_KIND } from '../../config/apps';
+
 export type AppKind = 'rh' | 'projects';
 
 export type Target = { rail: string } | { panel: string } | { selector: string };
@@ -41,8 +43,7 @@ export interface TourUser {
   clientPages?: string[];
 }
 
-export const getAppKind = (): AppKind =>
-  ((import.meta.env.VITE_APP_KIND as string | undefined)?.trim().toLowerCase() === 'rh' ? 'rh' : 'projects');
+export const getAppKind = (): AppKind => APP_KIND;
 
 /** Nom de l'application cote serveur ("rh" | "projets") */
 export const serverAppName = (kind: AppKind) => (kind === 'rh' ? 'rh' : 'projets');
@@ -425,7 +426,7 @@ const PROJECT_STEPS: TourStep[] = [
     points: [
       'Approuvez ou refusez les publications préparées par l’équipe.',
       'Affectez les clients à vos collaborateurs.',
-      'Une publication avec tournage prévient automatiquement le Head Prod.',
+      'Une publication avec tournage prévient automatiquement le responsable tournage.',
     ],
     any: ['VIEW_TOUS_MEDIA_PLAN'],
     open: 'Media Plan',

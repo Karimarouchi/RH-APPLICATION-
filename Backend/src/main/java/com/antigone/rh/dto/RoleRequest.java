@@ -14,4 +14,6 @@ import java.util.Set;
 public class RoleRequest {
     private String nom;
     private Set<Long> permissionIds;
+    /** null = inchange. Modifiable uniquement par un super administrateur. */
+    private Boolean accesTotal;
 }

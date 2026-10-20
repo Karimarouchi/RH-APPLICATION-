@@ -7,6 +7,7 @@ import com.antigone.rh.entity.Permission;
 import com.antigone.rh.entity.Role;
 import com.antigone.rh.repository.PermissionRepository;
 import com.antigone.rh.repository.RoleRepository;
+import com.antigone.rh.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,8 @@ public class RoleService {
             Map.entry("VIEW_CALENDRIER", "Calendrier d'entreprise — Consulter les événements et jours fériés globaux"),
             Map.entry("VIEW_RESTRICTION_CONGE", "Restrictions de congés — Définir et gérer les restrictions de dates de congés des collaborateurs"),
             Map.entry("VIEW_CALENDRIER_PROJETS", "Calendrier de tournage — Planification des shootings et productions"),
+            Map.entry("VALIDATE_SHOOTING",
+                    "Responsable tournage — Recevoir les demandes de shooting, poser et valider les dates sur son calendrier"),
             Map.entry("VIEW_DEADLINES", "Calendrier des deadlines — Consulter les échéances des projets et tâches"),
             Map.entry("VIEW_REUNIONS", "Réunions — Voir, créer et planifier les réunions d'équipe"),
             // ── Projets (Administration) ─────────────────────────────────────
@@ -96,6 +99,11 @@ public class RoleService {
                 .nom(request.getNom())
                 .permissions(permissions)
                 .build();
+        if (Boolean.TRUE.equals(request.getAccesTotal())) {
+            requireSuperAdmin();
+            role.setAccesTotal(true);
+        }
+        syncAccesTotal(role);
 
         return toDTO(roleRepository.save(role));
     }
@@ -111,6 +119,16 @@ public class RoleService {
             role.setPermissions(permissions);
         }
 
+        boolean wanted = request.getAccesTotal() != null ? request.getAccesTotal() : Boolean.TRUE.equals(role.getAccesTotal());
+        if (wanted != Boolean.TRUE.equals(role.getAccesTotal())) {
+            requireSuperAdmin();
+            if (!wanted && roleRepository.findByAccesTotalTrue().size() <= 1) {
+                throw new RuntimeException("Au moins un rôle doit garder l'accès total");
+            }
+            role.setAccesTotal(wanted);
+        }
+        syncAccesTotal(role);
+
         return toDTO(roleRepository.save(role));
     }
 
@@ -121,8 +139,25 @@ public class RoleService {
         if (!role.getComptes().isEmpty()) {
             throw new RuntimeException("Impossible de supprimer ce rôle car il est assigné à des comptes");
         }
+        if (Boolean.TRUE.equals(role.getAccesTotal()) && roleRepository.findByAccesTotalTrue().size() <= 1) {
+            throw new RuntimeException("Impossible de supprimer le dernier rôle avec accès total");
+        }
 
         roleRepository.delete(role);
+    }
+
+    /** Un rôle avec accès total possède toujours toutes les permissions existantes. */
+    public void syncAccesTotal(Role role) {
+        if (Boolean.TRUE.equals(role.getAccesTotal())) {
+            role.setPermissions(new HashSet<>(permissionRepository.findAll()));
+        }
+    }
+
+    private static void requireSuperAdmin() {
+        if (!SecurityUtils.isAdmin()) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Seul un super administrateur peut modifier l'accès total d'un rôle");
+        }
     }
 
     public List<PermissionDTO> getAllPermissions() {
@@ -152,6 +187,7 @@ public class RoleService {
         return RoleDTO.builder()
                 .id(role.getId())
                 .nom(role.getNom())
+                .accesTotal(Boolean.TRUE.equals(role.getAccesTotal()))
                 .permissions(role.getPermissions().stream()
                         .map(this::toPermissionDTO)
                         .collect(Collectors.toSet()))

@@ -21,6 +21,11 @@ public class Role {
     @Column(unique = true, nullable = false)
     private String nom;
 
+    /** Super administrateur : toutes les permissions, y compris celles ajoutees plus tard. */
+    @Column(name = "acces_total", columnDefinition = "boolean default false")
+    @Builder.Default
+    private Boolean accesTotal = false;
+
     @ManyToMany(mappedBy = "roles", fetch = FetchType.LAZY)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude

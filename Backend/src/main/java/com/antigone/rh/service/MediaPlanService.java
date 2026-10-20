@@ -7,15 +7,18 @@ import com.antigone.rh.entity.Client;
 import com.antigone.rh.entity.Employe;
 import com.antigone.rh.entity.MediaPlan;
 import com.antigone.rh.entity.MediaPlanAssignment;
+import com.antigone.rh.entity.Referentiel;
 import com.antigone.rh.enums.EtatPublication;
 import com.antigone.rh.enums.StatutMediaPlan;
 import com.antigone.rh.enums.TypeContenuShooting;
+import com.antigone.rh.enums.TypeReferentiel;
 import com.antigone.rh.exception.ResourceNotFoundException;
 import com.antigone.rh.repository.ClientRepository;
 import com.antigone.rh.repository.EmployeRepository;
 import com.antigone.rh.repository.MediaPlanAssignmentRepository;
 import com.antigone.rh.repository.MediaPlanRepository;
 import com.antigone.rh.repository.ProjetRepository;
+import com.antigone.rh.repository.ReferentielRepository;
 import com.antigone.rh.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,11 +26,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -50,6 +55,7 @@ public class MediaPlanService {
     private final com.antigone.rh.repository.CalendrierProjetRepository calendrierProjetRepository;
     private final NotificationService notificationService;
     private final ReactifInternService reactifInternService;
+    private final ReferentielRepository referentielRepository;
 
     private static final List<String> CHAMPS_CLIENT = List.of(
             "datePublication", "heure", "format", "type", "titre", "texteSurVisuel",
@@ -143,36 +149,30 @@ public class MediaPlanService {
         }
 
         String driveLink = null;
-        try {
-            // Get client name for folder naming
-            Long firstClientId = requests.get(0).getClientId();
-            if (firstClientId == null) {
-                throw new RuntimeException("ClientId manquant pour le premier media plan du lot");
-            }
-            Client client = clientRepository.findById(firstClientId).orElse(null);
-            String clientName = client != null ? client.getNom() : "Inconnu";
-
-            // Use the publication date of the first item to determine the month folder
-            // (fall back to today if no date provided)
-            LocalDate folderDate = LocalDate.now();
-            String firstDatePub = requests.get(0).getDatePublication();
-            if (firstDatePub != null && !firstDatePub.isBlank()) {
-                try {
-                    folderDate = LocalDate.parse(firstDatePub);
-                } catch (Exception ignored) {
-                    log.warn("Could not parse datePublication '{}', using today for folder name.", firstDatePub);
+        Long firstClientId = requests.get(0).getClientId();
+        if (firstClientId == null) {
+            throw new RuntimeException("ClientId manquant pour le premier media plan du lot");
+        }
+        if (googleDriveService.isAuthorized()) {
+            try {
+                Client client = clientRepository.findById(firstClientId).orElse(null);
+                String clientName = client != null ? client.getNom() : "Inconnu";
+                LocalDate folderDate = LocalDate.now();
+                String firstDatePub = requests.get(0).getDatePublication();
+                if (firstDatePub != null && !firstDatePub.isBlank()) {
+                    try {
+                        folderDate = LocalDate.parse(firstDatePub);
+                    } catch (Exception ignored) {
+                        log.warn("Could not parse datePublication '{}', using today for folder name.", firstDatePub);
+                    }
                 }
+                driveLink = googleDriveService.getExistingMediaPlanFolderLink(clientName, folderDate);
+                if (driveLink == null) {
+                    driveLink = googleDriveService.getOrCreateClientMonthFolder(clientName, folderDate);
+                }
+            } catch (Exception e) {
+                log.warn("Google Drive folder skipped: {}", e.getMessage());
             }
-
-            // Look up the pre-built Drive folder: ClientName / Year / Month / Mediaplan
-            driveLink = googleDriveService.getExistingMediaPlanFolderLink(clientName, folderDate);
-            if (driveLink == null) {
-                log.warn("Pre-built Drive folder not found for client '{}' / date '{}'. Falling back to getOrCreate.", clientName, folderDate);
-                driveLink = googleDriveService.getOrCreateClientMonthFolder(clientName, folderDate);
-            }
-        } catch (IOException e) {
-            log.error("Failed to create Google Drive folder: {}", e.getMessage());
-            throw new RuntimeException("Erreur Google Drive: " + e.getMessage());
         }
 
         List<MediaPlan> savedPlans = new ArrayList<>();
@@ -786,42 +786,53 @@ public class MediaPlanService {
     // =============================================
 
     /**
-     * Chef de projet du département qui correspond au format du média plan.
-     * C'est l'employé coché « manager du département », pas le premier sans supérieur.
-     * - Reel/Video → département contenant "prod"
-     * - Carrousel → département contenant "design"
-     * - Story → département contenant "social media"
+     * Chef de projet du département lié au format (référentiel FORMAT_MEDIA_PLAN.valeur
+     * = libellé exact du département). La case « manager du département » désigne la personne.
      */
     private Long findManagerByFormat(String format) {
-        if (format == null)
+        if (format == null || format.isBlank()) {
             return null;
-
-        String departmentKeyword;
-        switch (format.toLowerCase()) {
-            case "reel":
-            case "video":
-                departmentKeyword = "prod";
-                break;
-            case "carrousel":
-                departmentKeyword = "design";
-                break;
-            case "story":
-                departmentKeyword = "social media";
-                break;
-            default:
-                return null;
         }
-
-        // Le chef de projet est la personne cochée « manager du département », pas le premier sans supérieur.
-        List<Employe> allEmployees = employeRepository.findAll();
-        return allEmployees.stream()
+        Referentiel match = matchFormatReferentiel(format);
+        if (match == null || match.getValeur() == null || match.getValeur().isBlank()) {
+            return null;
+        }
+        String department = match.getValeur().trim();
+        return employeRepository.findAll().stream()
                 .filter(e -> !Boolean.TRUE.equals(e.getArchived()))
                 .filter(e -> Boolean.TRUE.equals(e.getManagerDepartement()))
-                .filter(e -> e.getDepartement() != null
-                        && e.getDepartement().toLowerCase().contains(departmentKeyword))
+                .filter(e -> e.getDepartement() != null && e.getDepartement().trim().equalsIgnoreCase(department))
                 .map(Employe::getId)
                 .findFirst()
                 .orElse(null);
+    }
+
+    private Referentiel matchFormatReferentiel(String format) {
+        String folded = fold(format);
+        List<Referentiel> formats = referentielRepository
+                .findByTypeReferentielAndActifTrue(TypeReferentiel.FORMAT_MEDIA_PLAN);
+        for (Referentiel ref : formats) {
+            if (ref.getLibelle() != null && fold(ref.getLibelle()).equals(folded)) {
+                return ref;
+            }
+        }
+        for (Referentiel ref : formats) {
+            if (ref.getLibelle() == null) {
+                continue;
+            }
+            String libelle = fold(ref.getLibelle());
+            if (libelle.contains(folded) || folded.contains(libelle)) {
+                return ref;
+            }
+        }
+        return null;
+    }
+
+    private static String fold(String value) {
+        return Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toLowerCase(Locale.ROOT)
+                .trim();
     }
 
     /**

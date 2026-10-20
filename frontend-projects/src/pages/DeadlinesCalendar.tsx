@@ -36,7 +36,6 @@ function daysUntil(dateStr: string): number {
 const DeadlinesCalendar: React.FC = () => {
   const { user } = useAuth();
   const permissions: string[] = (user as any)?.permissions || [];
-  const roles: string[] = (user as any)?.roles || [];
   const employeId = (user as any)?.employeId;
 
   const [calYear, setCalYear] = useState(new Date().getFullYear());
@@ -50,10 +49,7 @@ const DeadlinesCalendar: React.FC = () => {
 
   // Determine user role level
   const isAdmin = permissions.includes('VIEW_TOUS_PROJETS') || permissions.includes('MANAGE_ALL_PROJETS');
-  const isManager = roles.some((r: any) => {
-    const nom = (typeof r === 'string' ? r : r.nom)?.toUpperCase() || '';
-    return nom.includes('MANAGER') || nom.includes('HEAD') || nom.includes('CHEF');
-  });
+  const isManager = Boolean(user?.managerDepartement && user?.departement);
 
   useEffect(() => {
     if (!employeId) return;

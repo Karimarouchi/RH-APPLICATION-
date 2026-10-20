@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../api/authService';
 import { relayAuthSnapshotForSwitch } from '../utils/authStorage';
+import { APP_KIND, PROJECTS_APP_URL } from '../config/apps';
 import { LightPullThemeSwitcher } from '../components/ui/LightPullThemeSwitcher';
 
 // ── Animated character internals ─────────────────────────────────────────────
@@ -416,7 +417,7 @@ const LoginPage: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const { login, logout, user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const projectsAppUrl = (import.meta.env.VITE_PROJECTS_APP_URL as string | undefined)?.trim();
+  const projectsAppUrl = PROJECTS_APP_URL;
   const justLoggedIn = useRef(false);
 
   useEffect(() => {
@@ -425,12 +426,14 @@ const LoginPage: React.FC = () => {
   }, []);
 
   const redirectToProjectsHome = useCallback(() => {
-    if (projectsAppUrl) {
+    // Only leave this origin when login ran on the RH app.
+    // Reloading localhost:3000 from itself sent people back to /login with no error.
+    if (APP_KIND !== 'projects' && projectsAppUrl) {
       relayAuthSnapshotForSwitch();
       window.location.href = projectsAppUrl;
       return;
     }
-    navigate('/dashboard', { replace: true });
+    navigate('/accueil', { replace: true });
   }, [navigate, projectsAppUrl]);
 
   useEffect(() => {
@@ -452,7 +455,7 @@ const LoginPage: React.FC = () => {
     setLoading(true);
 
     try {
-      const response = await authService.login({ username, password });
+      const response = await authService.login({ username: username.trim(), password });
       if (response.data.success && response.data.data) {
         justLoggedIn.current = true;
         login(response.data.data);
@@ -466,7 +469,7 @@ const LoginPage: React.FC = () => {
     }
 
     try {
-      const clientRes = await authService.clientLogin(username, password);
+      const clientRes = await authService.clientLogin(username.trim(), password);
       if (clientRes.data.success && clientRes.data.data) {
         const c = clientRes.data.data;
         justLoggedIn.current = true;

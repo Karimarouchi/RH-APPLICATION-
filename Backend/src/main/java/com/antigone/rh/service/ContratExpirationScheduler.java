@@ -9,9 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -68,19 +66,10 @@ public class ContratExpirationScheduler {
             }
         }
 
+    /** Previent tous ceux qui gerent les fiches employes (VIEW_EMPLOYES). */
     private void notifyAdmins(String titre, String message) {
-        List<Employe> admins = employeRepository.findByRoleName("ADMIN");
-        List<Employe> rhs = employeRepository.findByRoleName("RH");
-        Set<Long> notifiedIds = new HashSet<>();
-        for (Employe admin : admins) {
-            if (notifiedIds.add(admin.getId())) {
-                notificationService.create(admin, titre, message, null);
-            }
-        }
-        for (Employe rh : rhs) {
-            if (notifiedIds.add(rh.getId())) {
-                notificationService.create(rh, titre, message, null);
-            }
+        for (Employe gestionnaire : employeRepository.findByPermission("VIEW_EMPLOYES")) {
+            notificationService.create(gestionnaire, titre, message, null);
         }
     }
 }

@@ -40,9 +40,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             AuthPrincipal principal = jwtService.parseToken(token);
+            // Les noms de roles sont libres : seuls le type de compte et l'acces total donnent un ROLE_xxx.
             Set<SimpleGrantedAuthority> authorities = new LinkedHashSet<>();
-            for (String role : principal.getRoles()) {
-                authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
+            if (principal.isSuperAdmin()) {
+                authorities.add(new SimpleGrantedAuthority(SecurityUtils.SUPER_ADMIN));
+            }
+            if ("CLIENT".equals(principal.getPrincipalType())) {
+                authorities.add(new SimpleGrantedAuthority("ROLE_CLIENT"));
             }
             for (String permission : principal.getPermissions()) {
                 authorities.add(new SimpleGrantedAuthority(permission));

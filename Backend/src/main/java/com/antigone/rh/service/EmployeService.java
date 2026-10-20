@@ -96,6 +96,20 @@ public class EmployeService {
                 .collect(Collectors.toList());
     }
 
+    public List<EmployeDTO> findByPermission(String code, boolean explicit) {
+        List<Employe> found = explicit
+                ? employeRepository.findByPermissionExplicite(code)
+                : employeRepository.findByPermission(code);
+        return found.stream().map(this::toDTO).collect(Collectors.toList());
+    }
+
+    public List<EmployeDTO> findDepartmentManagers() {
+        return employeRepository.findAllByArchivedFalse().stream()
+                .filter(e -> Boolean.TRUE.equals(e.getManagerDepartement()))
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
     public EmployeDTO findById(Long id) {
         Employe employe = employeRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Employé non trouvé avec l'id: " + id));
@@ -396,14 +410,9 @@ public class EmployeService {
         if (me != null && me.equals(id)) {
             throw new RuntimeException("Vous ne pouvez pas supprimer votre propre fiche");
         }
-        if (employe.getCompte() != null && employe.getCompte().getRoles().stream()
-                .anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getNom()))) {
-            long admins = compteRepository.findAll().stream()
-                    .filter(c -> c.getRoles().stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getNom())))
-                    .count();
-            if (admins <= 1) {
-                throw new RuntimeException("Impossible de supprimer le dernier administrateur");
-            }
+        if (employe.getCompte() != null) {
+            CompteService.requireOtherSuperAdmin(compteRepository, employe.getCompte(),
+                    "Impossible de supprimer le dernier administrateur");
         }
         long plans = count("select count(m) from MediaPlan m where m.createur.id = :id", id);
         if (plans > 0) {
@@ -597,21 +606,11 @@ public class EmployeService {
     }
 
     /**
-     * Notify all ADMIN and RH users.
+     * Notify everyone who manages employee records (VIEW_EMPLOYES).
      */
     private void notifyAdmins(String titre, String message) {
-        List<Employe> admins = employeRepository.findByRoleName("ADMIN");
-        List<Employe> rhs = employeRepository.findByRoleName("RH");
-        Set<Long> notifiedIds = new HashSet<>();
-        for (Employe admin : admins) {
-            if (notifiedIds.add(admin.getId())) {
-                notificationService.create(admin, titre, message, null);
-            }
-        }
-        for (Employe rh : rhs) {
-            if (notifiedIds.add(rh.getId())) {
-                notificationService.create(rh, titre, message, null);
-            }
+        for (Employe gestionnaire : employeRepository.findByPermission("VIEW_EMPLOYES")) {
+            notificationService.create(gestionnaire, titre, message, null);
         }
     }
 

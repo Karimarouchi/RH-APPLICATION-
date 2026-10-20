@@ -1,6 +1,6 @@
-import axios from 'axios';
+import api from './axios';
 
-const BASE_URL = '/api/mediaplan-comments';
+const BASE_URL = '/mediaplan-comments';
 
 export interface MediaPlanCommentDTO {
     id: number;
@@ -26,19 +26,19 @@ export interface MediaPlanCommentRequest {
 
 export const mediaPlanCommentService = {
     async create(req: MediaPlanCommentRequest): Promise<MediaPlanCommentDTO> {
-        const res = await axios.post(BASE_URL, req);
+        const res = await api.post(BASE_URL, req);
         return res.data;
     },
     async getByMediaPlanIds(ids: number[]): Promise<MediaPlanCommentDTO[]> {
         if (ids.length === 0) return [];
-        const res = await axios.get(`${BASE_URL}/by-mediaplan-ids`, { params: { ids: ids.join(',') } });
+        const res = await api.get(`${BASE_URL}/by-mediaplan-ids`, { params: { ids: ids.join(',') } });
         return res.data;
     },
     async getByClientIdAndMonthKey(clientId: number, monthKey: string): Promise<MediaPlanCommentDTO[]> {
-        const res = await axios.get(`${BASE_URL}/by-client-month`, { params: { clientId, monthKey } });
+        const res = await api.get(`${BASE_URL}/by-client-month`, { params: { clientId, monthKey } });
         return res.data;
     },
     async delete(id: number): Promise<void> {
-        await axios.delete(`${BASE_URL}/${id}`);
+        await api.delete(`${BASE_URL}/${id}`);
     },
 };

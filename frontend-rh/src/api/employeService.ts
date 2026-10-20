@@ -7,6 +7,9 @@ export const employeService = {
   getByMatricule: (matricule: string) => api.get<ApiResponse<Employe>>(`/employes/matricule/${matricule}`),
   getSubordinates: (id: number) => api.get<ApiResponse<Employe[]>>(`/employes/${id}/subordinates`),
   getByRole: (roleName: string) => api.get<ApiResponse<Employe[]>>(`/employes/by-role/${roleName}`),
+  getByPermission: (code: string, explicit = false) =>
+    api.get<ApiResponse<Employe[]>>(`/employes/by-permission/${encodeURIComponent(code)}${explicit ? '?explicit=true' : ''}`),
+  getDepartmentManagers: () => api.get<ApiResponse<Employe[]>>('/employes/department-managers'),
   create: (data: Partial<Employe>) => api.post<ApiResponse<Employe>>('/employes', data),
   update: (id: number, data: Partial<Employe>) => api.put<ApiResponse<Employe>>(`/employes/${id}`, data),
   delete: (id: number) => api.delete<ApiResponse<void>>(`/employes/${id}`),

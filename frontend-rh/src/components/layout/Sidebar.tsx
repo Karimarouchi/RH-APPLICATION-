@@ -326,6 +326,7 @@ const Sidebar: React.FC = () => {
   const [notifications, setNotifications] = useState<NotificationResponse[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [activePanelMode, setActivePanelMode] = useState<'mon-espace' | 'gestion-rh' | 'administration' | 'monitoring' | null>(null);
+  const lastAutoSubmenuKey = useRef<string | null>(null);
   const notifMenuRef = useRef<HTMLDivElement>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
 
@@ -450,6 +451,22 @@ const Sidebar: React.FC = () => {
     const activeItem = allRailItems.find((item) => isRailItemActive(item, location.pathname));
     return activeItem?.key === 'accueil' ? 'Antigone RH' : activeItem?.label || 'Antigone RH';
   }, [activePanelMode, location.pathname, visibleRailMain, visibleRailSecondary]);
+
+  useEffect(() => {
+    const matchKey = panelGroupsTemplate
+      .filter((group) => !activePanelMode || group.modes.includes(activePanelMode))
+      .flatMap((group) => group.items)
+      .find((item) =>
+        item.children?.some((child) =>
+          panelRouteMatches(location.pathname, location.search, child.path),
+        ),
+      )?.key ?? null;
+
+    if (matchKey && matchKey !== lastAutoSubmenuKey.current) {
+      setOpenSubmenu(matchKey);
+    }
+    lastAutoSubmenuKey.current = matchKey;
+  }, [activePanelMode, location.pathname, location.search, setOpenSubmenu]);
 
   const userInitials = `${user?.prenom?.[0] ?? ''}${user?.nom?.[0] ?? ''}`.toUpperCase() || 'RH';
 
@@ -921,7 +938,7 @@ const PanelItem: React.FC<{
   const navigate = useNavigate();
   const active = panelRouteMatches(currentPath, currentSearch, item.path);
   const childActive = item.children?.some((child) => panelRouteMatches(currentPath, currentSearch, child.path)) ?? false;
-  const isOpen = openSubmenu === item.key || childActive;
+  const isOpen = openSubmenu === item.key;
 
   if (item.children && item.children.length > 0) {
     return (
@@ -931,7 +948,7 @@ const PanelItem: React.FC<{
           onClick={(event) => {
             event.stopPropagation();
             setOpenSubmenu(isOpen ? null : item.key);
-            navigate(item.path);
+            if (!isOpen) navigate(item.path);
           }}
           className={`pc-panel-item ${active || childActive ? 'is-active' : ''}`}
         >

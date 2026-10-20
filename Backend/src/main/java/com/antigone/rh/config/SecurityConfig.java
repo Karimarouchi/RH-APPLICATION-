@@ -189,11 +189,12 @@ public class SecurityConfig {
                                                                 "/api/media-plans/*/refuse",
                                                                 "/api/media-plans/*/renvoyer-employe")
                                                 .hasAnyAuthority(ADMIN, "VALIDATE_MEDIA_PLAN")
-                                                // la date de shooting est posée par le manager Production, confirmée par l'employé
+                                                // la date de shooting est posée par un responsable tournage, confirmée par l'employé
                                                 .requestMatchers(HttpMethod.GET, "/api/media-plans/shootings/a-dater")
-                                                .authenticated()
-                                                .requestMatchers(HttpMethod.PATCH, "/api/media-plans/*/shooting-date",
-                                                                "/api/media-plans/*/shooting-date-confirm")
+                                                .hasAnyAuthority(ADMIN, "VALIDATE_SHOOTING", "VIEW_MEDIA_PLAN", "VIEW_TOUS_MEDIA_PLAN")
+                                                .requestMatchers(HttpMethod.PATCH, "/api/media-plans/*/shooting-date")
+                                                .hasAnyAuthority(ADMIN, "VALIDATE_SHOOTING")
+                                                .requestMatchers(HttpMethod.PATCH, "/api/media-plans/*/shooting-date-confirm")
                                                 .authenticated()
                                                 // --- Media plans : ecriture interne ---
                                                 .requestMatchers(HttpMethod.POST, "/api/media-plans", "/api/media-plans/**")

@@ -20,10 +20,13 @@ const api = axios.create({
   },
 });
 
+const isAuthRequest = (url?: string) =>
+  !!url && /\/auth\/(login|client-login|forgot-password|reset-password)/.test(url);
+
 api.interceptors.request.use(
   (config) => {
     const accessToken = getAccessToken();
-    if (accessToken) {
+    if (accessToken && !isAuthRequest(config.url)) {
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
     return config;
@@ -34,7 +37,7 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !isAuthRequest(error.config?.url)) {
       clearAuthSnapshot();
       if (window.location.pathname !== '/login') {
         window.location.assign('/login');

@@ -38,7 +38,7 @@ spring:
     # (add the jdbc: prefix to the postgresql:// URL Render gives you)
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/antigone_rh}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:Karim123}
+    password: ${DB_PASSWORD:admin}
     driver-class-name: org.postgresql.Driver
 
   jpa:

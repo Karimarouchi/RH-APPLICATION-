@@ -27,13 +27,11 @@ export const SidebarProvider: React.FC<{ children: ReactNode }> = ({ children })
   const toggleRail = useCallback(() => {
     setIsRailVisible((prev) => !prev);
     setIsExpanded(false); // fermer le panel secondaire aussi
-  }, []);;
+  }, []);
 
-  const setOpenSubmenu = useCallback(
-    (submenu: string | null) =>
-      setOpenSubmenuState((prev) => (prev === submenu ? null : submenu)),
-    []
-  );
+  const setOpenSubmenu = useCallback((submenu: string | null) => {
+    setOpenSubmenuState(submenu);
+  }, []);
 
   // Auto-collapse on small screens
   useEffect(() => {

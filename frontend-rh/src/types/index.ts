@@ -126,12 +126,14 @@ export interface PermissionDTO {
 export interface RoleDTO {
   id: number;
   nom: string;
+  accesTotal?: boolean;
   permissions: PermissionDTO[];
 }
 
 export interface RoleRequest {
   nom: string;
   permissionIds: number[];
+  accesTotal?: boolean;
 }
 
 export interface CompteDTO {
@@ -205,6 +207,9 @@ export interface LoginResponse {
   email: string;
   roles: string[];
   permissions: string[];
+  superAdmin?: boolean;
+  departement?: string | null;
+  managerDepartement?: boolean;
   mustChangePassword: boolean;
   genre: string | null;
   message: string;

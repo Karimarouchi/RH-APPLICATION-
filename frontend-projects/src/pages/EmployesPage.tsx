@@ -156,10 +156,7 @@ const EmployesPage: React.FC = () => {
       setTypesContrat((contratRes.data.data || []).filter((r: Referentiel) => r.actif));
       setGenres((genreRes.data.data || []).filter((r: Referentiel) => r.actif));
       setRoles(rolesRes.data.data || []);
-      try {
-        const managersRes = await employeService.getByRole('MANAGER');
-        setManagers(managersRes.data.data || []);
-      } catch { setManagers([]); }
+      setManagers(empRes.data.data || []);
       // Load stats
       try {
         const statsRes = await employeService.getStats();

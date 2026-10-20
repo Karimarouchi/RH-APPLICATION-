@@ -7,6 +7,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 public final class SecurityUtils {
 
+    /** Autorite des comptes dont un role a l'acces total (independant du nom du role). */
+    public static final String SUPER_ADMIN = "ROLE_ADMIN";
+
     private SecurityUtils() {
     }
 
@@ -42,7 +45,7 @@ public final class SecurityUtils {
     }
 
     public static boolean isAdmin() {
-        return hasAnyAuthority("ROLE_ADMIN");
+        return hasAnyAuthority(SUPER_ADMIN);
     }
 
     /** Employe connecte, ou null (compte client). */

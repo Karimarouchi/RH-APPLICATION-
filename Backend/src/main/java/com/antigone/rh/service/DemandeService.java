@@ -152,9 +152,9 @@ public class DemandeService {
                 .orElse(null);
     }
 
-    /** Admin et RH valident tout. Sinon, seul le chef du département de l'employé. */
+    /** Ceux qui traitent toutes les demandes (VIEW_DEMANDES) valident tout. Sinon, seul le chef du département de l'employé. */
     private void assertDepartmentValidator(Employe cible) {
-        if (SecurityUtils.isAdmin() || SecurityUtils.hasAnyAuthority("ROLE_RH")) {
+        if (SecurityUtils.isAdmin() || SecurityUtils.hasAnyAuthority("VIEW_DEMANDES")) {
             return;
         }
         if (cible.getDepartement() == null || cible.getDepartement().isBlank()) {
@@ -202,7 +202,7 @@ public class DemandeService {
         // ── Validation du genre pour congé maternité et congé règles (réservés aux
         // femmes) ──
         if ((typeConge == TypeConge.CONGE_MATERNITE || typeConge == TypeConge.CONGE_REGLES)
-                && employe.getGenre() != null && !"FEMME".equalsIgnoreCase(employe.getGenre())) {
+                && employe.getGenre() != null && !Genre.isFemme(employe.getGenre())) {
             String label = typeConge == TypeConge.CONGE_MATERNITE ? "maternité" : "règles";
             throw new RuntimeException("Le congé " + label + " est réservé aux salariées de genre féminin.");
         }

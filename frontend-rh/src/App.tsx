@@ -30,14 +30,14 @@ import DepartementsPage from './pages/DepartementsPage';
 import ArchivesPage from './pages/ArchivesPage';
 import { relayAuthSnapshotForSwitch } from './utils/authStorage';
 import { NotificationProvider } from './context/NotificationContext';
+import { PROJECTS_APP_URL } from './config/apps';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useAuth();
   if (!isAuthenticated) {
-    const projectsAppUrl = (import.meta.env.VITE_PROJECTS_APP_URL as string | undefined)?.trim();
-    if (projectsAppUrl) {
+    if (PROJECTS_APP_URL) {
       relayAuthSnapshotForSwitch();
-      window.location.replace(`${projectsAppUrl}/login`);
+      window.location.replace(`${PROJECTS_APP_URL}/login`);
       return <div className="min-h-screen flex items-center justify-center bg-gray-900"><p className="text-gray-400 text-sm">Redirection vers la page de connexion...</p></div>;
     }
     return <Navigate to="/login" replace />;

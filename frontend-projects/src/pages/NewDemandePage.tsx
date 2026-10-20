@@ -9,6 +9,7 @@ import Button from '../components/ui/Button';
 import { useAuth } from '../context/AuthContext';
 import { HiOutlineChevronLeft, HiOutlineChevronRight, HiOutlineCheckCircle } from 'react-icons/hi';
 import { useTachesObligatoires } from '../hooks/useTachesObligatoires';
+import { normalizeGenre } from '../utils/genre';
 
 // Map JS Date.getDay() (0=Sunday) to French day names used in joursTravail
 const DOW_TO_JOUR: Record<number, string> = {
@@ -451,14 +452,11 @@ const NewDemandePage: React.FC = () => {
         let types: Referentiel[] = congeRes.data.data || [];
 
         // Gender-based filtering
-        if (user?.genre) {
-          if (user.genre === 'HOMME') {
-            // Men: no maternité, no règles
-            types = types.filter((t) => t.libelle !== 'CONGE_MATERNITE' && t.libelle !== 'CONGE_REGLES');
-          } else if (user.genre === 'FEMME') {
-            // Women: no paternité
-            types = types.filter((t) => t.libelle !== 'CONGE_PATERNITE');
-          }
+        const genre = normalizeGenre(user?.genre);
+        if (genre === 'HOMME') {
+          types = types.filter((t) => t.libelle !== 'CONGE_MATERNITE' && t.libelle !== 'CONGE_REGLES');
+        } else if (genre === 'FEMME') {
+          types = types.filter((t) => t.libelle !== 'CONGE_PATERNITE');
         }
 
         setCongeTypes(types);

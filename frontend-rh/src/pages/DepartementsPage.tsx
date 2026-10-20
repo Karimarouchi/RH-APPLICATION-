@@ -12,7 +12,6 @@ import {
 import { employeService } from '../api/employeService';
 import { demandeService } from '../api/demandeService';
 import { referentielService } from '../api/referentielService';
-import { compteService } from '../api/compteService';
 import { Employe, StatutDemande } from '../types';
 
 const DepartementsPage: React.FC = () => {
@@ -23,7 +22,7 @@ const DepartementsPage: React.FC = () => {
     const [congeMap, setCongeMap] = useState<Map<number, number>>(new Map());
     // All department names from Referentiel (ensures empty depts are visible)
     const [allDeptNames, setAllDeptNames] = useState<string[]>([]);
-    // Set of employeIds that have the MANAGER role
+    // Employés cochés « manager du département »
     const [managerEmpIds, setManagerEmpIds] = useState<Set<number>>(new Set());
 
     useEffect(() => {
@@ -33,11 +32,10 @@ const DepartementsPage: React.FC = () => {
     const loadData = async () => {
         try {
             const today = new Date().toISOString().split('T')[0];
-            const [empResult, demandeResult, deptRefResult, comptesResult] = await Promise.allSettled([
+            const [empResult, demandeResult, deptRefResult] = await Promise.allSettled([
                 employeService.getAll(),
                 demandeService.getByStatut(StatutDemande.APPROUVEE),
                 referentielService.getByType('DEPARTEMENT'),
-                compteService.getAll(),
             ]);
 
             if (empResult.status === 'fulfilled') {
@@ -50,16 +48,12 @@ const DepartementsPage: React.FC = () => {
                 console.warn('Dept referentiel load failed:', (deptRefResult as any).reason);
             }
 
-            // Build set of employeIds with the MANAGER role
-            if (comptesResult.status === 'fulfilled') {
-                const comptes = comptesResult.value.data.data || [];
-                const mgrIds = new Set<number>();
-                comptes.forEach((c: any) => {
-                    const hasManagerRole = (c.roles || []).some((r: any) =>
-                        r.nom?.toUpperCase() === 'MANAGER'
-                    );
-                    if (hasManagerRole && c.employeId) mgrIds.add(c.employeId);
-                });
+            if (empResult.status === 'fulfilled') {
+                const mgrIds = new Set<number>(
+                    (empResult.value.data.data || [])
+                        .filter((e: { managerDepartement?: boolean }) => e.managerDepartement)
+                        .map((e: { id: number }) => e.id)
+                );
                 setManagerEmpIds(mgrIds);
             }
 
@@ -274,7 +268,7 @@ const DepartementsPage: React.FC = () => {
                                                                 </p>
                                                                 {isManager && (
                                                                     <span className="shrink-0 rounded-full bg-warning-100 px-2 py-0.5 text-[10px] font-bold text-warning-600 dark:bg-warning-500/20 dark:text-warning-400">
-                                                                        MANAGER
+                                                                        Chef
                                                                     </span>
                                                                 )}
                                                             </div>

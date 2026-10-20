@@ -20,6 +20,10 @@ public class LoginResponse {
     private String email;
     private Set<String> roles;
     private Set<String> permissions;
+    /** True si un des rôles du compte a l'accès total. */
+    private Boolean superAdmin;
+    private String departement;
+    private Boolean managerDepartement;
     private Boolean mustChangePassword;
     private String genre;
     private String message;

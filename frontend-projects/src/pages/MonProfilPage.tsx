@@ -5,6 +5,7 @@ import { employeService } from '../api/employeService';
 import { Employe } from '../types';
 import Badge from '../components/ui/Badge';
 import { API_BASE } from '../api/axios';
+import { formatGenreIcon, formatGenreLabel } from '../utils/genre';
 import {
   HiOutlineUser,
   HiOutlineMail,
@@ -119,10 +120,10 @@ const MonProfilPage: React.FC = () => {
         </div>
         <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 text-center">
           <p className="text-3xl font-bold text-green-500">
-            {employe.genre === 'HOMME' ? '♂' : employe.genre === 'FEMME' ? '♀' : '—'}
+            {formatGenreIcon(employe.genre)}
           </p>
           <p className="text-theme-sm text-gray-500 dark:text-gray-400 mt-1">
-            {employe.genre === 'HOMME' ? 'Homme' : employe.genre === 'FEMME' ? 'Femme' : 'Genre non défini'}
+            {formatGenreLabel(employe.genre)}
           </p>
         </div>
       </div>

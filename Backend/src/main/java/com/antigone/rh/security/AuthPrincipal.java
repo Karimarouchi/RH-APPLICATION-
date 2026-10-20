@@ -16,6 +16,8 @@ public class AuthPrincipal {
     private final String username;
     private final Set<String> roles;
     private final Set<String> permissions;
+    /** Un des roles du compte a l'acces total. */
+    private final boolean superAdmin;
 
     public Collection<String> getAuthorities() {
         return permissions;

@@ -59,7 +59,7 @@ def run(w):
              w.req('admin', 'PATCH', f'/api/media-plans/{m2}/renvoyer-employe')[0], 200)
     r.expect('resoumission', w.req('alice', 'PATCH', f'/api/media-plans/{m2}/resubmit')[0], 200)
 
-    r.section('Tournage et manager du departement Production')
+    r.section('Tournage et permission VALIDATE_SHOOTING')
     c, j = w.req('admin', 'GET', f"/api/employes/{E('dave')}")
     dave = data_of(j)
     dave['departement'] = 'Production'
@@ -86,7 +86,7 @@ def run(w):
     r.check(data_of(j).get('shootingStatus') == 'EN_ATTENTE_DATE', 'le shooting attend une date de la Production')
     r.check(notif_count('dave') > avant, 'le manager Production recoit la demande de date')
     r.expect('alice ne peut pas poser la date',
-             w.req('alice', 'PATCH', f'/api/media-plans/{sid}/shooting-date', {'date': workday(20)})[0], 400)
+             w.req('alice', 'PATCH', f'/api/media-plans/{sid}/shooting-date', {'date': workday(20)})[0], 403)
     r.expect('une date apres la limite est refusee',
              w.req('dave', 'PATCH', f'/api/media-plans/{sid}/shooting-date', {'date': workday(40)})[0], 400)
     c, j = w.req('dave', 'PATCH', f'/api/media-plans/{sid}/shooting-date', {'date': workday(20)})

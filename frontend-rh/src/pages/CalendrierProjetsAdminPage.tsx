@@ -103,15 +103,8 @@ const CalendrierProjetsAdminPage: React.FC = () => {
   const hasAccess      = permissions.includes(PERM_ACCESS);
   const hasDeadlines   = permissions.includes('VIEW_DEADLINES');
   const hasReunions    = permissions.includes('VIEW_REUNIONS');
-  const roles: any[] = (user as any)?.roles || [];
-    const canManagerMode = roles.some(r => {
-      const nom = (typeof r === 'string' ? r : r.nom)?.toUpperCase() || '';
-      return nom === 'HEAD PROD' || nom === 'HEAD_PROD' || nom === 'ROLE_HEAD_PROD';
-    });
-    const canSocialMode  = roles.some(r => {
-      const nom = (typeof r === 'string' ? r : r.nom)?.toUpperCase() || '';
-      return nom.startsWith('SOCIAL MEDIA') || nom.startsWith('SOCIAL_MEDIA') || nom.startsWith('ROLE_SOCIAL_MEDIA');
-    });
+  const canManagerMode = permissions.includes('VALIDATE_SHOOTING');
+  const canSocialMode  = permissions.includes('VIEW_CALENDRIER_PROJETS');
   const canSwitch      = canManagerMode && canSocialMode;
 
   // Determine which tabs are available
@@ -145,8 +138,8 @@ const CalendrierProjetsAdminPage: React.FC = () => {
   const roleBadge = canSwitch
     ? { label: 'Administrateur',         cls: 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 border-blue-200' }
     : canManagerMode
-      ? { label: 'Head Prod',            cls: 'bg-violet-50 text-violet-700 border-violet-200' }
-      : { label: 'Social Media', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+      ? { label: 'Responsable tournage', cls: 'bg-violet-50 text-violet-700 border-violet-200' }
+      : { label: 'Média plan', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
 
   return (
     <div>
@@ -200,27 +193,19 @@ const CalendrierCore: React.FC<CoreProps> = ({
   const { user } = useAuth();
 
   useEffect(() => {
-    // Pour supporter les différentes façons d'écrire le rôle en base de données
-    Promise.all([
-      employeService.getByRole('Head Prod').catch(() => ({ data: { data: [] } })),
-      employeService.getByRole('HEAD_PROD').catch(() => ({ data: { data: [] } }))
-    ]).then(([res1, res2]) => {
-      const data1 = res1.data?.data || [];
-      const data2 = res2.data?.data || [];
-      const mergedData = [...data1, ...data2];
-      
-      // Dédoublonner par ID au cas où
-      const uniqueManagers = Array.from(new Map(mergedData.map((m: any) => [m.id, m])).values());
-
-      const mappers = uniqueManagers.map((m: any) => ({
-        id: m.id,
-        name: `${m.nom || ''} ${m.prenom || ''}`.trim(),
-        avatar: `${m.nom?.[0] || ''}${m.prenom?.[0] || ''}`.toUpperCase() || '?',
-        color: 'bg-violet-500'
-      }));
-      setManagers(mappers);
-      if (mappers.length > 0) setManagerId(mappers[0].id);
-    });
+    employeService.getByPermission('VALIDATE_SHOOTING', true)
+      .catch(() => ({ data: { data: [] } }))
+      .then((res) => {
+        const uniqueManagers = res.data?.data || [];
+        const mappers = uniqueManagers.map((m: any) => ({
+          id: m.id,
+          name: `${m.nom || ''} ${m.prenom || ''}`.trim(),
+          avatar: `${m.nom?.[0] || ''}${m.prenom?.[0] || ''}`.toUpperCase() || '?',
+          color: 'bg-violet-500'
+        }));
+        setManagers(mappers);
+        if (mappers.length > 0) setManagerId(mappers[0].id);
+      });
   }, []);
 
   useEffect(() => {
@@ -451,20 +436,20 @@ const CalendrierCore: React.FC<CoreProps> = ({
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200
                   ${role==='manager' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300 dark:text-gray-100'}`}
               >
-                <HiOutlineUser size={15}/> Head Prod
+                <HiOutlineUser size={15}/> Responsable tournage
               </button>
               <button
                 onClick={()=>setRole('social')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200
                   ${role==='social' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300 dark:text-gray-100'}`}
               >
-                <HiOutlineUserGroup size={15}/> Social Media Manager
+                <HiOutlineUserGroup size={15}/> Demande de tournage
               </button>
             </div>
           ) : (
             <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium ${roleBadge.cls}`}>
               {canManagerMode ? <HiOutlineUser size={15}/> : <HiOutlineUserGroup size={15}/>}
-              {canManagerMode ? 'Mode Head Prod' : 'Mode Social Media'}
+              {canManagerMode ? 'Mode responsable tournage' : 'Mode demande de tournage'}
             </div>
           )}
         </div>
@@ -476,7 +461,7 @@ const CalendrierCore: React.FC<CoreProps> = ({
 
             {/* Liste managers */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4">
-              <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Head Prod</p>
+              <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Responsables tournage</p>
               <div className="space-y-2">
                 {managers.map(m=>(
                   <button

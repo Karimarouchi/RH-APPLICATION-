@@ -390,10 +390,7 @@ const EmployesPage: React.FC = () => {
       setGenres((genreRes.data.data || []).filter((r: Referentiel) => r.actif));
       setRoles(rolesRes.data.data || []);
       setAllPermissions(permsRes.data.data || []);
-      try {
-        const managersRes = await employeService.getByRole('MANAGER');
-        setManagers(managersRes.data.data || []);
-      } catch { setManagers([]); }
+      setManagers(empRes.data.data || []);
       // Load stats
       try {
         const statsRes = await employeService.getStats();
@@ -1360,13 +1357,7 @@ const EmployesPage: React.FC = () => {
               disabled={!formData.departement}
               onChange={(e) => {
                 setFormData({ ...formData, managerDepartement: e.target.checked });
-                if (e.target.checked) {
-                  const managerRole = roles.find(r => r.nom === 'MANAGER');
-                  if (managerRole && !selectedRoleIds.includes(managerRole.id)) {
-                    setSelectedRoleIds(prev => [...prev, managerRole.id]);
-                  }
-                  if (!existingCompteId) setCreateCompte(true);
-                }
+                if (e.target.checked && !existingCompteId) setCreateCompte(true);
               }}
             />
             <span>

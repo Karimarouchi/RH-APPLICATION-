@@ -40,7 +40,7 @@ import { useConfirm } from '../hooks/useConfirm';
 
 const HOURS = ['', ...Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`)];
 const MONTH_NAMES = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-const MIN_ROWS = 14;
+const MIN_ROWS = 1;
 
 const COLUMNS = [
     { key: 'datePublication', label: 'Date Pub.', defaultWidth: 130 },
@@ -431,14 +431,9 @@ const MediaPlanPage: React.FC = () => {
     useEffect(() => {
         const fetchHeadProd = async () => {
             try {
-                const [res1, res2] = await Promise.all([
-                    employeService.getByRole('Head Prod').catch(() => ({ data: { data: [] } } as any)),
-                    employeService.getByRole('HEAD_PROD').catch(() => ({ data: { data: [] } } as any)),
-                ]);
-                const data1 = res1.data?.data || [];
-                const data2 = res2.data?.data || [];
-                const merged = [...data1, ...data2];
-                const unique = Array.from(new Map(merged.map((m: any) => [m.id, m])).values());
+                const res = await employeService.getByPermission('VALIDATE_SHOOTING', true)
+                    .catch(() => ({ data: { data: [] } } as any));
+                const unique = res.data?.data || [];
                 setHeadProdId(unique.length > 0 ? unique[0].id : null);
             } catch (e) {
                 setHeadProdId(null);
@@ -541,8 +536,7 @@ const MediaPlanPage: React.FC = () => {
             setIsForbidden(false);
             if (!user?.employeId) return;
 
-            const roles = (user as any).roles || [];
-            const isAdmin = roles.includes('ADMIN') || roles.includes('MANAGER');
+            const isAdmin = (user?.permissions || []).includes('VIEW_TOUS_MEDIA_PLAN');
 
             if (selectedClientId) {
                 if (!isAdmin) {

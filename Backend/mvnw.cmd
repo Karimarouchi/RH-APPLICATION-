@@ -5,7 +5,7 @@
 setlocal
 
 @REM Set JAVA_HOME to Oracle JDK 17
-set "JAVA_HOME=C:\Program Files\Java\jdk-17"
+set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot"
 
 set "MAVEN_PROJECTBASEDIR=%~dp0"
 set "MAVEN_WRAPPER_PROPERTIES=%MAVEN_PROJECTBASEDIR%.mvn\wrapper\maven-wrapper.properties"

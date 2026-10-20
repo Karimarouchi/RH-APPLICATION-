@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { HiOutlinePlus, HiOutlinePencil, HiOutlineTrash, HiOutlineShieldCheck, HiOutlineCheck } from 'react-icons/hi';
 import { roleService } from '../api/roleService';
+import { useAuth } from '../context/AuthContext';
 import { RoleDTO, PermissionDTO } from '../types';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
@@ -10,7 +11,9 @@ import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useConfirm } from '../hooks/useConfirm';
 
 const RolesPage: React.FC = () => {
+  const { user } = useAuth();
   const { confirmState, confirm, handleConfirm, handleCancel } = useConfirm();
+  const canEditAccesTotal = Boolean(user?.superAdmin);
   const [roles, setRoles] = useState<RoleDTO[]>([]);
   const [allPermissions, setAllPermissions] = useState<PermissionDTO[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -18,6 +21,7 @@ const RolesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const [formNom, setFormNom] = useState('');
+  const [formAccesTotal, setFormAccesTotal] = useState(false);
   const [selectedPermissionIds, setSelectedPermissionIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
@@ -53,12 +57,12 @@ const RolesPage: React.FC = () => {
     {
       label: 'Calendriers',
       color: '#0891b2',
-      codes: ['VIEW_CALENDRIER', 'VIEW_RESTRICTION_CONGE', 'VIEW_CALENDRIER_PROJETS', 'VIEW_DEADLINES', 'VIEW_REUNIONS'],
+      codes: ['VIEW_CALENDRIER', 'VIEW_RESTRICTION_CONGE', 'VIEW_CALENDRIER_PROJETS', 'VALIDATE_SHOOTING', 'VIEW_DEADLINES', 'VIEW_REUNIONS'],
     },
     {
       label: 'Projets',
       color: '#059669',
-      codes: ['VIEW_PROJETS', 'MANAGE_ALL_PROJETS', 'VIEW_PROJETS_CREATE_TACHES', 'DELETE_PROJET', 'DELETE_TACHE'],
+      codes: ['VIEW_PROJETS', 'MANAGE_ALL_PROJETS', 'VIEW_TOUS_PROJETS', 'VIEW_PROJETS_CREATE_TACHES', 'VIEW_EQUIPES', 'DELETE_PROJET', 'DELETE_TACHE'],
     },
     {
       label: 'Clients',
@@ -82,6 +86,7 @@ const RolesPage: React.FC = () => {
   const openCreate = () => {
     setEditingRole(null);
     setFormNom('');
+    setFormAccesTotal(false);
     setSelectedPermissionIds(new Set());
     setShowModal(true);
   };
@@ -89,6 +94,7 @@ const RolesPage: React.FC = () => {
   const openEdit = (role: RoleDTO) => {
     setEditingRole(role);
     setFormNom(role.nom);
+    setFormAccesTotal(Boolean(role.accesTotal));
     setSelectedPermissionIds(new Set(role.permissions.map((p) => p.id)));
     setShowModal(true);
   };
@@ -99,6 +105,7 @@ const RolesPage: React.FC = () => {
       const request = {
         nom: formNom,
         permissionIds: Array.from(selectedPermissionIds),
+        ...(canEditAccesTotal ? { accesTotal: formAccesTotal } : {}),
       };
 
       if (editingRole) {
@@ -153,6 +160,9 @@ const RolesPage: React.FC = () => {
         <div className="flex items-center gap-2">
           <HiOutlineShieldCheck size={18} className="text-brand-500" />
           <span className="font-semibold text-gray-800 dark:text-white">{item.nom}</span>
+          {item.accesTotal && (
+            <Badge variant="light" color="warning">Accès total</Badge>
+          )}
         </div>
       ),
     },
@@ -244,10 +254,25 @@ const RolesPage: React.FC = () => {
               type="text"
               value={formNom}
               onChange={(e) => setFormNom(e.target.value)}
-              placeholder="Ex: ADMIN, MANAGER, EMPLOYE..."
+              placeholder="Ex: Responsable projets, RH, Tournage..."
               className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-theme-sm text-gray-700 focus:border-brand-300 focus:outline-none focus:ring focus:ring-brand-500/10 dark:border-gray-600 dark:text-gray-300"
             />
+            <p className="text-theme-xs text-gray-400 mt-1">Le nom est libre : seules les permissions définissent les droits.</p>
           </div>
+          {canEditAccesTotal && (
+            <label className="flex items-start gap-3 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={formAccesTotal}
+                onChange={(e) => setFormAccesTotal(e.target.checked)}
+              />
+              <span>
+                <span className="block text-theme-sm font-medium text-gray-700 dark:text-gray-300">Accès total</span>
+                <span className="block text-theme-xs text-gray-400">Toutes les permissions, y compris celles ajoutées plus tard. Indépendant du nom du rôle.</span>
+              </span>
+            </label>
+          )}
 
           {/* Permissions checkboxes */}
           <div>

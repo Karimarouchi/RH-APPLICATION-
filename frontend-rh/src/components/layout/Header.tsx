@@ -10,6 +10,7 @@ import { NotificationResponse } from '../../types';
 import { API_BASE } from '../../api/axios';
 import { relayAuthSnapshotForSwitch } from '../../utils/authStorage';
 import { getNotificationTarget, shouldDisplayNotification } from '../../utils/notificationRules';
+import { APP_KIND, PROJECTS_APP_URL, RH_APP_URL } from '../../config/apps';
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
@@ -21,11 +22,9 @@ const Header: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notifMenuRef = useRef<HTMLDivElement>(null);
-  const appKind = ((import.meta.env.VITE_APP_KIND as string | undefined)?.trim().toLowerCase() === 'rh')
-    ? 'rh'
-    : 'projects';
-  const rhAppUrl = (import.meta.env.VITE_RH_APP_URL as string | undefined)?.trim();
-  const projectsAppUrl = (import.meta.env.VITE_PROJECTS_APP_URL as string | undefined)?.trim();
+  const appKind = APP_KIND;
+  const rhAppUrl = RH_APP_URL;
+  const projectsAppUrl = PROJECTS_APP_URL;
 
   const switchToApp = useCallback((target: 'rh' | 'projects', targetPath: string, fallbackPath: string) => {
     const targetUrl = target === 'rh' ? rhAppUrl : projectsAppUrl;

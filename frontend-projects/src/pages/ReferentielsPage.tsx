@@ -297,18 +297,28 @@ const ReferentielsPage: React.FC = () => {
               className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-theme-sm text-gray-700 focus:border-brand-300 focus:outline-none focus:ring focus:ring-brand-500/10 dark:border-gray-600 dark:text-gray-300"
             />
           </div>
-          {refForm.typeReferentiel === TypeReferentiel.PARAMETRE_SYSTEME && (
+          {(refForm.typeReferentiel === TypeReferentiel.PARAMETRE_SYSTEME
+            || refForm.typeReferentiel === TypeReferentiel.FORMAT_MEDIA_PLAN) && (
             <div>
               <label className="block text-theme-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                {'Valeur *'}
+                {refForm.typeReferentiel === TypeReferentiel.FORMAT_MEDIA_PLAN
+                  ? 'Département responsable'
+                  : 'Valeur *'}
               </label>
               <input
                 type="text"
                 value={refForm.valeur}
                 onChange={(e) => setRefForm({ ...refForm, valeur: e.target.value })}
-                placeholder={'Ex: 120, 30...'}
+                placeholder={refForm.typeReferentiel === TypeReferentiel.FORMAT_MEDIA_PLAN
+                  ? 'Libellé exact du département (ex: Production)'
+                  : 'Ex: 120, 30...'}
                 className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-theme-sm text-gray-700 focus:border-brand-300 focus:outline-none focus:ring focus:ring-brand-500/10 dark:border-gray-600 dark:text-gray-300"
               />
+              {refForm.typeReferentiel === TypeReferentiel.FORMAT_MEDIA_PLAN && (
+                <p className="text-theme-xs text-gray-400 mt-1">
+                  Le manager de ce département valide les lignes de ce format. Laissez vide s'il n'y a pas de chef dédié.
+                </p>
+              )}
             </div>
           )}
         </div>

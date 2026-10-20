@@ -72,36 +72,43 @@ public class DataInitializer implements CommandLineRunner {
         roleService.initPermissions();
         log.info("Permissions initialisées avec succès");
 
-        // Créer le rôle ADMIN avec toutes les permissions s'il n'existe pas
-        if (roleRepository.findByNom("ADMIN").isEmpty()) {
-            List<Permission> allPermissions = permissionRepository.findAll();
-            Role adminRole = Role.builder()
-                    .nom("ADMIN")
-                    .permissions(new HashSet<>(allPermissions))
-                    .build();
-            roleRepository.save(adminRole);
-            log.info("Rôle ADMIN créé avec toutes les permissions ({})", allPermissions.size());
-        } else {
-            // Mettre à jour le rôle ADMIN existant pour s'assurer qu'il a toutes les
-            // permissions
-            Role adminRole = roleRepository.findByNom("ADMIN").get();
-            List<Permission> allPermissions = permissionRepository.findAll();
-            adminRole.setPermissions(new HashSet<>(allPermissions));
-            roleRepository.save(adminRole);
-            log.info("Rôle ADMIN mis à jour avec toutes les permissions ({})", allPermissions.size());
+        // Accès total = super admin, indépendant du nom du rôle.
+        // Migration : s'il n'existe encore aucun rôle à accès total, on reprend le rôle
+        // historiquement nommé ADMIN s'il existe, sinon on le crée.
+        if (roleRepository.findByAccesTotalTrue().isEmpty()) {
+            Role adminRole = roleRepository.findByNom("ADMIN").orElse(null);
+            if (adminRole == null) {
+                adminRole = Role.builder()
+                        .nom("ADMIN")
+                        .accesTotal(true)
+                        .permissions(new HashSet<>(permissionRepository.findAll()))
+                        .build();
+                roleRepository.save(adminRole);
+                log.info("Rôle ADMIN créé avec accès total ({} permissions)", adminRole.getPermissions().size());
+            } else {
+                adminRole.setAccesTotal(true);
+                roleService.syncAccesTotal(adminRole);
+                roleRepository.save(adminRole);
+                log.info("Rôle {} migré vers l'accès total", adminRole.getNom());
+            }
+        }
+
+        for (Role role : roleRepository.findByAccesTotalTrue()) {
+            roleService.syncAccesTotal(role);
+            roleRepository.save(role);
+            log.info("Rôle {} (accès total) synchronisé avec {} permissions", role.getNom(),
+                    role.getPermissions().size());
         }
     }
 
     /**
-     * Rôles attendus par le code (recherchés par nom exact : MANAGER, RH, Head Prod).
-     * Créés seulement s'ils n'existent pas : les permissions modifiées ensuite par un
-     * admin dans l'application ne sont jamais écrasées au redémarrage.
+     * Modèles de rôles pour une installation neuve. Le code ne dépend plus de ces noms :
+     * seules les permissions comptent. Jamais écrasés au redémarrage.
      */
     private void initDefaultRoles() {
         List<String> espacePersonnel = List.of("VIEW_DASHBOARD_RH", "VIEW_MES_DEMANDES",
                 "VIEW_MON_CALENDRIER", "VIEW_MES_PROJETS");
 
-        // Manager : gere toute la partie Projets (projets, taches, equipes, clients, media plans)
         createRoleIfNotExists("MANAGER", concat(espacePersonnel, List.of(
                 "VIEW_PROJETS", "MANAGE_ALL_PROJETS", "VIEW_PROJETS_CREATE_TACHES", "VIEW_TOUS_PROJETS",
                 "VIEW_EQUIPES", "VIEW_CLIENTS", "MANAGE_CLIENTS", "VIEW_MEDIA_PLAN",
@@ -113,12 +120,14 @@ public class DataInitializer implements CommandLineRunner {
                 "VIEW_REFERENTIELS", "VIEW_MONITORING", "VIEW_CALENDRIER", "VIEW_RESTRICTION_CONGE",
                 "VIEW_REUNIONS")));
 
-        // Le code accepte "Head Prod" ou "HEAD_PROD" ; on ne crée que si aucun des deux n'existe
         if (roleRepository.findByNom("HEAD_PROD").isEmpty()) {
             createRoleIfNotExists("Head Prod", concat(espacePersonnel, List.of(
-                    "VIEW_CALENDRIER_PROJETS", "VIEW_TOUS_MEDIA_PLAN", "VIEW_MEDIA_PLAN", "VIEW_PROJETS",
-                    "VIEW_CLIENTS", "VIEW_DEADLINES", "VIEW_REUNIONS", "VIEW_CALENDRIER")));
+                    "VALIDATE_SHOOTING", "VIEW_CALENDRIER_PROJETS", "VIEW_TOUS_MEDIA_PLAN", "VIEW_MEDIA_PLAN",
+                    "VIEW_PROJETS", "VIEW_CLIENTS", "VIEW_DEADLINES", "VIEW_REUNIONS", "VIEW_CALENDRIER")));
         }
+        // Installations existantes : le modèle Head Prod n'avait pas encore VALIDATE_SHOOTING.
+        grantPermissionIfMissing("Head Prod", "VALIDATE_SHOOTING");
+        grantPermissionIfMissing("HEAD_PROD", "VALIDATE_SHOOTING");
     }
 
     private static List<String> concat(List<String> a, List<String> b) {
@@ -138,6 +147,20 @@ public class DataInitializer implements CommandLineRunner {
         }
         roleRepository.save(Role.builder().nom(nom).permissions(permissions).build());
         log.info("Rôle {} créé avec {} permissions", nom, permissions.size());
+    }
+
+    private void grantPermissionIfMissing(String roleNom, String permissionName) {
+        roleRepository.findByNom(roleNom).ifPresent(role -> {
+            if (Boolean.TRUE.equals(role.getAccesTotal())) {
+                return;
+            }
+            permissionRepository.findByPermission(permissionName).ifPresent(permission -> {
+                if (role.getPermissions().add(permission)) {
+                    roleRepository.save(role);
+                    log.info("Permission {} ajoutée au rôle existant {}", permissionName, roleNom);
+                }
+            });
+        });
     }
 
     // ===================== Paramètres Système =====================
@@ -236,8 +259,8 @@ public class DataInitializer implements CommandLineRunner {
         // Departements utilises par les media plans (le code les retrouve par mot-cle dans le nom) :
         //   "Social Media" -> assignation des clients et format Story, "Production" -> Reel/Video,
         //   "Designer" -> Carrousel. Ne pas les renommer sans adapter MediaPlanService / MediaPlanAssignmentService.
-        createParamIfNotExists("Social Media", null, "Département social media (assigné aux media plans)", TypeReferentiel.DEPARTEMENT);
-        createParamIfNotExists("Designer graphique", null, "Département design graphique (carrousels des media plans)", TypeReferentiel.DEPARTEMENT);
+        createParamIfNotExists("Social Media", null, "Département social media", TypeReferentiel.DEPARTEMENT);
+        createParamIfNotExists("Designer graphique", null, "Département design graphique", TypeReferentiel.DEPARTEMENT);
     }
 
     // ===================== Postes =====================
@@ -287,11 +310,16 @@ public class DataInitializer implements CommandLineRunner {
 
     private void initFormatsMediaPlan() {
         createParamIfNotExists("Bannière", null, "Bannière publicitaire", TypeReferentiel.FORMAT_MEDIA_PLAN);
-        createParamIfNotExists("Story", null, "Format story (vertical)", TypeReferentiel.FORMAT_MEDIA_PLAN);
+        createParamIfNotExists("Story", "Social Media", "Format story (vertical)", TypeReferentiel.FORMAT_MEDIA_PLAN);
         createParamIfNotExists("Post carré", null, "Post format carré 1:1", TypeReferentiel.FORMAT_MEDIA_PLAN);
-        createParamIfNotExists("Vidéo", null, "Format vidéo", TypeReferentiel.FORMAT_MEDIA_PLAN);
-        createParamIfNotExists("Carrousel", null, "Format carrousel multi-images", TypeReferentiel.FORMAT_MEDIA_PLAN);
-        createParamIfNotExists("Réels / Short", null, "Vidéo courte format reels/shorts", TypeReferentiel.FORMAT_MEDIA_PLAN);
+        createParamIfNotExists("Vidéo", "Production", "Format vidéo", TypeReferentiel.FORMAT_MEDIA_PLAN);
+        createParamIfNotExists("Carrousel", "Designer graphique", "Format carrousel multi-images", TypeReferentiel.FORMAT_MEDIA_PLAN);
+        createParamIfNotExists("Réels / Short", "Production", "Vidéo courte format reels/shorts", TypeReferentiel.FORMAT_MEDIA_PLAN);
+        // Installations existantes : renseigner le département responsable si la valeur est vide.
+        fillValeurIfBlank("Story", "Social Media", TypeReferentiel.FORMAT_MEDIA_PLAN);
+        fillValeurIfBlank("Vidéo", "Production", TypeReferentiel.FORMAT_MEDIA_PLAN);
+        fillValeurIfBlank("Réels / Short", "Production", TypeReferentiel.FORMAT_MEDIA_PLAN);
+        fillValeurIfBlank("Carrousel", "Designer graphique", TypeReferentiel.FORMAT_MEDIA_PLAN);
     }
 
     // ===================== Types Media Plan =====================
@@ -329,19 +357,28 @@ public class DataInitializer implements CommandLineRunner {
         }
     }
 
+    private void fillValeurIfBlank(String libelle, String valeur, TypeReferentiel type) {
+        referentielRepository.findByLibelleAndTypeReferentiel(libelle, type).ifPresent(ref -> {
+            if (ref.getValeur() == null || ref.getValeur().isBlank()) {
+                ref.setValeur(valeur);
+                referentielRepository.save(ref);
+                log.info("Référentiel [{}] {} : valeur={}", type, libelle, valeur);
+            }
+        });
+    }
+
     // ===================== Compte Admin par défaut =====================
 
     private void initDefaultAdmin() {
-        // Récupérer le rôle ADMIN
-        Role adminRole = roleRepository.findByNom("ADMIN")
-                .orElseThrow(() -> new RuntimeException("Rôle ADMIN introuvable"));
+        Role adminRole = roleRepository.findByAccesTotalTrue().stream().findFirst()
+                .orElseThrow(() -> new RuntimeException("Aucun rôle avec accès total"));
 
         if (compteRepository.existsByUsername("admin")) {
             // Réinitialiser le mot de passe admin à chaque démarrage
             Compte adminCompte = compteRepository.findByUsername("admin")
                     .orElseThrow(() -> new RuntimeException("Compte admin introuvable"));
             // Le mot de passe n'est JAMAIS reinitialise : il a pu etre change par l'administrateur.
-            // On garantit seulement que le compte reste actif et garde le role ADMIN.
+            // On garantit seulement que le compte reste actif et garde un rôle à accès total.
             adminCompte.setEnabled(true);
             Set<Role> roles = new HashSet<>(adminCompte.getRoles());
             roles.add(adminRole);

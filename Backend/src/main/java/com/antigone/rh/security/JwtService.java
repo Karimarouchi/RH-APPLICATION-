@@ -55,6 +55,7 @@ public class JwtService {
                 .claim("clientId", principal.getClientId())
                 .claim("roles", principal.getRoles())
                 .claim("permissions", principal.getPermissions())
+                .claim("superAdmin", principal.isSuperAdmin())
                 .signWith(signingKey, SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -78,6 +79,7 @@ public class JwtService {
                 .username(claims.getSubject())
                 .roles(readStringSet(claims.get("roles")))
                 .permissions(readStringSet(claims.get("permissions")))
+                .superAdmin(Boolean.TRUE.equals(claims.get("superAdmin", Boolean.class)))
                 .build();
     }
 
