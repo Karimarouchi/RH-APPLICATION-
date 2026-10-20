@@ -218,6 +218,12 @@ export interface LoginResponse {
   tokenExpiresAt?: string;
   /** Guides de premiere connexion deja vus ("rh", "projets") */
   toursVus?: string[];
+  /** Present when a client account (not an employee) is logged in */
+  isClient?: boolean;
+  /** ID of the logged-in client (only present when isClient === true) */
+  clientId?: number;
+  /** Page keys accessible to this client: ['MEDIA_PLANS','PROJETS','FICHIERS'] */
+  clientPages?: string[];
 }
 
 export interface DemandeRequest {
