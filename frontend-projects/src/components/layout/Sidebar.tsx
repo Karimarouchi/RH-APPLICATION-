@@ -34,6 +34,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme, AppFont, AppFontSize, setSharedCookie } from '../../hooks/useTheme';
 import { flushSync } from 'react-dom';
 import { API_BASE } from '../../api/axios';
+import { employeService } from '../../api/employeService';
 import { projetService } from '../../api/projetService';
 import { mediaPlanAssignmentService } from '../../api/mediaPlanAssignmentService';
 import { notificationService } from '../../api/notificationService';
@@ -310,10 +311,17 @@ const ThemeAnimatedBtn: React.FC<{
   );
 };
 
+const resolvePhotoUrl = (url?: string | null) => {
+  if (!url) return null;
+  if (/^(https?:|data:|blob:)/i.test(url)) return url;
+  return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 const Sidebar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
+  const [photoBroken, setPhotoBroken] = useState(false);
   const { theme, toggleTheme, setTheme, font, setFont, fontSize, setFontSize } = useTheme();
   const {
     isExpanded,
@@ -573,6 +581,23 @@ const Sidebar: React.FC = () => {
   }, [activePanelMode, location.pathname, visibleRailMain, visibleRailSecondary]);
 
   const userInitials = `${user?.prenom?.[0] ?? ''}${user?.nom?.[0] ?? ''}`.toUpperCase() || 'SA';
+  const photoSrc = resolvePhotoUrl(user?.imageUrl);
+
+  useEffect(() => {
+    setPhotoBroken(false);
+  }, [user?.imageUrl]);
+
+  useEffect(() => {
+    if (!user?.employeId || user.imageUrl || user.isClient) return;
+    let cancelled = false;
+    employeService.getById(user.employeId)
+      .then((res) => {
+        const url = res.data.data?.imageUrl;
+        if (!cancelled && url) updateUser({ imageUrl: url });
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [user?.employeId, user?.imageUrl, user?.isClient, updateUser]);
 
   useEffect(() => {
     const matchKey = panelGroupsTemplate
@@ -917,15 +942,21 @@ const Sidebar: React.FC = () => {
             }}
             aria-label="Compte utilisateur"
           >
-            <div className="pc-avatar-chip">{userInitials}</div>
+            <div className={`pc-avatar-chip${photoSrc && !photoBroken ? ' has-photo' : ''}`}>
+              {photoSrc && !photoBroken ? (
+                <img src={photoSrc} alt="" onError={() => setPhotoBroken(true)} />
+              ) : (
+                userInitials
+              )}
+            </div>
           </button>
 
           {showAccountMenu && (
             <div className="pc-account-popup">
               <div className="pc-account-popup-header">
                 <div className="flex flex-1 items-center gap-3">
-                  {user?.imageUrl ? (
-                    <img src={`${API_BASE}${user.imageUrl}`} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover" />
+                  {photoSrc && !photoBroken ? (
+                    <img src={photoSrc} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover" />
                   ) : (
                     <div
                       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
