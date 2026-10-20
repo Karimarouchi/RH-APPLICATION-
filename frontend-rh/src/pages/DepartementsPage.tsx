@@ -51,8 +51,8 @@ const DepartementsPage: React.FC = () => {
             if (empResult.status === 'fulfilled') {
                 const mgrIds = new Set<number>(
                     (empResult.value.data.data || [])
-                        .filter((e: { managerDepartement?: boolean }) => e.managerDepartement)
-                        .map((e: { id: number }) => e.id)
+                        .filter((e: Employe) => !!e.managerDepartement)
+                        .map((e: Employe) => e.id)
                 );
                 setManagerEmpIds(mgrIds);
             }

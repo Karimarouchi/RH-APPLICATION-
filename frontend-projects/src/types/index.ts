@@ -107,11 +107,14 @@ export interface Employe {
   dateFinContrat: string | null;
   genre: string;
   departement: string;
+  managerDepartement?: boolean;
   ribBancaire: string;
   managerId: number | null;
   managerNom: string | null;
   imageUrl: string | null;
   lienDrive: string | null;
+  archived?: boolean;
+  archivedAt?: string | null;
 }
 
 export interface PermissionDTO {
