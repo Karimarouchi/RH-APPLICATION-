@@ -34,7 +34,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme, AppFont, AppFontSize, setSharedCookie } from '../../hooks/useTheme';
 import { flushSync } from 'react-dom';
 import { API_BASE } from '../../api/axios';
-import { employeService } from '../../api/employeService';
 import { projetService } from '../../api/projetService';
 import { mediaPlanAssignmentService } from '../../api/mediaPlanAssignmentService';
 import { notificationService } from '../../api/notificationService';
@@ -320,7 +319,7 @@ const resolvePhotoUrl = (url?: string | null) => {
 const Sidebar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, updateUser } = useAuth();
+  const { user, logout } = useAuth();
   const [photoBroken, setPhotoBroken] = useState(false);
   const { theme, toggleTheme, setTheme, font, setFont, fontSize, setFontSize } = useTheme();
   const {
@@ -586,18 +585,6 @@ const Sidebar: React.FC = () => {
   useEffect(() => {
     setPhotoBroken(false);
   }, [user?.imageUrl]);
-
-  useEffect(() => {
-    if (!user?.employeId || user.imageUrl || user.isClient) return;
-    let cancelled = false;
-    employeService.getById(user.employeId)
-      .then((res) => {
-        const url = res.data.data?.imageUrl;
-        if (!cancelled && url) updateUser({ imageUrl: url });
-      })
-      .catch(() => undefined);
-    return () => { cancelled = true; };
-  }, [user?.employeId, user?.imageUrl, user?.isClient, updateUser]);
 
   useEffect(() => {
     const matchKey = panelGroupsTemplate

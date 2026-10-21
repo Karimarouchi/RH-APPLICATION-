@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams } from 'react-router-dom';
 import {
     HiOutlineTrash,
@@ -12,6 +13,9 @@ import {
     HiOutlineDownload,
     HiOutlineChatAlt,
     HiOutlineShieldCheck,
+    HiOutlineDotsHorizontal,
+    HiOutlineCalendar,
+    HiOutlinePaperAirplane,
     HiChevronLeft,
     HiChevronRight,
 } from 'react-icons/hi';
@@ -22,7 +26,6 @@ import { referentielService } from '../api/referentielService';
 import { mediaPlanAssignmentService } from '../api/mediaPlanAssignmentService';
 import { mediaPlanCommentService, MediaPlanCommentDTO } from '../api/mediaPlanCommentService';
 import { employeService } from '../api/employeService';
-import { clientService } from '../api/clientService';
 import { calendrierProjetService } from '../api/calendrierProjetService';
 import {
     MediaPlan,
@@ -44,53 +47,218 @@ import './MediaPlanGrid.css';
 const HOURS = ['', ...Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`)];
 const MONTH_NAMES = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 const MIN_ROWS = 1;
-const PAGE_SIZE = 8;
+const EMPTY_PAD = 5;
+const PAGE_SIZE_OPTIONS = [5, 10, 15, 20];
 
 const COLUMNS = [
-    { key: 'datePublication', label: 'Date Pub.', defaultWidth: 148 },
-    { key: 'heure', label: 'Heure', defaultWidth: 104 },
-    { key: 'format', label: 'Format', defaultWidth: 136 },
-    { key: 'type', label: 'Type', defaultWidth: 128 },
-    { key: 'titre', label: 'Titre', defaultWidth: 220 },
-    { key: 'texteSurVisuel', label: 'Texte/Visuel', defaultWidth: 200 },
-    { key: 'inspiration', label: 'Inspiration', defaultWidth: 176 },
-    { key: 'autresElements', label: 'Autres', defaultWidth: 156 },
-    { key: 'platforme', label: 'Plateforme', defaultWidth: 144 },
-    { key: 'lienDrive', label: 'Lien Drive', defaultWidth: 188 },
-    { key: 'etatPublication', label: 'État Pub.', defaultWidth: 140 },
-    { key: 'rectifs', label: 'Rectifs', defaultWidth: 140 },
-    { key: 'remarques', label: 'Remarques', defaultWidth: 150 },
-    { key: 'shooting', label: 'Shooting', defaultWidth: 96 },
-    { key: 'statut', label: 'Statut', defaultWidth: 124 },
-    { key: 'actions', label: 'Actions', defaultWidth: 96 },
+    { key: 'select', label: '', defaultWidth: 44, sortable: false },
+    { key: 'datePublication', label: 'Date pub.', defaultWidth: 150, sortable: true },
+    { key: 'titre', label: 'Titre', defaultWidth: 200, sortable: true },
+    { key: 'texteSurVisuel', label: 'Texte / Visuel', defaultWidth: 190, sortable: true },
+    { key: 'inspiration', label: 'Inspiration', defaultWidth: 170, sortable: true },
+    { key: 'platforme', label: 'Plateforme', defaultWidth: 168, sortable: true },
+    { key: 'etatPublication', label: 'État pub.', defaultWidth: 150, sortable: true },
+    { key: 'rectifs', label: 'Rectificatifs', defaultWidth: 150, sortable: true },
+    { key: 'actions', label: '', defaultWidth: 48, sortable: false },
 ];
+
+type PlatKind = 'ig' | 'fb' | 'tt' | 'li' | 'yt' | 'x' | 'gads' | 'web' | 'default';
+
+const platformMeta = (name?: string | null): { cls: string; kind: PlatKind } => {
+    const n = (name || '').toLowerCase();
+    if (n.includes('insta')) return { cls: 'mp-plat-ig', kind: 'ig' };
+    if (n.includes('face')) return { cls: 'mp-plat-fb', kind: 'fb' };
+    if (n.includes('tik')) return { cls: 'mp-plat-tt', kind: 'tt' };
+    if (n.includes('link')) return { cls: 'mp-plat-li', kind: 'li' };
+    if (n.includes('you') || n.includes('tube')) return { cls: 'mp-plat-yt', kind: 'yt' };
+    if (n === 'x' || n.includes('twitter')) return { cls: 'mp-plat-x', kind: 'x' };
+    if (n.includes('google') || n.includes('ads')) return { cls: 'mp-plat-gads', kind: 'gads' };
+    if (n.includes('web') || n.includes('site')) return { cls: 'mp-plat-web', kind: 'web' };
+    return { cls: 'mp-plat-default', kind: 'default' };
+};
+
+const PlatMark: React.FC<{ kind: PlatKind; letter?: string }> = ({ kind, letter }) => {
+    if (kind === 'ig') return (
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden>
+            <rect x="3.2" y="3.2" width="17.6" height="17.6" rx="5" stroke="currentColor" strokeWidth="2" />
+            <circle cx="12" cy="12" r="4.1" stroke="currentColor" strokeWidth="2" />
+            <circle cx="17.15" cy="6.85" r="1.15" fill="currentColor" />
+        </svg>
+    );
+    if (kind === 'fb') return (
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden>
+            <path d="M14.2 21v-7.2h2.4l.36-2.8h-2.76V9.2c0-.8.22-1.36 1.38-1.36H17V5.32A18.4 18.4 0 0 0 14.7 5c-2.3 0-3.88 1.4-3.88 4v1.98H8.4v2.8h2.42V21h3.38Z" />
+        </svg>
+    );
+    if (kind === 'tt') return (
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden>
+            <path d="M14.4 4c.34 2.28 1.7 3.78 3.9 4.02v2.3c-1.34.12-2.56-.32-3.7-1.16v5.5c0 3.7-2.5 6.14-6.02 6.14A5.7 5.7 0 0 1 4 15.4c0-3.2 2.56-5.56 5.86-5.56.34 0 .86.06 1.12.12v2.5a3.4 3.4 0 0 0-1.12-.18c-1.62 0-2.86 1.26-2.86 3.08 0 1.8 1.2 3 2.9 3 1.72 0 2.9-1.2 2.9-3.28V4h1.6Z" />
+        </svg>
+    );
+    if (kind === 'li') return (
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden>
+            <path d="M6.54 9.3H3.9V20h2.64V9.3ZM5.2 4C4.3 4 3.6 4.7 3.6 5.58c0 .86.7 1.58 1.62 1.58.9 0 1.62-.72 1.62-1.58C6.84 4.7 6.12 4 5.2 4ZM20.1 13.16c0-3.3-1.76-4.84-4.12-4.84-1.9 0-2.74 1.04-3.22 1.78h-.06V9.3H10.1V20h2.64v-5.94c0-1.56.3-3.08 2.24-3.08 1.92 0 1.94 1.8 1.94 3.18V20H19.6v-6.84Z" />
+        </svg>
+    );
+    if (kind === 'yt') return (
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden>
+            <path d="M21.6 8.2a2.7 2.7 0 0 0-1.9-1.92C18.1 5.8 12 5.8 12 5.8s-6.1 0-7.7.48A2.7 2.7 0 0 0 2.4 8.2 28.4 28.4 0 0 0 2 12a28.4 28.4 0 0 0 .4 3.8 2.7 2.7 0 0 0 1.9 1.92c1.6.48 7.7.48 7.7.48s6.1 0 7.7-.48a2.7 2.7 0 0 0 1.9-1.92A28.4 28.4 0 0 0 22 12a28.4 28.4 0 0 0-.4-3.8ZM10.2 15.05V8.95L15.4 12l-5.2 3.05Z" />
+        </svg>
+    );
+    if (kind === 'x') return (
+        <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" aria-hidden>
+            <path d="M14.7 10.4 21.2 3h-1.54l-5.64 6.44L9.5 3H3.3l6.82 9.72L3.3 21h1.54l5.96-6.82L14.5 21h6.2l-6-10.6Zm-2.1 2.42-.7-1-5.5-7.7h2.36l4.44 6.22.7 1 5.76 8.08h-2.36l-4.7-6.6Z" />
+        </svg>
+    );
+    if (kind === 'gads') return (
+        <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden>
+            <path d="M7.6 16.8 12 7.2l4.4 9.6H7.6Z" fill="#fbbc04" />
+            <path d="M4 18.4 8.4 8.8l3.2 7 2.2 4.8-2.6-2.2H4Z" fill="#4285f4" />
+            <path d="M20 18.4h-7.2l-2.2-4.8 3.8-8.4L20 18.4Z" fill="#34a853" />
+        </svg>
+    );
+    if (kind === 'web') return (
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <circle cx="12" cy="12" r="8" />
+            <path d="M4.4 12h15.2M12 4c2.4 2.4 3.6 5.2 3.6 8s-1.2 5.6-3.6 8c-2.4-2.4-3.6-5.2-3.6-8s1.2-5.6 3.6-8Z" />
+        </svg>
+    );
+    return <span>{letter || '?'}</span>;
+};
+
+const PlatformLogo: React.FC<{ name?: string | null }> = ({ name }) => {
+    const meta = platformMeta(name);
+    return (
+        <span className={`mp-plat-ico ${meta.cls}`} aria-hidden>
+            <PlatMark kind={meta.kind} letter={(name?.[0] || '?').toUpperCase()} />
+        </span>
+    );
+};
+
+interface ChipOption {
+    value: string;
+    label: string;
+    icon?: React.ReactNode;
+}
+
+const ChipSelect: React.FC<{
+    value: string;
+    options: ChipOption[];
+    placeholder?: string;
+    disabled?: boolean;
+    className?: string;
+    onChange: (value: string) => void;
+}> = ({ value, options, placeholder = '', disabled, className, onChange }) => {
+    const [open, setOpen] = useState(false);
+    const btnRef = useRef<HTMLButtonElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+    const [pos, setPos] = useState({ top: 0, left: 0, width: 200 });
+    const selected = options.find((o) => o.value === value)
+        || (value ? { value, label: value, icon: <PlatformLogo name={value} /> } : undefined);
+
+    useEffect(() => {
+        if (!open) return;
+        const place = () => {
+            const r = btnRef.current?.getBoundingClientRect();
+            if (!r) return;
+            const width = Math.max(r.width, 220);
+            const menuH = Math.min(320, (options.length + 1) * 40 + 14);
+            let top = r.bottom + 6;
+            let left = r.left;
+            if (left + width > window.innerWidth - 8) left = Math.max(8, window.innerWidth - width - 8);
+            if (top + menuH > window.innerHeight - 8) top = Math.max(8, r.top - 6 - menuH);
+            setPos({ top, left, width });
+        };
+        place();
+        const onDown = (e: MouseEvent) => {
+            const t = e.target as Node;
+            if (btnRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+            setOpen(false);
+        };
+        const onReposition = () => setOpen(false);
+        window.addEventListener('mousedown', onDown);
+        window.addEventListener('scroll', onReposition, true);
+        window.addEventListener('resize', onReposition);
+        return () => {
+            window.removeEventListener('mousedown', onDown);
+            window.removeEventListener('scroll', onReposition, true);
+            window.removeEventListener('resize', onReposition);
+        };
+    }, [open, options.length]);
+
+    return (
+        <>
+            <button
+                ref={btnRef}
+                type="button"
+                disabled={disabled}
+                className={className}
+                onClick={() => { if (!disabled) setOpen((o) => !o); }}
+            >
+                {selected ? (
+                    <>
+                        {selected.icon}
+                        <span className="mp-selectchip-label">{selected.label}</span>
+                    </>
+                ) : (
+                    <span className="mp-selectchip-placeholder">{placeholder}</span>
+                )}
+            </button>
+            {open && createPortal(
+                <div ref={menuRef} className="mp-chipmenu" style={{ top: pos.top, left: pos.left, minWidth: pos.width }}>
+                    <button type="button" className={!value ? 'active' : ''} onClick={() => { onChange(''); setOpen(false); }}>
+                        <span className="mp-plat-ico mp-plat-empty" />
+                        {placeholder}
+                    </button>
+                    {options.map((o) => (
+                        <button
+                            key={o.value}
+                            type="button"
+                            className={o.value === value ? 'active' : ''}
+                            onClick={() => { onChange(o.value); setOpen(false); }}
+                        >
+                            {o.icon}
+                            {o.label}
+                        </button>
+                    ))}
+                </div>,
+                document.body,
+            )}
+        </>
+    );
+};
+
+const etatDot = (etat?: string | null) => {
+    if (etat === 'PUBLIEE' || etat === 'EN_COURS') return 'mp-dot';
+    if (etat === 'SM') return 'mp-dot orange';
+    if (etat === 'PAS_ENCORE') return 'mp-dot gray';
+    return 'mp-dot gray';
+};
 
 const rowMatchesSearch = (obj: object, query: string) =>
     !query || Object.values(obj).some((v) => typeof v === 'string' && v.toLowerCase().includes(query.toLowerCase()));
 
-const TablePager: React.FC<{ page: number; pageCount: number; total: number; onPage: (page: number) => void }> = ({
-    page, pageCount, total, onPage,
-}) => {
-    if (total === 0) return null;
-    return (
-        <div className="mp-pager">
-            <p className="text-xs font-medium text-[var(--text-3)]">
-                {total} ligne{total > 1 ? 's' : ''}
-            </p>
-            <div className="flex items-center gap-2">
-                <button type="button" disabled={page <= 0} onClick={() => onPage(page - 1)} className="mp-pager-btn">
-                    <HiChevronLeft size={16} />
-                </button>
-                <span className="text-xs font-semibold text-[var(--text-2)] min-w-[64px] text-center">
-                    {page + 1} / {pageCount}
-                </span>
-                <button type="button" disabled={page >= pageCount - 1} onClick={() => onPage(page + 1)} className="mp-pager-btn">
-                    <HiChevronRight size={16} />
-                </button>
-            </div>
+const TablePager: React.FC<{
+    page: number; pageCount: number; total: number; pageSize: number;
+    onPage: (page: number) => void; onPageSize: (size: number) => void;
+}> = ({ page, pageCount, total, pageSize, onPage, onPageSize }) => (
+    <div className="mp-pager">
+        <p>{total} ligne{total > 1 ? 's' : ''} au total</p>
+        <div className="mp-pager-right">
+            <span>Lignes par page</span>
+            <select value={pageSize} onChange={(e) => onPageSize(Number(e.target.value))}>
+                {PAGE_SIZE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <span>{page + 1} / {Math.max(pageCount, 1)}</span>
+            <button type="button" disabled={page <= 0} onClick={() => onPage(page - 1)} className="mp-pager-btn">
+                <HiChevronLeft size={16} />
+            </button>
+            <button type="button" disabled={page >= pageCount - 1} onClick={() => onPage(page + 1)} className="mp-pager-btn">
+                <HiChevronRight size={16} />
+            </button>
         </div>
-    );
-};
+    </div>
+);
 
 // ── Draft row ──
 interface DraftRow {
@@ -308,6 +476,13 @@ const MediaPlanPage: React.FC = () => {
     const [isForbidden, setIsForbidden] = useState(false);
     const [draftRows, setDraftRows] = useState<DraftRow[]>([]);
     const [tablePage, setTablePage] = useState(0);
+    const [pageSize, setPageSize] = useState(10);
+    const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+    const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
+    const [rowMenuKey, setRowMenuKey] = useState<string | null>(null);
+    const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null);
+    const [sortKey, setSortKey] = useState<string | null>(null);
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
     // Expanded cell
     const [expandedCell, setExpandedCell] = useState<{
@@ -455,16 +630,14 @@ const MediaPlanPage: React.FC = () => {
     useEffect(() => { loadData(); }, [selectedClientId]);
 
     useEffect(() => {
-        if (!selectedClientId) {
-            setClientLabel(null);
-            return;
-        }
-        clientService.getClientById(selectedClientId)
-            .then((res) => setClientLabel(res.data.data?.nom || null))
-            .catch(() => setClientLabel(null));
+        if (!selectedClientId) setClientLabel(null);
     }, [selectedClientId]);
 
     useEffect(() => {
+        if (!(user?.permissions || []).includes('VALIDATE_SHOOTING')) {
+            setHeadProdId(null);
+            return;
+        }
         const fetchHeadProd = async () => {
             try {
                 const res = await employeService.getByPermission('VALIDATE_SHOOTING', true)
@@ -476,7 +649,7 @@ const MediaPlanPage: React.FC = () => {
             }
         };
         fetchHeadProd();
-    }, []);
+    }, [user?.permissions]);
 
     useEffect(() => {
         const fetchAvailableDates = async () => {
@@ -624,6 +797,18 @@ const MediaPlanPage: React.FC = () => {
         return fromAssign?.clientNom || `Client #${selectedClientId}`;
     }, [selectedClientId, clientLabel, mediaPlans, assignments]);
 
+    const platformOptions = useMemo<ChipOption[]>(() => (
+        platformes.map((p) => ({ value: p.libelle, label: p.libelle, icon: <PlatformLogo name={p.libelle} /> }))
+    ), [platformes]);
+
+    const etatOptions = useMemo<ChipOption[]>(() => (
+        Object.values(EtatPublication).map((ep) => ({
+            value: ep,
+            label: EtatPublicationLabels[ep],
+            icon: <span className={etatDot(ep)} />,
+        }))
+    ), []);
+
     // ── Month list ──
     const monthList = useMemo(() => {
         const months: { key: string; label: string; year: number; month: number }[] = [];
@@ -686,10 +871,10 @@ const MediaPlanPage: React.FC = () => {
         const existing = monthMediaPlans.filter((mp) => rowMatchesSearch(mp, searchQuery));
         const drafts = draftRows.filter((d) => rowMatchesSearch(d, searchQuery));
         const total = existing.length + drafts.length;
-        const pageCount = Math.max(1, Math.ceil(Math.max(total, 1) / PAGE_SIZE));
+        const pageCount = Math.max(1, Math.ceil(Math.max(total, 1) / pageSize));
         const page = Math.min(tablePage, pageCount - 1);
-        const start = page * PAGE_SIZE;
-        const end = start + PAGE_SIZE;
+        const start = page * pageSize;
+        const end = start + pageSize;
         const existingSlice = existing.slice(start, end);
         const draftStart = Math.max(0, start - existing.length);
         const draftEnd = Math.max(0, end - existing.length);
@@ -700,20 +885,20 @@ const MediaPlanPage: React.FC = () => {
             pageCount,
             page,
         };
-    }, [monthMediaPlans, draftRows, searchQuery, tablePage]);
+    }, [monthMediaPlans, draftRows, searchQuery, tablePage, pageSize]);
 
     const pagedNewPlanDrafts = useMemo(() => {
         const drafts = draftRows.filter((d) => rowMatchesSearch(d, searchQuery));
-        const pageCount = Math.max(1, Math.ceil(Math.max(drafts.length, 1) / PAGE_SIZE));
+        const pageCount = Math.max(1, Math.ceil(Math.max(drafts.length, 1) / pageSize));
         const page = Math.min(tablePage, pageCount - 1);
-        const start = page * PAGE_SIZE;
+        const start = page * pageSize;
         return {
-            draftSlice: drafts.slice(start, start + PAGE_SIZE),
+            draftSlice: drafts.slice(start, start + pageSize),
             total: drafts.length,
             pageCount,
             page,
         };
-    }, [draftRows, searchQuery, tablePage]);
+    }, [draftRows, searchQuery, tablePage, pageSize]);
 
     const selectedMonthIndex = monthList.findIndex((m) => m.key === selectedMonth);
 
@@ -833,7 +1018,7 @@ const MediaPlanPage: React.FC = () => {
         setDraftRows(prev => {
             const next = [...prev, draft];
             if (selectedClientId) saveDraftsToStorage(selectedClientId, selectedMonth, next);
-            setTablePage(Math.floor((monthMediaPlans.filter((mp) => rowMatchesSearch(mp, searchQuery)).length + next.length - 1) / PAGE_SIZE));
+            setTablePage(Math.floor((monthMediaPlans.filter((mp) => rowMatchesSearch(mp, searchQuery)).length + next.length - 1) / pageSize));
             return next;
         });
     };
@@ -1039,7 +1224,7 @@ const MediaPlanPage: React.FC = () => {
                 className={`relative ${className}`}
                 style={cellStyle}
                 onClick={() => setSelectedCellKey(cellKey)}
-                onDoubleClick={() => { if (readOnly) openExpanded(cellValue, true, () => { }); }}
+                onDoubleClick={() => openExpanded(cellValue, !!readOnly, onSave)}
                 onContextMenu={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -1050,20 +1235,22 @@ const MediaPlanPage: React.FC = () => {
             >
                 {readOnly ? (
                     <div
-                        className="mp-textcell cursor-pointer overflow-hidden"
-                        style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', whiteSpace: 'normal', wordBreak: 'break-word', ...cellStyle }}
+                        className={`mp-textcell cursor-pointer overflow-hidden${!cellValue && placeholder !== 'Aucun' ? ' ghost' : ''}`}
+                        style={cellStyle}
                         title="Double-cliquez pour voir"
                     >
-                        {hasLink ? renderCellValue(cellValue) : (cellValue || <span className="mp-placeholder">—</span>)}
+                        {hasLink ? renderCellValue(cellValue) : (cellValue || <span className="mp-placeholder">{placeholder || ''}</span>)}
                     </div>
                 ) : (
-                    <div
-                        onClick={() => openExpanded(cellValue, false, onSave)}
-                        className={`mp-textcell overflow-hidden ${isSelected ? 'selected' : ''}`}
-                        style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', whiteSpace: 'normal', wordBreak: 'break-word', ...cellStyle }}
-                    >
-                        {cellValue || <span className="mp-placeholder">{placeholder || 'Saisir…'}</span>}
-                    </div>
+                    <input
+                        className={`mp-field ${isSelected ? 'selected' : ''}`}
+                        style={cellStyle}
+                        defaultValue={cellValue}
+                        key={`${cellKey}:${cellValue}`}
+                        placeholder={placeholder || ''}
+                        onBlur={(e) => { if (e.target.value !== cellValue) onSave(e.target.value); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); } }}
+                    />
                 )}
                 {hasComments && (
                     <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400" title={`${cellComments.length} commentaire(s)`} />
@@ -1091,103 +1278,173 @@ const MediaPlanPage: React.FC = () => {
     // ══════════════════════════════════════════════════
     // ── RENDER TABLE (reusable for both sent & drafts) ──
     // ══════════════════════════════════════════════════
-    const renderTableHeader = () => (
-        <thead>
-            <tr>
-                {COLUMNS.map((col, ci) => (
-                    <th key={col.key}
-                        className={ci === 0 ? 'mp-td-sticky' : ''}
-                        style={{ width: colWidths[ci], minWidth: 72 }}>
-                        {col.label}
-                        {ci < COLUMNS.length - 1 && (
-                            <div style={hoveredHandle === ci || resizingCol === ci ? resizeHandleHoverStyle : resizeHandleStyle}
-                                onMouseDown={e => startResize(ci, e)}
-                                onMouseEnter={() => setHoveredHandle(ci)}
-                                onMouseLeave={() => setHoveredHandle(null)} />
-                        )}
-                    </th>
-                ))}
-            </tr>
-        </thead>
+    const toggleSelect = (key: string) => {
+        setSelectedKeys(prev => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key); else next.add(key);
+            return next;
+        });
+    };
+
+    const toggleSort = (key: string) => {
+        if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+        else { setSortKey(key); setSortDir('asc'); }
+    };
+
+    const renderTableHeader = (rowKeys: string[] = []) => {
+        const allSelected = rowKeys.length > 0 && rowKeys.every((k) => selectedKeys.has(k));
+        return (
+            <thead>
+                <tr>
+                    {COLUMNS.map((col, ci) => (
+                        <th key={col.key} className={ci === 0 ? 'mp-td-sticky' : ''} style={{ width: colWidths[ci], minWidth: ci === 0 ? 36 : 80 }}>
+                            {col.key === 'select' ? (
+                                <input
+                                    type="checkbox"
+                                    className="mp-check"
+                                    checked={allSelected}
+                                    onChange={() => {
+                                        setSelectedKeys((prev) => {
+                                            if (allSelected) return new Set([...prev].filter((k) => !rowKeys.includes(k)));
+                                            return new Set([...prev, ...rowKeys]);
+                                        });
+                                    }}
+                                />
+                            ) : col.sortable ? (
+                                <button type="button" className="mp-th-sort" onClick={() => toggleSort(col.key)}>
+                                    {col.label}
+                                    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.6 5 1.4 8 3.6M2 6.4 5 8.6 8 6.4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+                                </button>
+                            ) : col.label}
+                            {ci > 0 && ci < COLUMNS.length - 1 && (
+                                <div style={hoveredHandle === ci || resizingCol === ci ? resizeHandleHoverStyle : resizeHandleStyle}
+                                    onMouseDown={e => startResize(ci, e)}
+                                    onMouseEnter={() => setHoveredHandle(ci)}
+                                    onMouseLeave={() => setHoveredHandle(null)} />
+                            )}
+                        </th>
+                    ))}
+                </tr>
+            </thead>
+        );
+    };
+
+    const renderGhostRow = (i: number) => (
+        <tr key={`ghost-${i}`} className="mp-row mp-row-empty" onClick={handleAddRow}>
+            <td><input type="checkbox" className="mp-check" disabled /></td>
+            {COLUMNS.slice(1, -1).map((col) => (
+                <td key={col.key}><div className={col.key === 'datePublication' ? 'mp-date ghost' : 'mp-field ghost'} /></td>
+            ))}
+            <td><button type="button" className="mp-icon-btn" tabIndex={-1}><HiOutlineDotsHorizontal size={18} /></button></td>
+        </tr>
     );
 
     const renderExistingRow = (mp: MediaPlan) => {
         const ro = isReadOnly(mp);
         const rowH = rowHeights[`mp-${mp.id}`] || DEFAULT_ROW_HEIGHT;
+        const rowKey = `mp-${mp.id}`;
+        const expanded = expandedRowKey === rowKey;
         return (
             <React.Fragment key={mp.id}>
-                <tr className={`mp-row ${ro ? 'mp-row-locked' : ''}`} style={{ height: rowH }}>
-                    <td className="mp-td mp-td-sticky" style={{ width: colWidths[0] }}><input type="date" value={mp.datePublication || ''} readOnly={ro} onChange={e => handleCellChange(mp, 'datePublication', e.target.value)} className={inputClass(ro)} /></td>
-                    <td className="mp-td" style={{ width: colWidths[1] }}>
-                        <select value={mp.heure || ''} disabled={ro} onChange={e => handleCellChange(mp, 'heure', e.target.value)} className={selectClass(ro)}>
-                            {HOURS.map(h => <option key={h} value={h}>{h || '-'}</option>)}
-                        </select>
+                <tr className={`mp-row ${ro ? 'mp-row-locked' : ''}`}>
+                    <td className="mp-td-sticky">
+                        <input type="checkbox" className="mp-check" checked={selectedKeys.has(rowKey)} onChange={() => toggleSelect(rowKey)} />
                     </td>
-                    <td className="mp-td" style={{ width: colWidths[2] }}>
-                        <select value={mp.format || ''} disabled={ro} onChange={e => handleCellChange(mp, 'format', e.target.value)} className={selectClass(ro)}>
-                            <option value="">-</option>
-                            {formats.map(f => <option key={f.id} value={f.libelle}>{f.libelle}</option>)}
-                        </select>
-                    </td>
-                    <td className="mp-td" style={{ width: colWidths[3] }}>
-                        <select value={mp.type || ''} disabled={ro} onChange={e => handleCellChange(mp, 'type', e.target.value)} className={selectClass(ro)}>
-                            <option value="">-</option>
-                            {types.map(t => <option key={t.id} value={t.libelle}>{t.libelle}</option>)}
-                        </select>
-                    </td>
-                    <td className="mp-td" style={{ width: colWidths[4] }}><TextCell cellKey={`mp-${mp.id}-titre`} rowId={`mp-${mp.id}`} columnKey="titre" mediaPlanId={mp.id} value={mp.titre} readOnly={ro} onSave={v => handleCellChange(mp, 'titre', v)} className="font-medium" /></td>
-                    <td className="mp-td" style={{ width: colWidths[5] }}><TextCell cellKey={`mp-${mp.id}-texte`} rowId={`mp-${mp.id}`} columnKey="texte" mediaPlanId={mp.id} value={mp.texteSurVisuel || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'texteSurVisuel', v)} /></td>
-                    <td className="mp-td" style={{ width: colWidths[6] }}><TextCell cellKey={`mp-${mp.id}-inspiration`} rowId={`mp-${mp.id}`} columnKey="inspiration" mediaPlanId={mp.id} value={mp.inspiration || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'inspiration', v)} /></td>
-                    <td className="mp-td" style={{ width: colWidths[7] }}><TextCell cellKey={`mp-${mp.id}-autres`} rowId={`mp-${mp.id}`} columnKey="autres" mediaPlanId={mp.id} value={mp.autresElements || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'autresElements', v)} /></td>
-                    <td className="mp-td" style={{ width: colWidths[8] }}>
-                        <select value={mp.platforme || ''} disabled={ro} onChange={e => handleCellChange(mp, 'platforme', e.target.value)} className={selectClass(ro)}>
-                            <option value="">-</option>
-                            {platformes.map(p => <option key={p.id} value={p.libelle}>{p.libelle}</option>)}
-                        </select>
-                    </td>
-                    <td className="mp-td" style={{ width: colWidths[9] }}><TextCell cellKey={`mp-${mp.id}-lien`} rowId={`mp-${mp.id}`} columnKey="lien" mediaPlanId={mp.id} value={mp.lienDrive || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'lienDrive', v)} /></td>
-                    <td className="mp-td" style={{ width: colWidths[10] }}>
-                        <select value={mp.etatPublication || ''} disabled={ro} onChange={e => handleCellChange(mp, 'etatPublication', e.target.value)} className={selectClass(ro)}>
-                            <option value="">-</option>
-                            {Object.values(EtatPublication).map(ep => <option key={ep} value={ep}>{EtatPublicationLabels[ep]}</option>)}
-                        </select>
-                    </td>
-                    <td className="mp-td" style={{ width: colWidths[11] }}><TextCell cellKey={`mp-${mp.id}-rectifs`} rowId={`mp-${mp.id}`} columnKey="rectifs" mediaPlanId={mp.id} value={mp.rectifs || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'rectifs', v)} /></td>
-                    <td className="mp-td" style={{ width: colWidths[12] }}><TextCell cellKey={`mp-${mp.id}-remarques`} rowId={`mp-${mp.id}`} columnKey="remarques" mediaPlanId={mp.id} value={mp.remarques || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'remarques', v)} /></td>
-                    <td className="mp-td" style={{ width: colWidths[13] }}>
-                        <div className="flex items-center justify-center">
-                            <input
-                                type="checkbox"
-                                checked={!!mp.isShooting}
-                                disabled={ro}
-                                onChange={e => handleCellChange(mp, 'isShooting', e.target.checked)}
-                                className="h-4 w-4 accent-brand-500"
-                            />
+                    <td>
+                        <div className={`mp-date${mp.datePublication ? '' : ' ghost'}`}>
+                            <HiOutlineCalendar size={16} />
+                            <input type="date" value={mp.datePublication || ''} readOnly={ro} onChange={e => handleCellChange(mp, 'datePublication', e.target.value)} />
                         </div>
                     </td>
-                    <td className="mp-td" style={{ width: colWidths[14] }}>
-                        {getStatusBadge(mp.statut)}
-                        {mp.retourManager && <div className="mt-1 text-[10px] font-semibold text-amber-600">Chez le manager</div>}
+                    <td><TextCell cellKey={`${rowKey}-titre`} rowId={rowKey} columnKey="titre" mediaPlanId={mp.id} value={mp.titre} readOnly={ro} onSave={v => handleCellChange(mp, 'titre', v)} /></td>
+                    <td><TextCell cellKey={`${rowKey}-texte`} rowId={rowKey} columnKey="texte" mediaPlanId={mp.id} value={mp.texteSurVisuel || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'texteSurVisuel', v)} /></td>
+                    <td><TextCell cellKey={`${rowKey}-inspiration`} rowId={rowKey} columnKey="inspiration" mediaPlanId={mp.id} value={mp.inspiration || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'inspiration', v)} /></td>
+                    <td>
+                        <ChipSelect
+                            className={`mp-selectchip${mp.platforme ? '' : ' ghost'}`}
+                            value={mp.platforme || ''}
+                            options={platformOptions}
+                            placeholder="Plateforme"
+                            disabled={ro}
+                            onChange={(v) => handleCellChange(mp, 'platforme', v)}
+                        />
                     </td>
-                    <td className="mp-td" style={{ width: colWidths[15] }}>
-                        {!ro && (
-                            <div className="flex gap-1">
-                                {mp.statut === 'DESAPPROUVE' && (
-                                    <button
-                                        onClick={() => handleResubmit(mp)}
-                                        className="p-1 rounded text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
-                                        title="Confirmer et envoyer"
-                                    >
-                                        <HiOutlineCheck size={15} />
-                                    </button>
+                    <td>
+                        <ChipSelect
+                            className={`mp-status${mp.etatPublication ? '' : ' ghost'}`}
+                            value={mp.etatPublication || ''}
+                            options={etatOptions}
+                            placeholder="État"
+                            disabled={ro}
+                            onChange={(v) => handleCellChange(mp, 'etatPublication', v)}
+                        />
+                    </td>
+                    <td>
+                        <TextCell cellKey={`${rowKey}-rectifs`} rowId={rowKey} columnKey="rectifs" mediaPlanId={mp.id} value={mp.rectifs || ''} placeholder="Aucun" readOnly={ro} onSave={v => handleCellChange(mp, 'rectifs', v)} />
+                    </td>
+                    <td className="relative">
+                        <button type="button" className="mp-icon-btn" onClick={() => setRowMenuKey(rowMenuKey === rowKey ? null : rowKey)}>
+                            <HiOutlineDotsHorizontal size={18} />
+                        </button>
+                        {rowMenuKey === rowKey && (
+                            <div className="mp-menu">
+                                <button type="button" onClick={() => { setExpandedRowKey(expanded ? null : rowKey); setRowMenuKey(null); }}>Plus de champs</button>
+                                {mp.statut === 'DESAPPROUVE' && !ro && (
+                                    <button type="button" onClick={() => { setRowMenuKey(null); handleResubmit(mp); }}>Confirmer et envoyer</button>
                                 )}
-                                <button onClick={() => handleClearRow(mp)} className="mp-icon-btn" title="Vider la ligne">
-                                    <HiOutlineTrash size={15} />
-                                </button>
+                                {!ro && <button type="button" onClick={() => { setRowMenuKey(null); handleClearRow(mp); }}>Vider la ligne</button>}
                             </div>
                         )}
                     </td>
                 </tr>
+                {expanded && (
+                    <tr>
+                        <td colSpan={COLUMNS.length} className="!p-0 !bg-transparent border-0">
+                            <div className="mp-details">
+                                <div>
+                                    <label>Heure</label>
+                                    <select value={mp.heure || ''} disabled={ro} onChange={e => handleCellChange(mp, 'heure', e.target.value)} className={selectClass(ro)}>
+                                        {HOURS.map(h => <option key={h} value={h}>{h || '-'}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label>Format</label>
+                                    <select value={mp.format || ''} disabled={ro} onChange={e => handleCellChange(mp, 'format', e.target.value)} className={selectClass(ro)}>
+                                        <option value="">-</option>
+                                        {formats.map(f => <option key={f.id} value={f.libelle}>{f.libelle}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label>Type</label>
+                                    <select value={mp.type || ''} disabled={ro} onChange={e => handleCellChange(mp, 'type', e.target.value)} className={selectClass(ro)}>
+                                        <option value="">-</option>
+                                        {types.map(t => <option key={t.id} value={t.libelle}>{t.libelle}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label>Lien Drive</label>
+                                    <TextCell cellKey={`${rowKey}-lien`} rowId={rowKey} columnKey="lien" mediaPlanId={mp.id} value={mp.lienDrive || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'lienDrive', v)} />
+                                </div>
+                                <div>
+                                    <label>Autres</label>
+                                    <TextCell cellKey={`${rowKey}-autres`} rowId={rowKey} columnKey="autres" mediaPlanId={mp.id} value={mp.autresElements || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'autresElements', v)} />
+                                </div>
+                                <div>
+                                    <label>Remarques</label>
+                                    <TextCell cellKey={`${rowKey}-remarques`} rowId={rowKey} columnKey="remarques" mediaPlanId={mp.id} value={mp.remarques || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'remarques', v)} />
+                                </div>
+                                <div>
+                                    <label>Shooting</label>
+                                    <input type="checkbox" className="mp-check" checked={!!mp.isShooting} disabled={ro} onChange={e => handleCellChange(mp, 'isShooting', e.target.checked)} />
+                                </div>
+                                <div>
+                                    <label>Statut</label>
+                                    {getStatusBadge(mp.statut)}
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                )}
 
                 {mp.isShooting && (
                     <tr>
@@ -1297,76 +1554,111 @@ const MediaPlanPage: React.FC = () => {
         const idx = draftRows.findIndex((row) => row._key === draft._key);
         if (idx < 0) return null;
         const rowH = rowHeights[draft._key] || DEFAULT_ROW_HEIGHT;
+        const expanded = expandedRowKey === draft._key;
         return (
             <React.Fragment key={draft._key}>
-                <tr className="mp-row mp-row-draft" style={{ height: rowH }}>
-                    <td className="mp-td mp-td-sticky" style={{ width: colWidths[0] }}><input type="date" value={draft.datePublication} onChange={e => handleDraftChange(idx, 'datePublication', e.target.value)} className={inputClass()} /></td>
-                    <td className="mp-td" style={{ width: colWidths[1] }}>
-                        <select value={draft.heure} onChange={e => handleDraftChange(idx, 'heure', e.target.value)} className={selectClass()}>
-                            {HOURS.map(h => <option key={h} value={h}>{h || '-'}</option>)}
-                        </select>
+                <tr className="mp-row" onClick={() => setFocusedRowKey(draft._key)}>
+                    <td className="mp-td-sticky">
+                        <input type="checkbox" className="mp-check" checked={selectedKeys.has(draft._key)} onChange={() => toggleSelect(draft._key)} />
                     </td>
-                    <td className="mp-td" style={{ width: colWidths[2] }}>
-                        <select value={draft.format} onChange={e => handleDraftChange(idx, 'format', e.target.value)} className={selectClass()}>
-                            <option value="">-</option>
-                            {formats.map(f => <option key={f.id} value={f.libelle}>{f.libelle}</option>)}
-                        </select>
-                    </td>
-                    <td className="mp-td" style={{ width: colWidths[3] }}>
-                        <select value={draft.type} onChange={e => handleDraftChange(idx, 'type', e.target.value)} className={selectClass()}>
-                            <option value="">-</option>
-                            {types.map(t => <option key={t.id} value={t.libelle}>{t.libelle}</option>)}
-                        </select>
-                    </td>
-                    <td className="mp-td" style={{ width: colWidths[4] }}><TextCell cellKey={`${draft._key}-titre`} rowId={draft._key} columnKey="titre" draftKey={draft._key} value={draft.titre} placeholder="Nom du post" onSave={v => handleDraftChange(idx, 'titre', v)} className="font-medium" /></td>
-                    <td className="mp-td" style={{ width: colWidths[5] }}><TextCell cellKey={`${draft._key}-texte`} rowId={draft._key} columnKey="texte" draftKey={draft._key} value={draft.texteSurVisuel} placeholder="Texte visuel" onSave={v => handleDraftChange(idx, 'texteSurVisuel', v)} /></td>
-                    <td className="mp-td" style={{ width: colWidths[6] }}><TextCell cellKey={`${draft._key}-inspiration`} rowId={draft._key} columnKey="inspiration" draftKey={draft._key} value={draft.inspiration} placeholder="Référence" onSave={v => handleDraftChange(idx, 'inspiration', v)} /></td>
-                    <td className="mp-td" style={{ width: colWidths[7] }}><TextCell cellKey={`${draft._key}-autres`} rowId={draft._key} columnKey="autres" draftKey={draft._key} value={draft.autresElements} placeholder="Notes" onSave={v => handleDraftChange(idx, 'autresElements', v)} /></td>
-                    <td className="mp-td" style={{ width: colWidths[8] }}>
-                        <select value={draft.platforme} onChange={e => handleDraftChange(idx, 'platforme', e.target.value)} className={selectClass()}>
-                            <option value="">-</option>
-                            {platformes.map(p => <option key={p.id} value={p.libelle}>{p.libelle}</option>)}
-                        </select>
-                    </td>
-                    <td className="mp-td" style={{ width: colWidths[9] }}><TextCell cellKey={`${draft._key}-lien`} rowId={draft._key} columnKey="lien" draftKey={draft._key} value={draft.lienDrive} placeholder="Lien Drive" onSave={v => handleDraftChange(idx, 'lienDrive', v)} /></td>
-                    <td className="mp-td" style={{ width: colWidths[10] }}>
-                        <select value={draft.etatPublication} onChange={e => handleDraftChange(idx, 'etatPublication', e.target.value)} className={selectClass()}>
-                            <option value="">-</option>
-                            {Object.values(EtatPublication).map(ep => <option key={ep} value={ep}>{EtatPublicationLabels[ep]}</option>)}
-                        </select>
-                    </td>
-                    <td className="mp-td" style={{ width: colWidths[11] }}><TextCell cellKey={`${draft._key}-rectifs`} rowId={draft._key} columnKey="rectifs" draftKey={draft._key} value={draft.rectifs} placeholder="Rectifs" onSave={v => handleDraftChange(idx, 'rectifs', v)} /></td>
-                    <td className="mp-td" style={{ width: colWidths[12] }}><TextCell cellKey={`${draft._key}-remarques`} rowId={draft._key} columnKey="remarques" draftKey={draft._key} value={draft.remarques} placeholder="Remarques" onSave={v => handleDraftChange(idx, 'remarques', v)} /></td>
-                    <td className="mp-td" style={{ width: colWidths[13] }}>
-                        <div className="flex items-center justify-center">
-                            <input
-                                type="checkbox"
-                                checked={!!draft.isShooting}
-                                onChange={e => handleDraftChange(idx, 'isShooting', e.target.checked)}
-                                className="h-4 w-4 accent-brand-500"
-                            />
+                    <td>
+                        <div className={`mp-date${!draft.datePublication ? ' ghost' : ''}`}>
+                            <HiOutlineCalendar size={16} />
+                            <input type="date" value={draft.datePublication} onChange={e => handleDraftChange(idx, 'datePublication', e.target.value)} />
                         </div>
                     </td>
-                    <td className="mp-td" style={{ width: colWidths[14] }}><Badge variant="light">Brouillon</Badge></td>
-                    <td className="mp-td" style={{ width: colWidths[15] }}>
-                        <div className="flex gap-1">
-                            <button onClick={() => {
-                                const { year, month } = parseMonthKey(selectedMonth);
-                                setDraftRows(prev => {
-                                    const updated = [...prev];
-                                    updated[idx] = { ...emptyDraft(), datePublication: `${year}-${String(month + 1).padStart(2, '0')}-01` };
-                                    if (selectedClientId) saveDraftsToStorage(selectedClientId, selectedMonth, updated);
-                                    return updated;
-                                });
-                            }} className="mp-icon-btn" title="Vider les champs">
-                                <HiOutlineRefresh size={15} />
-                            </button>
-                            <button onClick={() => removeDraft(idx)} className="mp-icon-btn" title="Supprimer la ligne">
-                                <HiOutlineTrash size={15} />
-                            </button>
-                        </div>
+                    <td><TextCell cellKey={`${draft._key}-titre`} rowId={draft._key} columnKey="titre" draftKey={draft._key} value={draft.titre} placeholder="Nom du post" onSave={v => handleDraftChange(idx, 'titre', v)} /></td>
+                    <td><TextCell cellKey={`${draft._key}-texte`} rowId={draft._key} columnKey="texte" draftKey={draft._key} value={draft.texteSurVisuel} placeholder="Texte visuel" onSave={v => handleDraftChange(idx, 'texteSurVisuel', v)} /></td>
+                    <td><TextCell cellKey={`${draft._key}-inspiration`} rowId={draft._key} columnKey="inspiration" draftKey={draft._key} value={draft.inspiration} placeholder="Référence" onSave={v => handleDraftChange(idx, 'inspiration', v)} /></td>
+                    <td>
+                        <ChipSelect
+                            className={`mp-selectchip${draft.platforme ? '' : ' ghost'}`}
+                            value={draft.platforme}
+                            options={platformOptions}
+                            placeholder="Plateforme"
+                            onChange={(v) => handleDraftChange(idx, 'platforme', v)}
+                        />
+                    </td>
+                    <td>
+                        <ChipSelect
+                            className={`mp-status${draft.etatPublication ? '' : ' ghost'}`}
+                            value={draft.etatPublication}
+                            options={etatOptions}
+                            placeholder="État"
+                            onChange={(v) => handleDraftChange(idx, 'etatPublication', v)}
+                        />
+                    </td>
+                    <td><TextCell cellKey={`${draft._key}-rectifs`} rowId={draft._key} columnKey="rectifs" draftKey={draft._key} value={draft.rectifs} placeholder="Aucun" onSave={v => handleDraftChange(idx, 'rectifs', v)} /></td>
+                    <td className="relative">
+                        <button type="button" className="mp-icon-btn" onClick={(e) => { e.stopPropagation(); setRowMenuKey(rowMenuKey === draft._key ? null : draft._key); }}>
+                            <HiOutlineDotsHorizontal size={18} />
+                        </button>
+                        {rowMenuKey === draft._key && (
+                            <div className="mp-menu">
+                                <button type="button" onClick={() => { setExpandedRowKey(expanded ? null : draft._key); setRowMenuKey(null); }}>Plus de champs</button>
+                                <button type="button" onClick={() => {
+                                    const { year, month } = parseMonthKey(selectedMonth);
+                                    setDraftRows(prev => {
+                                        const updated = [...prev];
+                                        updated[idx] = { ...emptyDraft(), datePublication: `${year}-${String(month + 1).padStart(2, '0')}-01` };
+                                        if (selectedClientId) saveDraftsToStorage(selectedClientId, selectedMonth, updated);
+                                        return updated;
+                                    });
+                                    setRowMenuKey(null);
+                                }}>Vider les champs</button>
+                                <button type="button" onClick={() => { setRowMenuKey(null); removeDraft(idx); }}>Supprimer la ligne</button>
+                            </div>
+                        )}
                     </td>
                 </tr>
+                {expanded && (
+                    <tr>
+                        <td colSpan={COLUMNS.length} className="!p-0 !bg-transparent border-0">
+                            <div className="mp-details">
+                                <div>
+                                    <label>Heure</label>
+                                    <select value={draft.heure} onChange={e => handleDraftChange(idx, 'heure', e.target.value)} className={selectClass()}>
+                                        {HOURS.map(h => <option key={h} value={h}>{h || '-'}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label>Format</label>
+                                    <select value={draft.format} onChange={e => handleDraftChange(idx, 'format', e.target.value)} className={selectClass()}>
+                                        <option value="">-</option>
+                                        {formats.map(f => <option key={f.id} value={f.libelle}>{f.libelle}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label>Type</label>
+                                    <select value={draft.type} onChange={e => handleDraftChange(idx, 'type', e.target.value)} className={selectClass()}>
+                                        <option value="">-</option>
+                                        {types.map(t => <option key={t.id} value={t.libelle}>{t.libelle}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label>Lien Drive</label>
+                                    <TextCell cellKey={`${draft._key}-lien`} rowId={draft._key} columnKey="lien" draftKey={draft._key} value={draft.lienDrive} onSave={v => handleDraftChange(idx, 'lienDrive', v)} />
+                                </div>
+                                <div>
+                                    <label>Autres</label>
+                                    <TextCell cellKey={`${draft._key}-autres`} rowId={draft._key} columnKey="autres" draftKey={draft._key} value={draft.autresElements} onSave={v => handleDraftChange(idx, 'autresElements', v)} />
+                                </div>
+                                <div>
+                                    <label>Remarques</label>
+                                    <TextCell cellKey={`${draft._key}-remarques`} rowId={draft._key} columnKey="remarques" draftKey={draft._key} value={draft.remarques} onSave={v => handleDraftChange(idx, 'remarques', v)} />
+                                </div>
+                                <div>
+                                    <label>Shooting</label>
+                                    <input type="checkbox" className="mp-check" checked={!!draft.isShooting} onChange={e => handleDraftChange(idx, 'isShooting', e.target.checked)} />
+                                </div>
+                                <div>
+                                    <label>Statut</label>
+                                    <Badge variant="light">Brouillon</Badge>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                )}
 
                 {draft.isShooting && (
                     <tr>
@@ -1437,15 +1729,10 @@ const MediaPlanPage: React.FC = () => {
 
     const renderFormatToolbar = (actions?: React.ReactNode) => (
         <div className="mp-toolbar">
-            <button
-                type="button"
-                onClick={() => updateFormat({ bold: !selectedFormat.bold })}
-                title="Gras"
-                className={`mp-tool ${selectedFormat.bold ? 'active' : ''}`}
-            >B</button>
+            <input type="checkbox" className="mp-check" readOnly tabIndex={-1} />
             <div className="mp-size">
                 <button type="button" onClick={() => updateFormat({ fontSize: Math.max(8, (selectedFormat.fontSize || 14) - 1) })}>−</button>
-                <span className="w-6 text-center text-xs font-semibold text-[var(--text-2)]">{selectedFormat.fontSize || 14}</span>
+                <span>{selectedFormat.fontSize || 14}</span>
                 <button type="button" onClick={() => updateFormat({ fontSize: Math.min(32, (selectedFormat.fontSize || 14) + 1) })}>+</button>
             </div>
             <label className="mp-tool relative overflow-hidden" title="Couleur du texte">
@@ -1453,20 +1740,16 @@ const MediaPlanPage: React.FC = () => {
                 <input type="color" value={selectedFormat.textColor || '#374151'} onChange={e => updateFormat({ textColor: e.target.value })} className="absolute inset-0 opacity-0 cursor-pointer" />
             </label>
             <label className="mp-tool relative overflow-hidden" title="Couleur de fond">
-                <span className="w-3.5 h-3.5 rounded-sm border border-gray-300" style={{ background: selectedFormat.fillColor || '#fff' }} />
+                <span className="w-3.5 h-3.5 rounded-sm border border-gray-200" style={{ background: selectedFormat.fillColor || '#fff' }} />
                 <input type="color" value={selectedFormat.fillColor || '#ffffff'} onChange={e => updateFormat({ fillColor: e.target.value })} className="absolute inset-0 opacity-0 cursor-pointer" />
             </label>
-            {selectedCellKey && (
-                <button type="button" onClick={() => { if (selectedCellKey) setCellFormats(prev => { const n = { ...prev }; delete n[selectedCellKey]; return n; }); }} className="mp-tool" title="Effacer la mise en forme">✕</button>
-            )}
-            <div className="mp-sep" />
-            <button type="button" onClick={exportToCSV} className="mp-tool" title="Exporter" style={{ width: 'auto', padding: '0 10px', gap: 6, fontWeight: 650 }}>
-                <HiOutlineDownload size={14} /> Exporter
+            <button type="button" onClick={exportToCSV} className="mp-export">
+                <HiOutlineDownload size={15} /> Exporter <HiOutlineChevronDown size={14} />
             </button>
             <div className="mp-search">
-                <HiOutlineSearch size={15} className="text-[var(--text-3)]" />
+                <HiOutlineSearch size={15} className="text-[#9ca3af]" />
                 <input type="text" placeholder="Rechercher une ligne…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-                {searchQuery && <button type="button" onClick={() => setSearchQuery('')} className="text-[var(--text-3)]"><HiOutlineX size={12} /></button>}
+                {searchQuery && <button type="button" onClick={() => setSearchQuery('')} className="text-[#9ca3af]"><HiOutlineX size={12} /></button>}
             </div>
             {actions && <div className="mp-actions">{actions}</div>}
         </div>
@@ -1509,15 +1792,13 @@ const MediaPlanPage: React.FC = () => {
     return (
         <div className="mp-page">
             <div className="mp-hero">
-                <div>
-                    <h1>Media Plan</h1>
-                    <div className="mp-hero-meta">
-                        <span className="mp-chip mp-chip-brand">Client : {clientName}</span>
-                        <span className={`mp-chip ${isGoogleAuthorized ? 'mp-chip-ok' : 'mp-chip-warn'}`}>
-                            <SiGoogledrive size={13} />
-                            {isGoogleAuthorized === null ? 'Vérification Drive…' : isGoogleAuthorized ? 'Drive connecté' : 'Drive non configuré'}
-                        </span>
-                    </div>
+                <h1>Media Plan</h1>
+                <div className="mp-hero-meta">
+                    <span className="mp-chip mp-chip-brand">Client : {clientName}</span>
+                    <span className={`mp-chip ${isGoogleAuthorized ? 'mp-chip-ok' : 'mp-chip-warn'}`}>
+                        <SiGoogledrive size={13} />
+                        {isGoogleAuthorized === null ? 'Vérification Drive…' : isGoogleAuthorized ? 'Drive connecté' : 'Drive non configuré'}
+                    </span>
                 </div>
             </div>
 
@@ -1604,7 +1885,7 @@ const MediaPlanPage: React.FC = () => {
                                 {isOpen && (
                                     <div className="mp-scroll">
                                         <table className="mp-table" style={{ tableLayout: 'fixed', width: tableWidth }}>
-                                            {renderTableHeader()}
+                                            {renderTableHeader(batch.plans.map((mp) => `mp-${mp.id}`))}
                                             <tbody>
                                                 {batch.plans.map(mp => renderExistingRow(mp))}
                                             </tbody>
@@ -1644,15 +1925,16 @@ const MediaPlanPage: React.FC = () => {
                                         <HiOutlinePlus size={16} /> Ajouter ligne
                                     </button>
                                     <button type="button" onClick={handleBulkConfirm} className="mp-btn mp-btn-ok">
-                                        <HiOutlineCheck size={16} /> Confirmer et envoyer
+                                        <HiOutlinePaperAirplane size={16} /> Confirmer et envoyer
                                     </button>
                                 </>
                             )}
                             <div className="mp-scroll">
                                 <table className="mp-table" style={{ tableLayout: 'fixed', width: tableWidth }}>
-                                    {renderTableHeader()}
+                                    {renderTableHeader(pagedNewPlanDrafts.draftSlice.map((d) => d._key))}
                                     <tbody>
                                         {pagedNewPlanDrafts.draftSlice.map((draft) => renderDraftRow(draft))}
+                                        {Array.from({ length: Math.max(0, EMPTY_PAD - pagedNewPlanDrafts.draftSlice.length) }, (_, i) => renderGhostRow(i))}
                                     </tbody>
                                 </table>
                             </div>
@@ -1660,7 +1942,9 @@ const MediaPlanPage: React.FC = () => {
                                 page={pagedNewPlanDrafts.page}
                                 pageCount={pagedNewPlanDrafts.pageCount}
                                 total={pagedNewPlanDrafts.total}
+                                pageSize={pageSize}
                                 onPage={setTablePage}
+                                onPageSize={(n) => { setPageSize(n); setTablePage(0); }}
                             />
                         </div>
                     )}
@@ -1678,16 +1962,20 @@ const MediaPlanPage: React.FC = () => {
                                 <HiOutlinePlus size={16} /> Ajouter ligne
                             </button>
                             <button type="button" onClick={handleBulkConfirm} className="mp-btn mp-btn-ok">
-                                <HiOutlineCheck size={16} /> Confirmer et envoyer
+                                <HiOutlinePaperAirplane size={16} /> Confirmer et envoyer
                             </button>
                         </>
                     )}
                     <div className="mp-scroll">
                         <table className="mp-table" style={{ tableLayout: 'fixed', width: tableWidth }}>
-                            {renderTableHeader()}
+                            {renderTableHeader([
+                                ...pagedUnsent.existingSlice.map((mp) => `mp-${mp.id}`),
+                                ...pagedUnsent.draftSlice.map((d) => d._key),
+                            ])}
                             <tbody>
                                 {pagedUnsent.existingSlice.map(mp => renderExistingRow(mp))}
                                 {pagedUnsent.draftSlice.map((draft) => renderDraftRow(draft))}
+                                {Array.from({ length: Math.max(0, EMPTY_PAD - pagedUnsent.existingSlice.length - pagedUnsent.draftSlice.length) }, (_, i) => renderGhostRow(i))}
                             </tbody>
                         </table>
                     </div>
@@ -1695,7 +1983,9 @@ const MediaPlanPage: React.FC = () => {
                         page={pagedUnsent.page}
                         pageCount={pagedUnsent.pageCount}
                         total={pagedUnsent.total}
+                        pageSize={pageSize}
                         onPage={setTablePage}
+                        onPageSize={(n) => { setPageSize(n); setTablePage(0); }}
                     />
                 </div>
             )}

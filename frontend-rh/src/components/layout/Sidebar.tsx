@@ -36,7 +36,6 @@ import {
   HiX,
 } from 'react-icons/hi';
 import { API_BASE } from '../../api/axios';
-import { employeService } from '../../api/employeService';
 import { notificationService } from '../../api/notificationService';
 import { demandeService } from '../../api/demandeService';
 import { agentDashboardService } from '../../api/agentDashboardService';
@@ -308,7 +307,7 @@ const resolvePhotoUrl = (url?: string | null) => {
 const Sidebar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, updateUser } = useAuth();
+  const { user, logout } = useAuth();
   const [photoBroken, setPhotoBroken] = useState(false);
   const { theme, toggleTheme, setTheme, font, setFont, fontSize, setFontSize } = useTheme();
   const {
@@ -482,18 +481,6 @@ const Sidebar: React.FC = () => {
   useEffect(() => {
     setPhotoBroken(false);
   }, [user?.imageUrl]);
-
-  useEffect(() => {
-    if (!user?.employeId || user.imageUrl || user.isClient) return;
-    let cancelled = false;
-    employeService.getById(user.employeId)
-      .then((res) => {
-        const url = res.data.data?.imageUrl;
-        if (!cancelled && url) updateUser({ imageUrl: url });
-      })
-      .catch(() => undefined);
-    return () => { cancelled = true; };
-  }, [user?.employeId, user?.imageUrl, user?.isClient, updateUser]);
 
   const openPanelIfNeeded = () => {
     if (!isExpanded) toggleSidebar();
