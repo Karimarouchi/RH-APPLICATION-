@@ -112,6 +112,7 @@ export const getNotificationTarget = (notif: NotificationResponse): Notification
   const titre = normalizeText(notif.titre || '');
   if (titre === 'demande a finaliser') return { kind: 'rh', path: '/demandes' };
   if (titre === 'demande a valider') return { kind: 'rh', path: '/validations' };
+  if (titre === 'interim de chef de departement' || titre === 'interim termine') return { kind: 'rh', path: '/validations' };
   if (titre === 'demande transmise au rh' || titre === 'demande approuvee' || titre === 'demande refusee') {
     return { kind: 'rh', path: '/mes-demandes' };
   }

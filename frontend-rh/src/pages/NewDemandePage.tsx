@@ -7,6 +7,7 @@ import { employeService } from '../api/employeService';
 import { TypeDemande, TypeConge, TypeCongeLabels, Referentiel, CalendrierJour, HoraireTravail, CalculateDaysResult, SoldeCongeInfo, EmployeHoraire } from '../types';
 import Button from '../components/ui/Button';
 import { useAuth } from '../context/AuthContext';
+import type { InterimaireOption } from '../api/demandeService';
 import { HiOutlineChevronLeft, HiOutlineChevronRight, HiOutlineCheckCircle } from 'react-icons/hi';
 import { useTachesObligatoires } from '../hooks/useTachesObligatoires';
 import { normalizeGenre } from '../utils/genre';
@@ -270,6 +271,17 @@ const NewDemandePage: React.FC = () => {
   const [soldeInfo, setSoldeInfo] = useState<SoldeCongeInfo | null>(null);
   const [employeHoraire, setEmployeHoraire] = useState<EmployeHoraire | null>(null);
   const [autorisationWarnings, setAutorisationWarnings] = useState<string[]>([]);
+  // Chef de département : l'employé qui validera à sa place pendant son congé
+  const isChefDepartement = !!(user?.managerDepartement && user?.departement);
+  const [delegueId, setDelegueId] = useState('');
+  const [interimaires, setInterimaires] = useState<InterimaireOption[]>([]);
+
+  useEffect(() => {
+    if (!isChefDepartement) return;
+    demandeService.getInterimaires()
+      .then((res) => setInterimaires(res.data.data || []))
+      .catch(() => setInterimaires([]));
+  }, [isChefDepartement]);
 
   // Load existing demande for edit mode
   useEffect(() => {
@@ -288,6 +300,7 @@ const NewDemandePage: React.FC = () => {
         setRaison(d.raison || '');
         if (d.type === 'CONGE') {
           setTypeConge(d.typeConge || '');
+          setDelegueId(d.delegueId ? String(d.delegueId) : '');
           setDateDebut(d.dateDebut || '');
           setDateFin(d.dateFin || '');
         } else if (d.type === 'TELETRAVAIL') {
@@ -517,6 +530,11 @@ const NewDemandePage: React.FC = () => {
       }
     }
 
+    if (type === TypeDemande.CONGE && isChefDepartement && !delegueId) {
+      setError('Choisissez l\'employé qui validera les demandes de votre département pendant votre congé.');
+      return;
+    }
+
     // Validate justificatif
     if (needsJustificatif && !justificatif) {
       const docNames: Record<string, string> = {
@@ -542,6 +560,7 @@ const NewDemandePage: React.FC = () => {
         data.typeConge = typeConge;
         data.dateDebut = dateDebut;
         data.dateFin = dateFin || dateDebut;
+        if (isChefDepartement) data.delegueId = Number(delegueId);
       } else if (type === TypeDemande.TELETRAVAIL) {
         data.dateDebut = dateDebut;
         data.dateFin = dateFin;
@@ -872,6 +891,24 @@ const NewDemandePage: React.FC = () => {
                       ⚠ {w}
                     </p>
                   ))}
+                </div>
+              )}
+
+              {/* Intérim : un chef de département confie ses validations pendant son congé */}
+              {type === TypeDemande.CONGE && isChefDepartement && (
+                <div className="rounded-xl border border-brand-200 bg-brand-50/60 p-4 dark:border-brand-500/30 dark:bg-brand-500/10">
+                  <label className="mb-1.5 block text-theme-sm font-medium text-gray-700 dark:text-gray-300">
+                    Qui valide les demandes de votre département pendant votre congé ? <span className="text-error-500">*</span>
+                  </label>
+                  <select value={delegueId} onChange={(e) => setDelegueId(e.target.value)} className={inputClass}>
+                    <option value="">Choisir un employé</option>
+                    {interimaires.map((emp) => (
+                      <option key={emp.id} value={emp.id}>{emp.nom}{emp.poste ? ` — ${emp.poste}` : ''}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1.5 text-theme-xs text-gray-500 dark:text-gray-400">
+                    Dès le début de votre congé, cette personne reçoit vos demandes à valider. Vous reprenez vos droits en signalant votre retour depuis « Mes demandes ».
+                  </p>
                 </div>
               )}
 

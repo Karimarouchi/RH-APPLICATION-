@@ -31,10 +31,12 @@ public class ValidationService {
     }
 
     public List<Validation> findByValidateur(Long validateurId) {
+        demandeService.syncPendingChefSteps();
         return validationRepository.findByValidateurId(validateurId);
     }
 
     public List<Validation> findPendingByValidateur(Long validateurId) {
+        demandeService.syncPendingChefSteps();
         return validationRepository.findByValidateurIdAndDecision(validateurId, DecisionValidation.EN_ATTENTE);
     }
 

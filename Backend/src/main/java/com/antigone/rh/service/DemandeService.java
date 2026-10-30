@@ -59,6 +59,7 @@ public class DemandeService {
     // =========================================
 
     public List<DemandeResponse> findAll() {
+        syncPendingChefSteps();
         return demandeRepository.findAll().stream()
                 // ADMINISTRATION demandes are managed exclusively via /demandes-papier —
                 // exclude here
@@ -120,6 +121,10 @@ public class DemandeService {
         demande.setRaison(request.getRaison());
         demande.setEmploye(employe);
 
+        if (demande instanceof Conge conge) {
+            applyInterim(conge, employe, request.getDelegueId());
+        }
+
         Demande saved = demandeRepository.save(demande);
         assignDepartmentHead(saved, employe);
         return toResponse(saved);
@@ -133,8 +138,9 @@ public class DemandeService {
         if (chef == null || chef.getId().equals(employe.getId())) {
             return;
         }
-        // Chef en congé : la demande part directement au RH.
-        if (isChefOnLeave(chef)) {
+        Employe validateur = currentDepartmentValidator(chef);
+        // Chef en congé sans intérimaire (ou l'intérimaire qui fait sa propre demande) : directement au RH.
+        if (validateur == null || validateur.getId().equals(employe.getId())) {
             saveHistorique(saved, StatutDemande.EN_ATTENTE, StatutDemande.EN_ATTENTE, employe,
                     "Chef de département (" + nomComplet(chef) + ") en congé : demande transmise directement au RH");
             for (Employe rh : findRhValidators()) {
@@ -149,14 +155,156 @@ public class DemandeService {
         }
         validationRepository.save(Validation.builder()
                 .demande(saved)
-                .validateur(chef)
+                .validateur(validateur)
                 .ordre(ORDRE_CHEF)
                 .decision(DecisionValidation.EN_ATTENTE)
                 .build());
-        String nom = ((employe.getPrenom() != null ? employe.getPrenom() : "") + " "
-                + (employe.getNom() != null ? employe.getNom() : "")).trim();
-        notificationService.create(chef, "Demande à valider",
-                nom + " a envoyé une demande. Vous êtes le chef de son département.", saved);
+        notifyStepValidator(validateur, chef, saved);
+    }
+
+    private void notifyStepValidator(Employe validateur, Employe chef, Demande demande) {
+        String nom = nomComplet(demande.getEmploye());
+        String message = validateur.getId().equals(chef.getId())
+                ? nom + " a envoyé une demande. Vous êtes le chef de son département."
+                : nom + " a envoyé une demande. Vous la validez à la place de " + nomComplet(chef)
+                        + " (chef de département en congé).";
+        notificationService.create(validateur, "Demande à valider", message, demande);
+    }
+
+    // =========================================
+    // INTÉRIM DU CHEF DE DÉPARTEMENT
+    // =========================================
+
+    /**
+     * Qui valide aujourd'hui pour le département de ce chef : le chef lui-même ; pendant son congé, l'employé
+     * qu'il a désigné (jusqu'à ce qu'il signale son retour) ; null s'il est en congé sans intérimaire (le RH tranche).
+     */
+    private Employe currentDepartmentValidator(Employe chef) {
+        Conge delegation = activeDelegation(chef);
+        if (delegation != null) {
+            Employe delegue = delegation.getDelegue();
+            return Boolean.TRUE.equals(delegue.getArchived()) ? null : delegue;
+        }
+        return isChefOnLeave(chef) ? null : chef;
+    }
+
+    private Conge activeDelegation(Employe chef) {
+        return congeRepository.findActiveDelegations(chef.getId(), LocalDate.now()).stream().findFirst().orElse(null);
+    }
+
+    /** Un chef de département qui part en congé désigne l'employé qui validera à sa place. */
+    private void applyInterim(Conge conge, Employe employe, Long delegueId) {
+        boolean estChef = Boolean.TRUE.equals(employe.getManagerDepartement())
+                && employe.getDepartement() != null && !employe.getDepartement().isBlank();
+        if (!estChef) {
+            conge.setDelegue(null);
+            return;
+        }
+        if (delegueId == null) {
+            throw new RuntimeException(
+                    "Choisissez l'employé qui validera les demandes de votre département pendant votre congé");
+        }
+        if (delegueId.equals(employe.getId())) {
+            throw new RuntimeException("L'intérimaire doit être un autre employé que vous");
+        }
+        Employe delegue = employeRepository.findById(delegueId)
+                .orElseThrow(() -> new RuntimeException("Intérimaire introuvable"));
+        if (Boolean.TRUE.equals(delegue.getArchived())) {
+            throw new RuntimeException("Cet employé est archivé : choisissez un autre intérimaire");
+        }
+        conge.setDelegue(delegue);
+    }
+
+    /** Employés proposés comme intérimaire : ceux du département du chef, sinon tous les employés actifs. */
+    public List<Map<String, Object>> interimairesPossibles() {
+        Long me = SecurityUtils.currentEmployeIdOrNull();
+        Employe chef = me != null ? employeRepository.findById(me).orElse(null) : null;
+        List<Employe> actifs = employeRepository.findAllByArchivedFalse().stream()
+                .filter(e -> me == null || !e.getId().equals(me))
+                .collect(Collectors.toList());
+        String dept = chef != null && chef.getDepartement() != null ? chef.getDepartement().trim().toLowerCase() : null;
+        List<Employe> memeDept = actifs.stream()
+                .filter(e -> dept != null && e.getDepartement() != null
+                        && e.getDepartement().trim().toLowerCase().equals(dept))
+                .collect(Collectors.toList());
+        return (memeDept.isEmpty() ? actifs : memeDept).stream()
+                .sorted(Comparator.comparing(DemandeService::nomComplet, String.CASE_INSENSITIVE_ORDER))
+                .map(e -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("id", e.getId());
+                    m.put("nom", nomComplet(e));
+                    m.put("poste", e.getPoste());
+                    return m;
+                })
+                .collect(Collectors.toList());
+    }
+
+    /** Intérims confiés à l'utilisateur connecté (pour afficher ses demandes à valider). */
+    public List<Map<String, Object>> monInterim() {
+        Long me = SecurityUtils.currentEmployeIdOrNull();
+        if (me == null) {
+            return List.of();
+        }
+        return congeRepository.findActiveDelegationsFor(me, LocalDate.now()).stream()
+                .map(c -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("congeId", c.getId());
+                    m.put("chefNom", nomComplet(c.getEmploye()));
+                    m.put("departement", c.getEmploye().getDepartement());
+                    m.put("dateDebut", c.getDateDebut());
+                    m.put("dateFin", c.getDateFin());
+                    return m;
+                })
+                .collect(Collectors.toList());
+    }
+
+    /** Le chef signale son retour : l'intérim s'arrête et les demandes en attente lui reviennent. */
+    public DemandeResponse signalerRetour(Long demandeId) {
+        Demande demande = demandeRepository.findById(demandeId)
+                .orElseThrow(() -> new RuntimeException("Demande non trouvée"));
+        if (!(demande instanceof Conge conge) || conge.getDelegue() == null) {
+            throw new RuntimeException("Ce congé n'a pas d'intérim à clôturer");
+        }
+        Long actorId = SecurityUtils.currentEmployeIdOrNull();
+        if (!demande.getEmploye().getId().equals(actorId) && !isFinalValidator()) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Seul le chef concerné peut signaler son retour");
+        }
+        if (demande.getStatut() != StatutDemande.APPROUVEE) {
+            throw new RuntimeException("Seul un congé approuvé peut avoir un intérim en cours");
+        }
+        if (Boolean.TRUE.equals(conge.getRetourSignale())) {
+            throw new RuntimeException("Votre retour a déjà été signalé");
+        }
+        conge.setRetourSignale(true);
+        demandeRepository.save(conge);
+        saveHistorique(conge, StatutDemande.APPROUVEE, StatutDemande.APPROUVEE, conge.getEmploye(),
+                "Retour signalé : " + nomComplet(conge.getEmploye()) + " reprend ses droits de validation");
+        syncPendingChefSteps();
+        notificationService.create(conge.getDelegue(), "Intérim terminé",
+                nomComplet(conge.getEmploye()) + " est de retour : la validation des demandes du département "
+                        + conge.getEmploye().getDepartement() + " lui revient.",
+                null);
+        return toResponse(conge);
+    }
+
+    /** Remet chaque demande en attente chez la bonne personne (chef ou intérimaire) avant d'afficher les listes. */
+    public void syncPendingChefSteps() {
+        for (Validation v : validationRepository.findByOrdreAndDecision(ORDRE_CHEF, DecisionValidation.EN_ATTENTE)) {
+            if (v.getDemande().getStatut() == StatutDemande.EN_ATTENTE) {
+                pendingChefStep(v.getDemande());
+            }
+        }
+    }
+
+    /** Libellé de la personne qui a validé l'étape du chef : le chef, ou son intérimaire. */
+    private String libelleValidateur(Employe validateur) {
+        if (Boolean.TRUE.equals(validateur.getManagerDepartement())) {
+            return "le chef de département (" + nomComplet(validateur) + ")";
+        }
+        return congeRepository.findActiveDelegationsFor(validateur.getId(), LocalDate.now()).stream().findFirst()
+                .map(c -> nomComplet(validateur) + " (intérim de " + nomComplet(c.getEmploye()) + ")")
+                .orElse(nomComplet(validateur));
     }
 
     private Employe findDepartmentHead(String departement) {
@@ -187,17 +335,22 @@ public class DemandeService {
         }
         Employe employe = demande.getEmploye();
         Employe chef = findDepartmentHead(employe.getDepartement());
-        if (chef != null && chef.getId().equals(step.getValidateur().getId())) {
-            // Chef en congé : son étape reste ouverte (il la retrouve à son retour) mais le RH peut trancher.
-            return isChefOnLeave(chef) ? null : step;
-        }
         if (chef == null || chef.getId().equals(employe.getId())) {
             validationRepository.delete(step);
             return null;
         }
-        step.setValidateur(chef);
-        validationRepository.save(step);
-        return isChefOnLeave(chef) ? null : step;
+        Employe validateur = currentDepartmentValidator(chef);
+        // Chef en congé sans intérimaire : l'étape reste ouverte (il la retrouve à son retour) mais le RH peut trancher.
+        if (validateur == null || validateur.getId().equals(employe.getId())) {
+            return null;
+        }
+        // Début ou fin d'intérim : la demande passe à la personne qui valide aujourd'hui.
+        if (!validateur.getId().equals(step.getValidateur().getId())) {
+            step.setValidateur(validateur);
+            validationRepository.save(step);
+            notifyStepValidator(validateur, chef, demande);
+        }
+        return step;
     }
 
     /** Le chef a un congé approuvé aujourd'hui : ses demandes à valider reviennent au RH. */
@@ -271,11 +424,14 @@ public class DemandeService {
         }
         Long actorId = SecurityUtils.currentEmployeIdOrNull();
         Employe chef = findDepartmentHead(cible.getDepartement());
-        if (chef != null && actorId != null && chef.getId().equals(actorId)) {
-            return;
+        if (chef != null && actorId != null) {
+            Employe validateur = currentDepartmentValidator(chef);
+            if (chef.getId().equals(actorId) || (validateur != null && validateur.getId().equals(actorId))) {
+                return;
+            }
         }
         throw new org.springframework.security.access.AccessDeniedException(
-                "Seul le chef de ce département peut valider cette demande");
+                "Seul le chef de ce département (ou son intérimaire) peut valider cette demande");
     }
 
     private Conge createConge(DemandeRequest request, Employe employe) {
@@ -523,6 +679,7 @@ public class DemandeService {
 
         if (demande instanceof Conge conge) {
             updateConge(conge, request, demande.getEmploye());
+            applyInterim(conge, demande.getEmploye(), request.getDelegueId());
         } else if (demande instanceof Autorisation autorisation) {
             updateAutorisation(autorisation, request, demande.getEmploye());
         } else if (demande instanceof Teletravail teletravail) {
@@ -646,21 +803,20 @@ public class DemandeService {
         if (pending != null) {
             Employe chef = pending.getValidateur();
             if (!chef.getId().equals(adminEmployeId)) {
-                throw new RuntimeException("Le chef de département (" + nomComplet(chef)
-                        + ") doit d'abord valider cette demande");
+                throw new RuntimeException("Cette demande attend d'abord la validation de " + nomComplet(chef));
             }
+            String par = libelleValidateur(chef);
             decideChefStep(pending, DecisionValidation.APPROUVEE, null);
             saveHistorique(demande, StatutDemande.EN_ATTENTE, StatutDemande.EN_ATTENTE, chef,
-                    "Validée par le chef de département (" + nomComplet(chef) + "), transmise au RH");
+                    "Validée par " + par + ", transmise au RH");
             notificationService.create(demande.getEmploye(), "Demande transmise au RH",
-                    "Votre chef de département " + nomComplet(chef)
-                            + " a validé votre demande. Elle attend maintenant la validation du RH.",
+                    "Votre demande a été validée par " + par + ". Elle attend maintenant la validation du RH.",
                     demande);
             for (Employe rh : findRhValidators()) {
                 if (!rh.getId().equals(demande.getEmploye().getId())) {
                     notificationService.create(rh, "Demande à finaliser",
-                            nomComplet(chef) + " (chef de département) a validé la demande de "
-                                    + nomComplet(demande.getEmploye()) + ". Elle attend votre validation finale.",
+                            "La demande de " + nomComplet(demande.getEmploye()) + " a été validée par " + par
+                                    + ". Elle attend votre validation finale.",
                             demande);
                 }
             }
@@ -701,6 +857,14 @@ public class DemandeService {
                         + ".",
                 demande);
 
+        if (demande instanceof Conge conge && conge.getDelegue() != null) {
+            notificationService.create(conge.getDelegue(), "Intérim de chef de département",
+                    "Pendant le congé de " + nomComplet(conge.getEmploye()) + " (du " + conge.getDateDebut()
+                            + " au " + conge.getDateFin() + "), vous validerez à sa place les demandes du département "
+                            + conge.getEmploye().getDepartement() + ", jusqu'à ce qu'il signale son retour.",
+                    null);
+        }
+
         return toResponse(demande);
     }
 
@@ -720,8 +884,8 @@ public class DemandeService {
         boolean refusParChef = pending != null;
         if (pending != null) {
             if (!pending.getValidateur().getId().equals(adminEmployeId)) {
-                throw new RuntimeException("Le chef de département (" + nomComplet(pending.getValidateur())
-                        + ") doit d'abord se prononcer sur cette demande");
+                throw new RuntimeException("Cette demande attend d'abord la décision de "
+                        + nomComplet(pending.getValidateur()));
             }
             decideChefStep(pending, DecisionValidation.REFUSEE, commentaire);
         } else if (!isFinalValidator()) {
@@ -1097,7 +1261,14 @@ public class DemandeService {
                         .chefValidateurNom(nomComplet(step.getValidateur()))
                         .decisionChef(step.getDecision().name())
                         .chefEnConge(step.getDecision() == DecisionValidation.EN_ATTENTE
-                                && isChefOnLeave(step.getValidateur()));
+                                && isChefOnLeave(step.getValidateur())
+                                && activeDelegation(step.getValidateur()) == null);
+                Employe validateur = step.getValidateur();
+                if (!Boolean.TRUE.equals(validateur.getManagerDepartement())) {
+                    congeRepository.findActiveDelegationsFor(validateur.getId(), LocalDate.now()).stream()
+                            .findFirst()
+                            .ifPresent(c -> builder.interimDe(nomComplet(c.getEmploye())));
+                }
             }
         }
 
@@ -1109,6 +1280,11 @@ public class DemandeService {
             builder.nombreJours(conge.getNombreJours());
             builder.joursOuvrables(conge.getJoursOuvrables());
             builder.justificatifPath(conge.getJustificatifPath());
+            if (conge.getDelegue() != null) {
+                builder.delegueId(conge.getDelegue().getId())
+                        .delegueNom(nomComplet(conge.getDelegue()))
+                        .retourSignale(Boolean.TRUE.equals(conge.getRetourSignale()));
+            }
         } else if (demande instanceof Autorisation autorisation) {
             builder.date(autorisation.getDate());
             builder.heureDebut(autorisation.getHeureDebut());

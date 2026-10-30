@@ -256,9 +256,11 @@ public class SecurityConfig {
                                                 .hasAnyAuthority(ADMIN, "VIEW_VALIDATIONS", "VIEW_DEMANDES")
                                                 .requestMatchers(HttpMethod.POST, "/api/validations")
                                                 .hasAnyAuthority(ADMIN, "VIEW_VALIDATIONS", "VIEW_DEMANDES")
+                                                // l'intérimaire d'un chef n'a pas ce droit : ValidationService vérifie
+                                                // que l'appelant est bien la personne désignée sur l'étape
                                                 .requestMatchers(HttpMethod.PATCH, "/api/validations/*/approve",
                                                                 "/api/validations/*/refuse")
-                                                .hasAnyAuthority(ADMIN, "VIEW_VALIDATIONS", "VIEW_DEMANDES")
+                                                .authenticated()
 
                                                 // --- Calendriers, reunions ---
                                                 .requestMatchers(HttpMethod.POST, "/api/calendrier/**")

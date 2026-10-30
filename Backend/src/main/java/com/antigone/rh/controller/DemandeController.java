@@ -103,6 +103,24 @@ public class DemandeController {
         }
     }
 
+    /** Chef de département : employés qu'il peut désigner comme intérimaire pendant son congé. */
+    @GetMapping("/interimaires")
+    public ResponseEntity<ApiResponse<List<java.util.Map<String, Object>>>> interimaires() {
+        return ResponseEntity.ok(ApiResponse.ok(demandeService.interimairesPossibles()));
+    }
+
+    /** Intérims de chef de département confiés à l'utilisateur connecté. */
+    @GetMapping("/mon-interim")
+    public ResponseEntity<ApiResponse<List<java.util.Map<String, Object>>>> monInterim() {
+        return ResponseEntity.ok(ApiResponse.ok(demandeService.monInterim()));
+    }
+
+    /** Le chef de retour de congé reprend ses droits de validation. */
+    @PatchMapping("/{id}/retour")
+    public ResponseEntity<ApiResponse<DemandeResponse>> signalerRetour(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok("Retour signalé", demandeService.signalerRetour(id)));
+    }
+
     @PatchMapping("/{id}/approve")
     public ResponseEntity<ApiResponse<DemandeResponse>> approve(
             @PathVariable Long id, @RequestParam(required = false) Long adminEmployeId) {

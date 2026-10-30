@@ -17,6 +17,8 @@ public class DemandeRequest {
     private LocalDate dateDebut;
     private LocalDate dateFin;
     private String justificatifPath;
+    /** Chef de département : l'employé qui validera à sa place pendant ce congé. */
+    private Long delegueId;
 
     // For Teletravail
     // uses dateDebut and dateFin above

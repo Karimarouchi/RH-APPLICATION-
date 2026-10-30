@@ -1,6 +1,9 @@
 import api from './axios';
 import { ApiResponse, CalculateDaysResult, DemandeRequest, DemandeResponse, HistoriqueStatut, StatutDemande } from '../types';
 
+export interface InterimaireOption { id: number; nom: string; poste?: string | null }
+export interface InterimEnCours { congeId: number; chefNom: string; departement: string; dateDebut: string; dateFin: string }
+
 export const demandeService = {
   getAll: () => api.get<ApiResponse<DemandeResponse[]>>('/demandes'),
   getById: (id: number) => api.get<ApiResponse<DemandeResponse>>(`/demandes/${id}`),
@@ -43,6 +46,12 @@ export const demandeService = {
       `/demandes/batch/refuse?adminEmployeId=${adminEmployeId}${commentaire ? `&commentaire=${encodeURIComponent(commentaire)}` : ''}`,
       ids
     ),
+  /** Chef de département : employés qu'il peut désigner comme intérimaire pendant son congé. */
+  getInterimaires: () => api.get<ApiResponse<InterimaireOption[]>>('/demandes/interimaires'),
+  /** Intérims de chef de département confiés à l'utilisateur connecté. */
+  getMonInterim: () => api.get<ApiResponse<InterimEnCours[]>>('/demandes/mon-interim'),
+  /** Le chef de retour de congé reprend ses droits de validation. */
+  signalerRetour: (id: number) => api.patch<ApiResponse<DemandeResponse>>(`/demandes/${id}/retour`),
   getHistorique: (id: number) => api.get<ApiResponse<HistoriqueStatut[]>>(`/demandes/${id}/historique`),
   calculateDays: (dateDebut: string, dateFin: string, typeConge?: string) =>
     api.get<ApiResponse<CalculateDaysResult>>(`/demandes/calculate-days`, {

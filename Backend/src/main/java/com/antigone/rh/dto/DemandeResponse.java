@@ -32,6 +32,8 @@ public class DemandeResponse {
     private String decisionChef;
     /** Le chef attendu est en congé aujourd'hui : le RH peut décider à sa place. */
     private Boolean chefEnConge;
+    /** La demande est chez un intérimaire : nom du chef de département qu'il remplace. */
+    private String interimDe;
 
     // For Conge
     private String typeConge;
@@ -41,6 +43,10 @@ public class DemandeResponse {
     private LocalDate dateDebut;
     private LocalDate dateFin;
     private String justificatifPath;
+    /** Congé d'un chef de département : son intérimaire et le retour signalé. */
+    private Long delegueId;
+    private String delegueNom;
+    private Boolean retourSignale;
 
     // For Autorisation
     private LocalDate date;

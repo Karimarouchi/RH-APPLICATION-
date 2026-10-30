@@ -80,7 +80,8 @@ const App: React.FC = () => {
           <Route path="mes-demandes" element={<MesDemandesPage />} />
           <Route path="mes-demandes/papier" element={<PermissionRoute permission="VIEW_MES_DEMANDES"><MesDemandesPapierPage /></PermissionRoute>} />
           <Route path="mes-demandes-papier" element={<PermissionRoute permission="VIEW_MES_DEMANDES"><MesDemandesPapierPage /></PermissionRoute>} />
-          <Route path="validations" element={<PermissionRoute permission="VIEW_VALIDATIONS"><ValidationsPage /></PermissionRoute>} />
+          {/* Pas de garde de permission : la page ne montre que les demandes confiées à l'utilisateur (chef ou intérimaire). */}
+          <Route path="validations" element={<ValidationsPage />} />
           <Route path="referentiels" element={<PermissionRoute permission="VIEW_REFERENTIELS"><ReferentielsPage /></PermissionRoute>} />
           <Route path="calendrier" element={<PermissionRoute permission="VIEW_CALENDRIER"><CalendrierPage /></PermissionRoute>} />
           <Route path="restrictions-conges" element={<PermissionRoute permission="VIEW_RESTRICTION_CONGE"><RestrictionsCongesPage /></PermissionRoute>} />

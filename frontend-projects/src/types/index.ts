@@ -231,6 +231,8 @@ export interface DemandeRequest {
   date?: string;
   heureDebut?: string;
   heureFin?: string;
+  /** Chef de département : l'employé qui validera à sa place pendant ce congé. */
+  delegueId?: number;
 }
 
 export interface DemandeResponse {
@@ -249,6 +251,12 @@ export interface DemandeResponse {
   decisionChef?: 'EN_ATTENTE' | 'APPROUVEE' | 'REFUSEE';
   /** Le chef attendu est en congé aujourd'hui : le RH peut décider à sa place. */
   chefEnConge?: boolean;
+  /** La demande est chez un intérimaire : nom du chef de département qu'il remplace. */
+  interimDe?: string;
+  /** Congé d'un chef de département : son intérimaire et le retour signalé. */
+  delegueId?: number;
+  delegueNom?: string;
+  retourSignale?: boolean;
   typeConge?: string;
   typeCongeLabel?: string;
   nombreJours?: number;
