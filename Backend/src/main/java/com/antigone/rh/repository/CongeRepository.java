@@ -73,7 +73,15 @@ public interface CongeRepository extends JpaRepository<Conge, Long> {
     @Query("SELECT DISTINCT c.employe.id FROM Conge c WHERE c.statut = com.antigone.rh.enums.StatutDemande.APPROUVEE AND c.dateDebut <= :date AND c.dateFin >= :date")
     List<Long> findEmployeIdsOnLeave(@Param("date") LocalDate date);
 
-    /** L'employé a-t-il un congé approuvé qui couvre cette date ? */
-    @Query("SELECT COUNT(c) > 0 FROM Conge c WHERE c.employe.id = :employeId AND c.statut = com.antigone.rh.enums.StatutDemande.APPROUVEE AND c.dateDebut <= :date AND c.dateFin >= :date")
+    /** L'employé a-t-il un congé approuvé qui couvre cette date (et dont il n'a pas déjà signalé son retour) ? */
+    @Query("SELECT COUNT(c) > 0 FROM Conge c WHERE c.employe.id = :employeId AND c.statut = com.antigone.rh.enums.StatutDemande.APPROUVEE AND c.dateDebut <= :date AND c.dateFin >= :date AND (c.retourSignale IS NULL OR c.retourSignale = false)")
     boolean isOnApprovedLeave(@Param("employeId") Long employeId, @Param("date") LocalDate date);
+
+    /** Intérims en cours d'un chef : congé approuvé commencé, avec un intérimaire, retour pas encore signalé. */
+    @Query("SELECT c FROM Conge c WHERE c.employe.id = :chefId AND c.statut = com.antigone.rh.enums.StatutDemande.APPROUVEE AND c.delegue IS NOT NULL AND c.dateDebut <= :date AND (c.retourSignale IS NULL OR c.retourSignale = false) ORDER BY c.dateDebut DESC")
+    List<Conge> findActiveDelegations(@Param("chefId") Long chefId, @Param("date") LocalDate date);
+
+    /** Intérims en cours confiés à cet employé. */
+    @Query("SELECT c FROM Conge c WHERE c.delegue.id = :delegueId AND c.statut = com.antigone.rh.enums.StatutDemande.APPROUVEE AND c.dateDebut <= :date AND (c.retourSignale IS NULL OR c.retourSignale = false) ORDER BY c.dateDebut DESC")
+    List<Conge> findActiveDelegationsFor(@Param("delegueId") Long delegueId, @Param("date") LocalDate date);
 }

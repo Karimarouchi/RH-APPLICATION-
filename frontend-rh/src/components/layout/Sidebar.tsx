@@ -341,6 +341,15 @@ const Sidebar: React.FC = () => {
 
   const canViewValidations = userPermissions.includes('VIEW_VALIDATIONS');
 
+  // Intérimaire d'un chef de département en congé : accès à ses demandes à valider sans le droit habituel
+  const [interimChefs, setInterimChefs] = useState<string[]>([]);
+  useEffect(() => {
+    if (!user) return;
+    demandeService.getMonInterim()
+      .then((res) => setInterimChefs((res.data.data || []).map((i) => i.chefNom)))
+      .catch(() => setInterimChefs([]));
+  }, [user]);
+
   useEffect(() => {
     if (!canViewValidations) return;
     const fetchPending = async () => {
@@ -442,13 +451,16 @@ const Sidebar: React.FC = () => {
             if (item.key === 'validations' && canViewValidations && pendingCount > 0) {
               return { ...item, badge: pendingCount };
             }
+            if (item.key === 'mes-demandes' && interimChefs.length > 0 && !canViewValidations && item.children) {
+              return { ...item, children: [...item.children, { label: 'À valider (intérim)', path: '/validations' }] };
+            }
             return item;
           }),
       }))
       .filter((group) => group.items.length > 0);
 
     return groups;
-  }, [activePanelMode, canViewValidations, pendingCount, userPermissions]);
+  }, [activePanelMode, canViewValidations, interimChefs, pendingCount, userPermissions]);
 
   const panelTitle = useMemo(() => {
     if (activePanelMode === 'mon-espace') return 'Mon Espace';

@@ -36,6 +36,7 @@ import { flushSync } from 'react-dom';
 import { API_BASE } from '../../api/axios';
 import { projetService } from '../../api/projetService';
 import { mediaPlanAssignmentService } from '../../api/mediaPlanAssignmentService';
+import { clientService } from '../../api/clientService';
 import { notificationService } from '../../api/notificationService';
 import { NotificationResponse, Projet } from '../../types';
 import { relayAuthSnapshotForSwitch } from '../../utils/authStorage';
@@ -405,6 +406,20 @@ const Sidebar: React.FC = () => {
     }
 
     const fetchClients = async () => {
+      // Qui voit tous les media plans (admin, manager) peut saisir pour n'importe quel client,
+      // pas seulement ceux auxquels il est assigné.
+      if (userPermissions.includes('VIEW_TOUS_MEDIA_PLAN')) {
+        try {
+          const response = await clientService.getAllClients();
+          const clients = (response.data.data || [])
+            .map((client) => ({ id: client.id, nom: client.nom }))
+            .sort((a, b) => a.nom.localeCompare(b.nom));
+          setAssignedClients(clients);
+          return;
+        } catch {
+          // pas le droit de lister les clients : on retombe sur les affectations
+        }
+      }
       try {
         const response = await mediaPlanAssignmentService.getByEmploye(user.employeId);
         const assignments = response.data.data || [];

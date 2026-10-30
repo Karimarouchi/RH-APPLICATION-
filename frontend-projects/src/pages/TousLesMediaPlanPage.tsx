@@ -8,6 +8,7 @@ import {
     HiOutlineArrowLeft,
     HiOutlineUserGroup,
     HiOutlineShieldCheck,
+    HiOutlinePlus,
 } from 'react-icons/hi';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -522,12 +523,19 @@ const TousLesMediaPlanPage: React.FC = () => {
                                 ))}
                             </div>
                         </div>
-                        {canValidateMediaPlans && (
-                            <button onClick={openAssignModal}
-                                className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 transition-colors">
-                                <HiOutlineUserAdd size={18} /> Assigner Employé
+                        <div className="flex flex-wrap gap-2">
+                            {/* Ouvre la saisie du media plan de ce client (ajout de lignes) */}
+                            <button onClick={() => navigate(`/media-plan/${selectedClientId}`)}
+                                className="inline-flex items-center gap-2 rounded-lg border border-brand-500 px-4 py-2.5 text-sm font-medium text-brand-600 hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-500/10 transition-colors">
+                                <HiOutlinePlus size={18} /> Ajouter des lignes
                             </button>
-                        )}
+                            {canValidateMediaPlans && (
+                                <button onClick={openAssignModal}
+                                    className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 transition-colors">
+                                    <HiOutlineUserAdd size={18} /> Assigner Employé
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {mediaPlans.length === 0 ? (

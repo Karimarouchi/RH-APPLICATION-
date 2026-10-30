@@ -292,6 +292,9 @@ const DemandesPage: React.FC = () => {
     if (item.chefEnConge) {
       return <span className="text-theme-xs text-warning-600 dark:text-warning-400">Chef en congé ({item.chefValidateurNom}) · à valider par le RH</span>;
     }
+    if (item.interimDe) {
+      return <span className="text-theme-xs text-gray-500 dark:text-gray-400">En attente de {item.chefValidateurNom} (intérim de {item.interimDe})</span>;
+    }
     return <span className="text-theme-xs text-gray-500 dark:text-gray-400">En attente du chef : {item.chefValidateurNom}</span>;
   };
 

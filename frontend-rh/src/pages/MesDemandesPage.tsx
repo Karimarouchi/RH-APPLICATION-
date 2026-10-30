@@ -222,6 +222,25 @@ const MesDemandesPage: React.FC = () => {
     return '—';
   };
 
+  /** Congé approuvé et commencé d'un chef qui a un intérimaire : il peut signaler son retour. */
+  const canSignalReturn = (item: DemandeResponse) =>
+    item.type === 'CONGE' && item.statut === 'APPROUVEE' && !!item.delegueId && !item.retourSignale
+    && !!item.dateDebut && item.dateDebut <= new Date().toISOString().slice(0, 10);
+
+  const handleSignalReturn = async (item: DemandeResponse) => {
+    setActionLoading(true);
+    try {
+      const res = await demandeService.signalerRetour(item.id);
+      const updated = res.data.data;
+      setDemandes((prev) => prev.map((d) => (d.id === item.id ? { ...d, ...updated } : d)));
+      if (selectedDemande?.id === item.id) setSelectedDemande({ ...item, ...updated });
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Impossible de signaler votre retour');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   /** Une fois validée par le chef (transmise au RH), la demande ne peut plus être modifiée ni annulée. */
   const canChange = (item: DemandeResponse) => item.statut === 'EN_ATTENTE' && item.decisionChef !== 'APPROUVEE';
 
@@ -287,6 +306,11 @@ const MesDemandesPage: React.FC = () => {
           {item.statut === 'EN_ATTENTE' && item.decisionChef === 'APPROUVEE' && (
             <p className="text-theme-xs text-success-600 dark:text-success-400 mt-0.5">Validée par votre chef · chez le RH</p>
           )}
+          {item.delegueNom && (
+            <p className="text-theme-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              Intérim : {item.delegueNom}{item.retourSignale ? ' · retour signalé' : ''}
+            </p>
+          )}
           {item.statut === 'REFUSEE' && item.decisionChef === 'REFUSEE' && (
             <p className="text-theme-xs text-error-500 mt-0.5">Refusée par votre chef</p>
           )}
@@ -318,6 +342,16 @@ const MesDemandesPage: React.FC = () => {
           >
             <HiOutlineEye size={16} />
           </button>
+          {canSignalReturn(item) && (
+            <button
+              onClick={() => handleSignalReturn(item)}
+              disabled={actionLoading}
+              className="rounded-lg bg-brand-500 px-2 py-1 text-theme-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+              title="Reprendre vos droits de validation"
+            >
+              Je suis de retour
+            </button>
+          )}
           {canChange(item) && (
             <>
               <button

@@ -13,4 +13,5 @@ public interface ValidationRepository extends JpaRepository<Validation, Long> {
     List<Validation> findByValidateurId(Long validateurId);
     List<Validation> findByDemandeIdOrderByOrdreAsc(Long demandeId);
     List<Validation> findByValidateurIdAndDecision(Long validateurId, DecisionValidation decision);
+    List<Validation> findByOrdreAndDecision(Integer ordre, DecisionValidation decision);
 }
