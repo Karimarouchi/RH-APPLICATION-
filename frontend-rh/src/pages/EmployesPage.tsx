@@ -324,6 +324,13 @@ const EmployesPage: React.FC = () => {
   // Form submission state – errors shown only after the user clicks "Créer"
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
+  // In-app alert shown at the top of the form (replaces the browser alert)
+  const [formAlert, setFormAlert] = useState<{ title: string; items: string[] } | null>(null);
+  const formAlertRef = useRef<HTMLDivElement>(null);
+  const showFormAlert = (title: string, items: string[]) => {
+    setFormAlert({ title, items });
+    requestAnimationFrame(() => formAlertRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
 
   // Compte creation (only for new employee)
   const [createCompte, setCreateCompte] = useState(false);
@@ -405,7 +412,15 @@ const EmployesPage: React.FC = () => {
 
   const handleSave = async () => {
     setSubmitted(true);
-    if (hasErrors) return;
+    const problems = getFormErrorMessages();
+    if (problems.length > 0) {
+      showFormAlert(
+        problems.length === 1 ? 'Un champ est vide ou incorrect' : `${problems.length} champs sont vides ou incorrects`,
+        problems,
+      );
+      return;
+    }
+    setFormAlert(null);
     setSaving(true);
     try {
 
@@ -486,7 +501,7 @@ const EmployesPage: React.FC = () => {
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Erreur inconnue';
       console.error('Erreur sauvegarde:', msg, err?.response?.data);
-      alert('Erreur : ' + msg);
+      showFormAlert("L'enregistrement a échoué", [msg]);
     } finally {
       setSaving(false);
     }
@@ -569,6 +584,7 @@ const EmployesPage: React.FC = () => {
     setImageFile(null);
     setImagePreview(null);
     setSubmitted(false);
+    setFormAlert(null);
   };
 
   const hasActiveFilters = Object.values(filters).some(v => v !== '');
@@ -823,7 +839,26 @@ const EmployesPage: React.FC = () => {
     dateEmbauche: !formData.dateEmbauche || formData.dateEmbauche > todayStr,
     ribBancaire: !!formData.ribBancaire && formData.ribBancaire.length !== 20,
   };
-  const hasErrors = Object.values(formErrors).some(Boolean);
+  // Human-readable list of what is missing / wrong, in form order
+  const getFormErrorMessages = (): string[] => {
+    const messages: string[] = [];
+    if (formErrors.cin) messages.push(!formData.cin.trim() ? 'CIN : obligatoire' : 'CIN : doit contenir exactement 8 chiffres');
+    if (formErrors.genre) messages.push('Genre : obligatoire');
+    if (formErrors.prenom) messages.push('Prénom : obligatoire');
+    if (formErrors.nom) messages.push('Nom : obligatoire');
+    if (formErrors.email) messages.push(!formData.email.trim() ? 'Email : obligatoire' : 'Email : format invalide');
+    if (formErrors.telephone) messages.push(!formData.telephone.trim() ? 'Téléphone : obligatoire' : 'Téléphone : format invalide (8 chiffres, commence par 2, 5 ou 9)');
+    if (formErrors.telephonePro) messages.push('Téléphone professionnel : format invalide (8 chiffres, commence par 2, 5 ou 9)');
+    if (formErrors.poste) messages.push('Poste : obligatoire');
+    if (formErrors.departement) messages.push('Département : obligatoire');
+    if (formErrors.typeContrat) messages.push('Type contrat : obligatoire');
+    if (formErrors.cnss) messages.push('CNSS : chiffres uniquement (tirets autorisés)');
+    if (formErrors.ribBancaire) messages.push('RIB bancaire : doit contenir exactement 20 chiffres');
+    if (formErrors.dateEmbauche) messages.push(!formData.dateEmbauche ? "Date d'embauche : obligatoire" : "Date d'embauche : ne peut pas être dans le futur");
+    if (formErrors.salaire) messages.push(formData.salaire === '' || formData.salaire === null ? 'Salaire : obligatoire' : 'Salaire : doit être positif');
+    if (createCompte && selectedRoleIds.length === 0) messages.push('Compte utilisateur : sélectionnez au moins un rôle');
+    return messages;
+  };
 
   return (
     <div className="space-y-6">
@@ -1157,6 +1192,22 @@ const EmployesPage: React.FC = () => {
 
       {/* Modal */}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingEmploye ? "Modifier l'employé" : 'Nouvel employé'} size="lg">
+        {formAlert && (
+          <div ref={formAlertRef} role="alert" className="mb-5 flex items-start gap-3 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-error-100 text-error-600 dark:bg-error-500/20 dark:text-error-400">
+              <HiOutlineX size={16} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-theme-sm font-semibold text-error-700 dark:text-error-400">{formAlert.title}</p>
+              <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-theme-xs text-error-600 dark:text-error-300">
+                {formAlert.items.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </div>
+            <button type="button" onClick={() => setFormAlert(null)} className="shrink-0 rounded-lg p-1 text-error-500 hover:bg-error-100 dark:hover:bg-error-500/20" aria-label="Fermer">
+              <HiOutlineX size={14} />
+            </button>
+          </div>
+        )}
         {/* Image Upload */}
         <div className="flex items-center gap-5 mb-6 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
           <div
@@ -1433,7 +1484,7 @@ const EmployesPage: React.FC = () => {
 
         <div className="flex justify-end gap-3 mt-6">
           <Button variant="ghost" onClick={() => setShowModal(false)}>Annuler</Button>
-          <Button onClick={handleSave} disabled={(submitted && hasErrors) || (createCompte && selectedRoleIds.length === 0) || saving}>
+          <Button onClick={handleSave} disabled={saving}>
             {saving ? (
               <span className="flex items-center gap-2">
                 <svg className="animate-spin h-5 w-5 text-brand-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

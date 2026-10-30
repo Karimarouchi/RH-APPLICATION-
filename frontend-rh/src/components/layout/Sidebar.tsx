@@ -43,7 +43,9 @@ import { useSidebar } from '../../hooks/useSidebar';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme, AppFont, AppFontSize, setSharedCookie } from '../../hooks/useTheme';
 import { NotificationResponse } from '../../types';
-import { getRhNotificationPath, shouldDisplayNotification } from '../../utils/notificationRules';
+import { getMediaPlanNotificationTarget, getRhNotificationPath, shouldDisplayNotification } from '../../utils/notificationRules';
+import { relayAuthSnapshotForSwitch } from '../../utils/authStorage';
+import { PROJECTS_APP_URL } from '../../config/apps';
 import './SidebarCanva.css';
 
 interface NavItemDef {
@@ -538,10 +540,17 @@ const Sidebar: React.FC = () => {
 
   const handleNotificationClick = (notif: NotificationResponse) => {
     if (!notif.lu) handleMarkAsRead(notif.id);
+    setShowNotifications(false);
+
+    // Media plan notifications live in the projects app
+    const mediaPlanTarget = getMediaPlanNotificationTarget(notif);
+    if (mediaPlanTarget && PROJECTS_APP_URL) {
+      relayAuthSnapshotForSwitch();
+      window.location.assign(new URL(mediaPlanTarget.path, PROJECTS_APP_URL).toString());
+      return;
+    }
 
     navigate(getRhNotificationPath(notif));
-
-    setShowNotifications(false);
   };
 
   const getNotificationIcon = (title: string) => {

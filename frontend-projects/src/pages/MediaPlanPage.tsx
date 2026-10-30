@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { useParams } from 'react-router-dom';
 import {
     HiOutlineTrash,
-    HiOutlineCheck,
     HiOutlineSearch,
     HiOutlinePlus,
     HiOutlineX,
@@ -58,8 +57,8 @@ const COLUMNS = [
     { key: 'inspiration', label: 'Inspiration', defaultWidth: 170, sortable: true },
     { key: 'platforme', label: 'Plateforme', defaultWidth: 168, sortable: true },
     { key: 'etatPublication', label: 'État pub.', defaultWidth: 150, sortable: true },
-    { key: 'rectifs', label: 'Rectificatifs', defaultWidth: 150, sortable: true },
-    { key: 'actions', label: '', defaultWidth: 48, sortable: false },
+    { key: 'statut', label: 'Statut', defaultWidth: 130, sortable: false },
+    { key: 'actions', label: '', defaultWidth: 140, sortable: false },
 ];
 
 type PlatKind = 'ig' | 'fb' | 'tt' | 'li' | 'yt' | 'x' | 'gads' | 'web' | 'default';
@@ -273,9 +272,7 @@ interface DraftRow {
     inspiration: string;
     autresElements: string;
     platforme: string;
-    lienDrive: string;
     etatPublication: string;
-    rectifs: string;
     remarques: string;
     isShooting: boolean;
     shootingDescription: string;
@@ -298,9 +295,7 @@ const emptyDraft = (): DraftRow => ({
     inspiration: '',
     autresElements: '',
     platforme: '',
-    lienDrive: '',
     etatPublication: '',
-    rectifs: '',
     remarques: '',
     isShooting: false,
     shootingDescription: '',
@@ -322,7 +317,7 @@ interface CellFormat {
 // datePublication is excluded because it's always pre-filled with the month's first day
 const isDraftFilled = (d: DraftRow) => !!(
     d.titre || d.heure || d.format || d.type || d.texteSurVisuel || d.inspiration || d.autresElements ||
-    d.platforme || d.lienDrive || d.etatPublication || d.rectifs || d.remarques ||
+    d.platforme || d.etatPublication || d.remarques ||
     d.isShooting || d.shootingDescription || d.shootingLocalisation || d.shootingAuPlusTard || d.shootingDate || d.shootingTypeDeContenu
 );
 
@@ -443,22 +438,9 @@ const resizeHandleHoverStyle: React.CSSProperties = {
     ...resizeHandleStyle, borderRight: '2px solid var(--color-brand-500, #6366f1)',
 };
 
-// ── Get status label and color for accordion header ──
-const getStatusInfo = (plans: MediaPlan[]) => {
-    if (plans.length === 0) return { label: 'Vide', color: 'gray' };
-    if (plans.every(p => p.statut === 'APPROUVE')) return { label: 'Approuvé', color: 'green' };
-    if (plans.some(p => p.statut === 'DESAPPROUVE')) return { label: 'Désapprouvé', color: 'red' };
-    if (plans.some(p => p.statut === 'EN_ATTENTE')) return { label: 'En attente', color: 'warning' };
-    return { label: 'Brouillon', color: 'brand' };
-};
-
-const statusColorClasses: Record<string, string> = {
-    green: 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800 text-green-700 dark:text-green-400',
-    red: 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800 text-red-700 dark:text-red-400',
-    warning: 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800 text-yellow-700 dark:text-yellow-400',
-    brand: 'bg-brand-50 border-brand-200 dark:bg-brand-900/20 dark:border-brand-800 text-brand-700 dark:text-brand-400',
-    gray: 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700 text-gray-600 dark:text-gray-400',
-};
+// A line refused by the manager comes back to its author with a "motif de refus".
+// While the client's feedback is with the manager (retourManager), it is not shown yet.
+const hasRefusalMotif = (mp: MediaPlan) => mp.statut === 'DESAPPROUVE' && !mp.retourManager && !!mp.rectifs?.trim();
 
 // ══════════════════════════════════════════════════
 // ── MAIN COMPONENT ──
@@ -493,18 +475,7 @@ const MediaPlanPage: React.FC = () => {
     const now = new Date();
     const [selectedMonth, setSelectedMonth] = useState(getMonthKey(now.getFullYear(), now.getMonth()));
 
-    // Accordion states: track which batch accordions are open by batch key
-    const [openBatches, setOpenBatches] = useState<Set<string>>(new Set());
-    const [newPlanOpen, setNewPlanOpen] = useState(false);
     const [isGoogleAuthorized, setIsGoogleAuthorized] = useState<boolean | null>(null);
-
-    const toggleBatch = (batchKey: string) => {
-        setOpenBatches(prev => {
-            const next = new Set(prev);
-            if (next.has(batchKey)) next.delete(batchKey); else next.add(batchKey);
-            return next;
-        });
-    };
 
     // Column widths
     const [colWidths, setColWidths] = useState<number[]>(COLUMNS.map(c => c.defaultWidth));
@@ -578,19 +549,20 @@ const MediaPlanPage: React.FC = () => {
 
     // ── Export CSV ──
     const exportToCSV = () => {
-        const headers = COLUMNS.filter(c => c.key !== 'actions').map(c => c.label);
+        const headers = ['Date pub.', 'Heure', 'Format', 'Type', 'Titre', 'Texte / Visuel', 'Inspiration', 'Autres',
+            'Plateforme', 'Lien Drive', 'État pub.', 'Motif de refus', 'Remarques', 'Shooting', 'Statut'];
         const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
         const rows = [
             headers.join(','),
             ...monthMediaPlans.map(mp =>
                 [mp.datePublication, mp.heure, mp.format, mp.type, mp.titre, mp.texteSurVisuel,
                 mp.inspiration, mp.autresElements, mp.platforme, mp.lienDrive,
-                mp.etatPublication, mp.rectifs, mp.remarques, mp.isShooting ? 'Oui' : 'Non', mp.statut].map(escape).join(',')
+                mp.etatPublication, hasRefusalMotif(mp) ? mp.rectifs : '', mp.remarques, mp.isShooting ? 'Oui' : 'Non', mp.statut].map(escape).join(',')
             ),
             ...draftRows.filter(isDraftFilled).map(d =>
                 [d.datePublication, d.heure, d.format, d.type, d.titre, d.texteSurVisuel,
-                d.inspiration, d.autresElements, d.platforme, d.lienDrive,
-                d.etatPublication, d.rectifs, d.remarques, d.isShooting ? 'Oui' : 'Non', 'Brouillon'].map(escape).join(',')
+                d.inspiration, d.autresElements, d.platforme, '',
+                d.etatPublication, '', d.remarques, d.isShooting ? 'Oui' : 'Non', 'Brouillon'].map(escape).join(',')
             ),
         ].join('\n');
         const blob = new Blob([rows], { type: 'text/csv;charset=utf-8;' });
@@ -833,42 +805,19 @@ const MediaPlanPage: React.FC = () => {
         });
     }, [mediaPlans, selectedMonth]);
 
-    // ── Check if month has sent plans ──
-    const isMonthSent = useMemo(() => {
-        return monthMediaPlans.some(mp => mp.statut === 'EN_ATTENTE' || mp.statut === 'APPROUVE');
-    }, [monthMediaPlans]);
+    // ── Status summary for the month card ──
+    const monthCounts = useMemo(() => ({
+        pending: monthMediaPlans.filter(mp => mp.statut === 'EN_ATTENTE' || mp.retourManager).length,
+        client: monthMediaPlans.filter(mp => mp.statut === 'EN_ATTENTE_CLIENT').length,
+        approved: monthMediaPlans.filter(mp => mp.statut === 'APPROUVE').length,
+        refused: monthMediaPlans.filter(mp => mp.statut === 'DESAPPROUVE' && !mp.retourManager).length,
+    }), [monthMediaPlans]);
 
-    // ── Group sent plans into batches by dateCreation time gap (>5s gap = new batch) ──
-    const sentBatches = useMemo(() => {
-        if (!isMonthSent) return [];
-        const sorted = [...monthMediaPlans].sort((a, b) => {
-            const da = a.dateCreation ? new Date(a.dateCreation).getTime() : 0;
-            const db = b.dateCreation ? new Date(b.dateCreation).getTime() : 0;
-            return da - db;
-        });
-        const batches: { key: string; plans: MediaPlan[] }[] = [];
-        let currentBatch: MediaPlan[] = [];
-        let lastTime = 0;
-        for (const mp of sorted) {
-            const t = mp.dateCreation ? new Date(mp.dateCreation).getTime() : 0;
-            // Within a submission, consecutive API calls are <1s apart
-            // Between submissions, there's always 10+ seconds of user interaction
-            if (currentBatch.length === 0 || (t - lastTime) < 5000) {
-                currentBatch.push(mp);
-            } else {
-                batches.push({ key: `batch-${batches.length}`, plans: currentBatch });
-                currentBatch = [mp];
-            }
-            lastTime = t;
-        }
-        if (currentBatch.length > 0) {
-            batches.push({ key: `batch-${batches.length}`, plans: currentBatch });
-        }
-        return batches;
-    }, [monthMediaPlans, isMonthSent]);
-
-    const pagedUnsent = useMemo(() => {
-        const existing = monthMediaPlans.filter((mp) => rowMatchesSearch(mp, searchQuery));
+    // All lines of the month (sent + drafts) live in a single table
+    const pagedRows = useMemo(() => {
+        const existing = monthMediaPlans
+            .filter((mp) => rowMatchesSearch(mp, searchQuery))
+            .sort((a, b) => (a.datePublication || '').localeCompare(b.datePublication || '') || a.id - b.id);
         const drafts = draftRows.filter((d) => rowMatchesSearch(d, searchQuery));
         const total = existing.length + drafts.length;
         const pageCount = Math.max(1, Math.ceil(Math.max(total, 1) / pageSize));
@@ -887,43 +836,29 @@ const MediaPlanPage: React.FC = () => {
         };
     }, [monthMediaPlans, draftRows, searchQuery, tablePage, pageSize]);
 
-    const pagedNewPlanDrafts = useMemo(() => {
-        const drafts = draftRows.filter((d) => rowMatchesSearch(d, searchQuery));
-        const pageCount = Math.max(1, Math.ceil(Math.max(drafts.length, 1) / pageSize));
-        const page = Math.min(tablePage, pageCount - 1);
-        const start = page * pageSize;
-        return {
-            draftSlice: drafts.slice(start, start + pageSize),
-            total: drafts.length,
-            pageCount,
-            page,
-        };
-    }, [draftRows, searchQuery, tablePage, pageSize]);
-
     const selectedMonthIndex = monthList.findIndex((m) => m.key === selectedMonth);
 
-    // ── Load drafts ──
+    // ── Load drafts ── (an empty month starts with one blank line)
     useEffect(() => {
         if (!selectedClientId) return;
-        if (isMonthSent && !newPlanOpen) {
-            setDraftRows([]);
-            return;
-        }
         const saved = loadDraftsFromStorage(selectedClientId, selectedMonth);
         if (saved.length > 0) {
             setDraftRows(saved);
+            return;
+        }
+        if (monthMediaPlans.length > 0) {
+            setDraftRows([]);
             return;
         }
         const { year, month } = parseMonthKey(selectedMonth);
         const d = emptyDraft();
         d.datePublication = `${year}-${String(month + 1).padStart(2, '0')}-01`;
         setDraftRows([d]);
-    }, [selectedMonth, monthMediaPlans.length, selectedClientId, isMonthSent, newPlanOpen]);
+    }, [selectedMonth, monthMediaPlans.length, selectedClientId]);
 
     useEffect(() => {
-        setOpenBatches(new Set());
-        setNewPlanOpen(false);
         setTablePage(0);
+        setExpandedRowKey(null);
     }, [selectedMonth]);
 
     useEffect(() => {
@@ -1084,9 +1019,8 @@ const MediaPlanPage: React.FC = () => {
                         inspiration: draft.inspiration || undefined,
                         autresElements: draft.autresElements || undefined,
                         platforme: draft.platforme || undefined,
-                        lienDrive: draft.lienDrive || undefined,
+                        // lienDrive is set by the backend (client/month Drive folder)
                         etatPublication: draft.etatPublication || undefined,
-                        rectifs: draft.rectifs || undefined,
                         remarques: draft.remarques || undefined,
                         isShooting: draft.isShooting,
                         shootingDescription: draft.isShooting ? (draft.shootingDescription || undefined) : undefined,
@@ -1101,7 +1035,7 @@ const MediaPlanPage: React.FC = () => {
                     await mediaPlanService.createBulk(requests);
 
                     if (selectedClientId) clearDraftsFromStorage(selectedClientId, selectedMonth);
-                    setNewPlanOpen(false);
+                    setDraftRows([]);
                 }
 
                 if (resubmittableExisting.length > 0) {
@@ -1135,41 +1069,20 @@ const MediaPlanPage: React.FC = () => {
         });
     };
 
-    const handleBatchResubmit = (plans: MediaPlan[]) => {
-        const disapprovedLines = plans.filter(p => p.statut === 'DESAPPROUVE' && !p.retourManager);
-        if (disapprovedLines.length === 0) return;
-
-        const invalidShootingExisting = disapprovedLines.find(mp => mp.isShooting && !mp.shootingAuPlusTard);
-        if (invalidShootingExisting) {
-            alert('Indiquez la date au plus tard pour les lignes Shooting désapprouvées.');
-            return;
-        }
-
-        confirm(`Confirmer et envoyer ${disapprovedLines.length} ligne(s) désapprouvée(s) au manager ?`, async () => {
-            try {
-                for (const mp of disapprovedLines) {
-                    await mediaPlanService.resubmit(mp.id);
-                }
-                await loadData();
-            } catch (e: any) {
-                alert(e.response?.data?.message || 'Erreur');
-            }
-        });
-    };
-
     // ===== CLEAR ROW =====
+    // Keeps the Drive link (automatic) and the manager's motif de refus
     const handleClearRow = async (mp: MediaPlan) => {
         if (mp.statut === 'EN_ATTENTE' || mp.statut === 'APPROUVE') return;
         try {
             await mediaPlanService.update(mp.id, {
                 titre: mp.titre, heure: '', format: '', type: '', texteSurVisuel: '',
-                inspiration: '', autresElements: '', platforme: '', lienDrive: '',
-                etatPublication: '', rectifs: '', remarques: '',
+                inspiration: '', autresElements: '', platforme: '',
+                etatPublication: '', remarques: '',
             } as any);
             setMediaPlans(prev => prev.map(p => p.id === mp.id ? {
                 ...p, heure: null, format: null, type: null, texteSurVisuel: null,
-                inspiration: null, autresElements: null, platforme: null, lienDrive: null,
-                etatPublication: null, rectifs: null, remarques: null,
+                inspiration: null, autresElements: null, platforme: null,
+                etatPublication: null, remarques: null,
             } : p));
         } catch (e: any) { console.error(e); }
     };
@@ -1182,9 +1095,11 @@ const MediaPlanPage: React.FC = () => {
         });
     };
 
-    const getStatusBadge = (statut: string) => {
-        const variants: Record<string, string> = { EN_ATTENTE: 'warning', APPROUVE: 'success', DESAPPROUVE: 'danger' };
-        return <Badge variant={(variants[statut] || 'neutral') as any}>{StatutMediaPlanLabels[statut as keyof typeof StatutMediaPlanLabels] || statut}</Badge>;
+    const getStatusBadge = (mp: MediaPlan) => {
+        // Client feedback is with the manager: the line is not back to the employee yet
+        if (mp.retourManager) return <Badge variant="warning">Chez le manager</Badge>;
+        const variants: Record<string, string> = { EN_ATTENTE: 'warning', EN_ATTENTE_CLIENT: 'info', APPROUVE: 'success', DESAPPROUVE: 'danger' };
+        return <Badge variant={(variants[mp.statut] || 'neutral') as any}>{StatutMediaPlanLabels[mp.statut as keyof typeof StatutMediaPlanLabels] || mp.statut}</Badge>;
     };
 
     const getShootingStatusBadge = (statut: StatutShooting | null) => {
@@ -1259,21 +1174,19 @@ const MediaPlanPage: React.FC = () => {
         );
     };
 
-    // ── Open new plan section ──
-    const handleOpenNewPlan = () => {
-        setNewPlanOpen(true);
-        // Load or create draft rows for the new plan
-        if (!selectedClientId) return;
-        const saved = loadDraftsFromStorage(selectedClientId, selectedMonth);
-        if (saved.length > 0) {
-            setDraftRows(saved);
-            return;
-        }
-        const { year, month } = parseMonthKey(selectedMonth);
-        const d = emptyDraft();
-        d.datePublication = `${year}-${String(month + 1).padStart(2, '0')}-01`;
-        setDraftRows([d]);
-    };
+    // "Suivant" opens the second group of fields of a line (heure, format, type, …)
+    const renderNextButton = (rowKey: string, expanded: boolean, readOnly?: boolean) => (
+        <button
+            type="button"
+            className={`mp-next-btn${expanded ? ' open' : ''}`}
+            onClick={(e) => { e.stopPropagation(); setExpandedRowKey(expanded ? null : rowKey); setRowMenuKey(null); }}
+            aria-expanded={expanded}
+            title={readOnly ? 'Voir les autres champs' : 'Remplir les autres champs de la ligne'}
+        >
+            {expanded ? 'Réduire' : readOnly ? 'Détails' : 'Suivant'}
+            {expanded ? <HiOutlineChevronDown size={14} /> : <HiOutlineChevronRight size={14} />}
+        </button>
+    );
 
     // ══════════════════════════════════════════════════
     // ── RENDER TABLE (reusable for both sent & drafts) ──
@@ -1379,24 +1292,34 @@ const MediaPlanPage: React.FC = () => {
                             onChange={(v) => handleCellChange(mp, 'etatPublication', v)}
                         />
                     </td>
-                    <td>
-                        <TextCell cellKey={`${rowKey}-rectifs`} rowId={rowKey} columnKey="rectifs" mediaPlanId={mp.id} value={mp.rectifs || ''} placeholder="Aucun" readOnly={ro} onSave={v => handleCellChange(mp, 'rectifs', v)} />
-                    </td>
+                    <td>{getStatusBadge(mp)}</td>
                     <td className="relative">
-                        <button type="button" className="mp-icon-btn" onClick={() => setRowMenuKey(rowMenuKey === rowKey ? null : rowKey)}>
-                            <HiOutlineDotsHorizontal size={18} />
-                        </button>
-                        {rowMenuKey === rowKey && (
+                        <div className="mp-row-actions">
+                            {renderNextButton(rowKey, expanded, ro)}
+                            {!ro && (
+                                <button type="button" className="mp-icon-btn" onClick={() => setRowMenuKey(rowMenuKey === rowKey ? null : rowKey)}>
+                                    <HiOutlineDotsHorizontal size={18} />
+                                </button>
+                            )}
+                        </div>
+                        {rowMenuKey === rowKey && !ro && (
                             <div className="mp-menu">
-                                <button type="button" onClick={() => { setExpandedRowKey(expanded ? null : rowKey); setRowMenuKey(null); }}>Plus de champs</button>
-                                {mp.statut === 'DESAPPROUVE' && !ro && (
-                                    <button type="button" onClick={() => { setRowMenuKey(null); handleResubmit(mp); }}>Confirmer et envoyer</button>
-                                )}
-                                {!ro && <button type="button" onClick={() => { setRowMenuKey(null); handleClearRow(mp); }}>Vider la ligne</button>}
+                                <button type="button" onClick={() => { setRowMenuKey(null); handleResubmit(mp); }}>Confirmer et envoyer</button>
+                                <button type="button" onClick={() => { setRowMenuKey(null); handleClearRow(mp); }}>Vider la ligne</button>
                             </div>
                         )}
                     </td>
                 </tr>
+                {hasRefusalMotif(mp) && (
+                    <tr>
+                        <td colSpan={COLUMNS.length} className="!p-0 !bg-transparent border-0">
+                            <div className="mp-refusal" role="note">
+                                <span className="mp-refusal-label">Motif de refus</span>
+                                <p>{mp.rectifs}</p>
+                            </div>
+                        </td>
+                    </tr>
+                )}
                 {expanded && (
                     <tr>
                         <td colSpan={COLUMNS.length} className="!p-0 !bg-transparent border-0">
@@ -1422,10 +1345,6 @@ const MediaPlanPage: React.FC = () => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label>Lien Drive</label>
-                                    <TextCell cellKey={`${rowKey}-lien`} rowId={rowKey} columnKey="lien" mediaPlanId={mp.id} value={mp.lienDrive || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'lienDrive', v)} />
-                                </div>
-                                <div>
                                     <label>Autres</label>
                                     <TextCell cellKey={`${rowKey}-autres`} rowId={rowKey} columnKey="autres" mediaPlanId={mp.id} value={mp.autresElements || ''} readOnly={ro} onSave={v => handleCellChange(mp, 'autresElements', v)} />
                                 </div>
@@ -1438,8 +1357,13 @@ const MediaPlanPage: React.FC = () => {
                                     <input type="checkbox" className="mp-check" checked={!!mp.isShooting} disabled={ro} onChange={e => handleCellChange(mp, 'isShooting', e.target.checked)} />
                                 </div>
                                 <div>
-                                    <label>Statut</label>
-                                    {getStatusBadge(mp.statut)}
+                                    <label>Lien Drive</label>
+                                    <div className="mp-drive-link">
+                                        <SiGoogledrive size={14} />
+                                        {mp.lienDrive
+                                            ? <a href={mp.lienDrive} target="_blank" rel="noopener noreferrer">Ouvrir le dossier</a>
+                                            : <span>Généré automatiquement</span>}
+                                    </div>
                                 </div>
                             </div>
                         </td>
@@ -1588,14 +1512,16 @@ const MediaPlanPage: React.FC = () => {
                             onChange={(v) => handleDraftChange(idx, 'etatPublication', v)}
                         />
                     </td>
-                    <td><TextCell cellKey={`${draft._key}-rectifs`} rowId={draft._key} columnKey="rectifs" draftKey={draft._key} value={draft.rectifs} placeholder="Aucun" onSave={v => handleDraftChange(idx, 'rectifs', v)} /></td>
+                    <td><Badge variant="light">Brouillon</Badge></td>
                     <td className="relative">
-                        <button type="button" className="mp-icon-btn" onClick={(e) => { e.stopPropagation(); setRowMenuKey(rowMenuKey === draft._key ? null : draft._key); }}>
-                            <HiOutlineDotsHorizontal size={18} />
-                        </button>
+                        <div className="mp-row-actions">
+                            {renderNextButton(draft._key, expanded)}
+                            <button type="button" className="mp-icon-btn" onClick={(e) => { e.stopPropagation(); setRowMenuKey(rowMenuKey === draft._key ? null : draft._key); }}>
+                                <HiOutlineDotsHorizontal size={18} />
+                            </button>
+                        </div>
                         {rowMenuKey === draft._key && (
                             <div className="mp-menu">
-                                <button type="button" onClick={() => { setExpandedRowKey(expanded ? null : draft._key); setRowMenuKey(null); }}>Plus de champs</button>
                                 <button type="button" onClick={() => {
                                     const { year, month } = parseMonthKey(selectedMonth);
                                     setDraftRows(prev => {
@@ -1636,10 +1562,6 @@ const MediaPlanPage: React.FC = () => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label>Lien Drive</label>
-                                    <TextCell cellKey={`${draft._key}-lien`} rowId={draft._key} columnKey="lien" draftKey={draft._key} value={draft.lienDrive} onSave={v => handleDraftChange(idx, 'lienDrive', v)} />
-                                </div>
-                                <div>
                                     <label>Autres</label>
                                     <TextCell cellKey={`${draft._key}-autres`} rowId={draft._key} columnKey="autres" draftKey={draft._key} value={draft.autresElements} onSave={v => handleDraftChange(idx, 'autresElements', v)} />
                                 </div>
@@ -1652,8 +1574,11 @@ const MediaPlanPage: React.FC = () => {
                                     <input type="checkbox" className="mp-check" checked={!!draft.isShooting} onChange={e => handleDraftChange(idx, 'isShooting', e.target.checked)} />
                                 </div>
                                 <div>
-                                    <label>Statut</label>
-                                    <Badge variant="light">Brouillon</Badge>
+                                    <label>Lien Drive</label>
+                                    <div className="mp-drive-link">
+                                        <SiGoogledrive size={14} />
+                                        <span>Généré automatiquement à l'envoi</span>
+                                    </div>
                                 </div>
                             </div>
                         </td>
@@ -1777,8 +1702,6 @@ const MediaPlanPage: React.FC = () => {
         );
     }
 
-    const sentStatus = getStatusInfo(monthMediaPlans);
-
     if (isForbidden) {
         return (
             <div className="flex flex-col items-center justify-center p-12 text-center h-[60vh] bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
@@ -1824,171 +1747,49 @@ const MediaPlanPage: React.FC = () => {
                 </button>
             </div>
 
-            {/* ══════════════════════════════════════════════════ */}
-            {/* CASE 1: Month has sent plans → collapsible accordion + "add new" button */}
-            {/* ══════════════════════════════════════════════════ */}
-            {isMonthSent && (
-                <>
-                    {/* ── Sent plans accordions — one per batch ── */}
-                    {sentBatches.map((batch, batchIdx) => {
-                        const batchStatus = getStatusInfo(batch.plans);
-                        const isOpen = openBatches.has(batch.key);
-                        const hasDisapproved = batch.plans.some(p => p.statut === 'DESAPPROUVE');
-                        return (
-                            <div key={batch.key} className={`rounded-xl border-2 overflow-hidden transition-all duration-300 ${statusColorClasses[batchStatus.color]}`}>
-                                <div
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={() => toggleBatch(batch.key)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault();
-                                            toggleBatch(batch.key);
-                                        }
-                                    }}
-                                    className="w-full flex items-center justify-between px-5 py-4 text-left hover:opacity-80 transition-opacity"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        {isOpen
-                                            ? <HiOutlineChevronDown size={20} className="transition-transform" />
-                                            : <HiOutlineChevronRight size={20} className="transition-transform" />}
-                                        <span className="text-base font-semibold">{batchStatus.label}</span>
-                                        <span className="text-sm opacity-70">— {batch.plans.length} ligne(s)</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {hasDisapproved && (
-                                            <>
-                                                <button
-                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOpenNewPlan(); }}
-                                                    className="flex items-center gap-1 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-600 transition-colors"
-                                                    title="Ajouter une ligne"
-                                                >
-                                                    <HiOutlinePlus size={14} /> Ajouter ligne
-                                                </button>
-                                                <button
-                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleBatchResubmit(batch.plans); }}
-                                                    className="flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 transition-colors"
-                                                    title="Confirmer et envoyer"
-                                                >
-                                                    <HiOutlineCheck size={14} /> Confirmer et envoyer
-                                                </button>
-                                            </>
-                                        )}
-                                        <Badge variant={
-                                            batchStatus.color === 'green' ? 'success' :
-                                                batchStatus.color === 'red' ? 'danger' :
-                                                    batchStatus.color === 'warning' ? 'warning' : 'neutral' as any
-                                        }>{batchStatus.label}</Badge>
-                                    </div>
-                                </div>
-
-                                {isOpen && (
-                                    <div className="mp-scroll">
-                                        <table className="mp-table" style={{ tableLayout: 'fixed', width: tableWidth }}>
-                                            {renderTableHeader(batch.plans.map((mp) => `mp-${mp.id}`))}
-                                            <tbody>
-                                                {batch.plans.map(mp => renderExistingRow(mp))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-
-                    {/* ── "Add new plan" button ── */}
-                    {!newPlanOpen && (
-                        <button onClick={handleOpenNewPlan}
-                            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-brand-300 dark:border-brand-700 text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors font-medium text-sm">
-                            <HiOutlinePlus size={18} />
-                            Ajouter un nouveau plan média pour ce mois
-                        </button>
-                    )}
-
-                    {/* ── New plan accordion (draft table) ── */}
-                    {newPlanOpen && (
-                        <div className="mp-shell">
-                            <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)] bg-[#fff8f3]">
-                                <div className="flex items-center gap-3">
-                                    <HiOutlineChevronDown size={20} className="text-brand-500" />
-                                    <span className="text-base font-semibold text-[var(--text-1)]">Nouveau plan média</span>
-                                    <Badge variant="light">Brouillon</Badge>
-                                </div>
-                                <button onClick={() => { setNewPlanOpen(false); setDraftRows([]); }}
-                                    className="mp-icon-btn" title="Fermer">
-                                    <HiOutlineX size={16} />
-                                </button>
-                            </div>
-                            {renderFormatToolbar(
-                                <>
-                                    <button type="button" onClick={handleAddRow} className="mp-btn mp-btn-brand">
-                                        <HiOutlinePlus size={16} /> Ajouter ligne
-                                    </button>
-                                    <button type="button" onClick={handleBulkConfirm} className="mp-btn mp-btn-ok">
-                                        <HiOutlinePaperAirplane size={16} /> Confirmer et envoyer
-                                    </button>
-                                </>
-                            )}
-                            <div className="mp-scroll">
-                                <table className="mp-table" style={{ tableLayout: 'fixed', width: tableWidth }}>
-                                    {renderTableHeader(pagedNewPlanDrafts.draftSlice.map((d) => d._key))}
-                                    <tbody>
-                                        {pagedNewPlanDrafts.draftSlice.map((draft) => renderDraftRow(draft))}
-                                        {Array.from({ length: Math.max(0, EMPTY_PAD - pagedNewPlanDrafts.draftSlice.length) }, (_, i) => renderGhostRow(i))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            <TablePager
-                                page={pagedNewPlanDrafts.page}
-                                pageCount={pagedNewPlanDrafts.pageCount}
-                                total={pagedNewPlanDrafts.total}
-                                pageSize={pageSize}
-                                onPage={setTablePage}
-                                onPageSize={(n) => { setPageSize(n); setTablePage(0); }}
-                            />
-                        </div>
-                    )}
-                </>
-            )}
-
-            {/* ══════════════════════════════════════════════════ */}
-            {/* CASE 2: Month not sent yet → original table with drafts */}
-            {/* ══════════════════════════════════════════════════ */}
-            {!isMonthSent && (
-                <div className="mp-shell">
-                    {renderFormatToolbar(
-                        <>
-                            <button type="button" onClick={handleAddRow} className="mp-btn mp-btn-brand">
-                                <HiOutlinePlus size={16} /> Ajouter ligne
-                            </button>
-                            <button type="button" onClick={handleBulkConfirm} className="mp-btn mp-btn-ok">
-                                <HiOutlinePaperAirplane size={16} /> Confirmer et envoyer
-                            </button>
-                        </>
-                    )}
-                    <div className="mp-scroll">
-                        <table className="mp-table" style={{ tableLayout: 'fixed', width: tableWidth }}>
-                            {renderTableHeader([
-                                ...pagedUnsent.existingSlice.map((mp) => `mp-${mp.id}`),
-                                ...pagedUnsent.draftSlice.map((d) => d._key),
-                            ])}
-                            <tbody>
-                                {pagedUnsent.existingSlice.map(mp => renderExistingRow(mp))}
-                                {pagedUnsent.draftSlice.map((draft) => renderDraftRow(draft))}
-                                {Array.from({ length: Math.max(0, EMPTY_PAD - pagedUnsent.existingSlice.length - pagedUnsent.draftSlice.length) }, (_, i) => renderGhostRow(i))}
-                            </tbody>
-                        </table>
+            {/* All lines of the month (sent + drafts) in a single card */}
+            <div className="mp-shell">
+                {monthMediaPlans.length > 0 && (
+                    <div className="mp-summary">
+                        <span className="mp-summary-title">{monthList[selectedMonthIndex]?.label} · {monthMediaPlans.length} ligne{monthMediaPlans.length > 1 ? 's' : ''} envoyée{monthMediaPlans.length > 1 ? 's' : ''}</span>
+                        {monthCounts.pending > 0 && <Badge variant="warning">{monthCounts.pending} chez le manager</Badge>}
+                        {monthCounts.client > 0 && <Badge variant="info">{monthCounts.client} chez le client</Badge>}
+                        {monthCounts.approved > 0 && <Badge variant="success">{monthCounts.approved} approuvée{monthCounts.approved > 1 ? 's' : ''}</Badge>}
+                        {monthCounts.refused > 0 && <Badge variant="danger">{monthCounts.refused} à corriger</Badge>}
                     </div>
-                    <TablePager
-                        page={pagedUnsent.page}
-                        pageCount={pagedUnsent.pageCount}
-                        total={pagedUnsent.total}
-                        pageSize={pageSize}
-                        onPage={setTablePage}
-                        onPageSize={(n) => { setPageSize(n); setTablePage(0); }}
-                    />
+                )}
+                {renderFormatToolbar(
+                    <>
+                        <button type="button" onClick={handleAddRow} className="mp-btn mp-btn-brand">
+                            <HiOutlinePlus size={16} /> Ajouter ligne
+                        </button>
+                        <button type="button" onClick={handleBulkConfirm} className="mp-btn mp-btn-ok">
+                            <HiOutlinePaperAirplane size={16} /> Confirmer et envoyer
+                        </button>
+                    </>
+                )}
+                <div className="mp-scroll">
+                    <table className="mp-table" style={{ tableLayout: 'fixed', width: tableWidth }}>
+                        {renderTableHeader([
+                            ...pagedRows.existingSlice.map((mp) => `mp-${mp.id}`),
+                            ...pagedRows.draftSlice.map((d) => d._key),
+                        ])}
+                        <tbody>
+                            {pagedRows.existingSlice.map(mp => renderExistingRow(mp))}
+                            {pagedRows.draftSlice.map((draft) => renderDraftRow(draft))}
+                            {Array.from({ length: Math.max(0, EMPTY_PAD - pagedRows.existingSlice.length - pagedRows.draftSlice.length) }, (_, i) => renderGhostRow(i))}
+                        </tbody>
+                    </table>
                 </div>
-            )}
+                <TablePager
+                    page={pagedRows.page}
+                    pageCount={pagedRows.pageCount}
+                    total={pagedRows.total}
+                    pageSize={pageSize}
+                    onPage={setTablePage}
+                    onPageSize={(n) => { setPageSize(n); setTablePage(0); }}
+                />
+            </div>
 
             {/* Expanded cell overlay */}
             {expandedCell && (

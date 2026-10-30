@@ -1,0 +1,57 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ArrowColor #683B77
+skinparam activity {
+  BackgroundColor #F7F1FA
+  BorderColor #683B77
+  DiamondBackgroundColor #FFFFFF
+  DiamondBorderColor #683B77
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+
+title Diagramme d'activité — Détermination du statut de pointage à l'arrivée
+
+start
+:Recevoir le signal « Arrivée » de l'agent;
+:Enregistrer l'heure d'entrée,
+l'adresse IP et le réseau Wi-Fi;
+
+if (Jour férié ?) then (oui)
+  :Statut = JOUR FÉRIÉ;
+  stop
+endif
+
+if (Jour non travaillé\nselon l'horaire ?) then (oui)
+  :Statut = JOUR NON TRAVAILLÉ;
+  stop
+endif
+
+if (Congé approuvé ce jour ?) then (oui)
+  :Statut = EN CONGÉ;
+  stop
+endif
+
+:Vérifier le télétravail
+(demande approuvée ou jour de télétravail de l'horaire);
+:Calculer l'heure de début attendue
+(décalée si autorisation de sortie approuvée);
+
+if (Arrivée après l'heure attendue ?) then (oui)
+  :Statut = RETARD
+  (minutes de retard enregistrées);
+else (non)
+  if (En télétravail ?) then (oui)
+    :Statut = TÉLÉTRAVAIL;
+  else (non)
+    :Statut = PRÉSENT;
+  endif
+endif
+
+:Enregistrer le pointage;
+stop
+
+@enduml

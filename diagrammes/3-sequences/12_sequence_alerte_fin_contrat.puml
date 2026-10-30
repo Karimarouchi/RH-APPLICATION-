@@ -1,0 +1,52 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ArrowColor #683B77
+skinparam sequence {
+  LifeLineBorderColor #9C7BAA
+  ParticipantBorderColor #683B77
+  ParticipantBackgroundColor #F7F1FA
+  ActorBorderColor #683B77
+  ActorBackgroundColor #F7F1FA
+  GroupBorderColor #683B77
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+autonumber
+hide footbox
+
+title Diagramme de séquence — Alerte automatique de fin de contrat
+
+participant "Planificateur" as CRON
+control "Serveur" as S
+database "Base de données" as DB
+actor "Responsable RH" as RH
+
+CRON -> S : Déclenchement quotidien (8h00)
+
+S -> DB : Chercher les contrats CIVP qui finissent\ndans 30, 7 ou 3 jours
+DB --> S : Employés concernés
+loop Pour chaque employé CIVP
+  S -> DB : Lire les personnes qui gèrent les employés
+  S -> DB : Créer une notification\n(« URGENT » si 3 jours)
+  S -->> RH : « Fin de contrat CIVP »
+end
+
+S -> DB : Chercher les contrats CDD qui finissent\ndans exactement 1 mois
+DB --> S : Employés concernés
+loop Pour chaque employé CDD
+  S -> DB : Créer une notification
+  S -->> RH : « Expiration de contrat CDD »
+end
+
+RH -> RH : Consulter la notification\ndans l'application
+
+note right of RH
+  Sont notifiés : tous ceux qui ont la
+  permission « Employés » (Responsable RH,
+  Administrateur…).
+end note
+
+@enduml

@@ -1,0 +1,40 @@
+@startuml
+!pragma layout smetana
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ArrowColor #683B77
+skinparam node {
+  BackgroundColor #F7F1FA
+  BorderColor #683B77
+}
+skinparam artifact {
+  BackgroundColor #FFFFFF
+  BorderColor #683B77
+}
+skinparam database {
+  BackgroundColor #FFFFFF
+  BorderColor #683B77
+}
+
+title Diagramme de déploiement — Antigone RH
+
+node "Poste de l'utilisateur" as PC {
+  artifact "Navigateur web\n(application RH)" as NAV
+  artifact "Agent Desktop\n(pointage automatique)" as AGENT
+}
+
+node "Serveur (VPS)" as VPS {
+  artifact "Nginx\n(pages web de l'application RH\n+ redirection /api)" as NGINX
+  artifact "API Spring Boot\n(conteneur Docker)" as API
+  database "PostgreSQL\n(conteneur Docker)" as DB
+}
+
+node "Service e-mail\n(SMTP)" as SMTP
+
+NAV --> NGINX : HTTP(S)
+AGENT --> NGINX : HTTP(S)
+NGINX --> API : /api
+API --> DB : JDBC
+API --> SMTP : envoi d'e-mails
+
+@enduml

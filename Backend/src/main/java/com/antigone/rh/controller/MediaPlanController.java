@@ -81,7 +81,10 @@ public class MediaPlanController {
         java.util.List<String> champs = body.get("champs") instanceof java.util.List
                 ? (java.util.List<String>) body.get("champs")
                 : java.util.List.of();
-        return ResponseEntity.ok(ApiResponse.ok("Ligne acceptée", mediaPlanService.accept(id, champs, approver)));
+        // validationClient=false : le manager valide seul, la ligne est approuvée directement
+        boolean validationClient = !Boolean.FALSE.equals(body.get("validationClient"));
+        return ResponseEntity.ok(ApiResponse.ok("Ligne acceptée",
+                mediaPlanService.accept(id, champs, validationClient, approver)));
     }
 
     @PatchMapping("/{id}/refuse")

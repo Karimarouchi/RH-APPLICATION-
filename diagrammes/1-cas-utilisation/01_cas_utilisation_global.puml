@@ -1,0 +1,86 @@
+@startuml
+!pragma layout smetana
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+skinparam ArrowColor #683B77
+skinparam usecase {
+  BackgroundColor #F7F1FA
+  BorderColor #683B77
+}
+skinparam rectangle {
+  BorderColor #683B77
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+left to right direction
+
+title Diagramme de cas d'utilisation global — Antigone RH
+
+actor "Employé" as EMP
+actor "Chef de\ndépartement" as CHEF
+actor "Responsable RH" as RH
+actor "Administrateur" as ADM
+actor "Agent Desktop\n<<système>>" as AGENT
+
+CHEF -up-|> EMP
+RH -up-|> EMP
+ADM -up-|> RH
+
+rectangle "Application Antigone RH" {
+  usecase "Consulter son tableau de bord\net son calendrier" as UC1
+  usecase "Gérer ses demandes\n(congé, autorisation, télétravail)" as UC2
+  usecase "Demander un document\nadministratif" as UC3
+  usecase "Gérer son profil" as UC4
+  usecase "Pointer sa présence" as UC5
+
+  usecase "Valider les demandes\nde son département" as UC6
+
+  usecase "Gérer les employés\net les départements" as UC7
+  usecase "Traiter toutes les demandes\n(congés et documents)" as UC8
+  usecase "Paramétrer le calendrier,\nles horaires et les référentiels" as UC9
+  usecase "Gérer les restrictions\nde congés" as UC10
+  usecase "Superviser la présence\n(monitoring)" as UC11
+  usecase "Consulter le tableau\nde bord RH" as UC12
+
+  usecase "Gérer les comptes\nutilisateurs" as UC13
+  usecase "Gérer les rôles\net les permissions" as UC14
+}
+
+EMP --> UC1
+EMP --> UC2
+EMP --> UC3
+EMP --> UC4
+EMP --> UC5
+
+CHEF --> UC6
+
+RH --> UC7
+RH --> UC8
+RH --> UC9
+RH --> UC10
+RH --> UC11
+RH --> UC12
+
+ADM --> UC13
+ADM --> UC14
+
+UC5 <-- AGENT
+
+note as N1
+  <b>Toutes les actions nécessitent</b>
+  <b>une authentification préalable.</b>
+  (voir le diagramme « Authentification »)
+end note
+
+note as N2
+  L'Administrateur a un <b>accès total</b> :
+  il hérite de toutes les fonctionnalités
+  du Responsable RH, qui hérite lui-même
+  de celles de l'Employé.
+end note
+
+@enduml

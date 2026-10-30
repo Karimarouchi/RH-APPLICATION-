@@ -1,0 +1,79 @@
+@startuml
+!pragma layout smetana
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ArrowColor #683B77
+skinparam class {
+  BackgroundColor #F7F1FA
+  BorderColor #683B77
+}
+skinparam package {
+  BorderColor #9C7BAA
+  FontColor #683B77
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+hide members
+hide circle
+
+title Diagramme de classes — Vue globale du module RH
+
+package "Personnel et accès" {
+  class Employe
+  class Compte
+  class Role
+  class Permission
+  class DocumentEmploye
+  class Notification
+}
+
+package "Demandes" {
+  class Demande
+  class Conge
+  class Autorisation
+  class Teletravail
+  class Validation
+  class HistoriqueStatut
+}
+
+package "Calendrier et paramétrage" {
+  class HoraireTravail
+  class AffectationHoraire
+  class TacheObligatoire <<restriction de congé>>
+  class Calendrier
+  class Referentiel
+}
+
+package "Présence et monitoring" {
+  class Pointage
+  class Heartbeat
+  class RapportInactivite
+}
+
+Employe --> Employe : manager
+Employe -- Compte
+Compte -- Role
+Role -- Permission
+Employe *-- DocumentEmploye
+Employe -- Notification
+
+Employe -- Demande : soumet
+Demande <|-- Conge
+Demande <|-- Autorisation
+Demande <|-- Teletravail
+Demande *-- Validation
+Demande *-- HistoriqueStatut
+
+AffectationHoraire --> Employe
+AffectationHoraire --> HoraireTravail
+TacheObligatoire --> Employe
+
+Pointage --> Employe
+Heartbeat --> Employe
+RapportInactivite --> Employe
+
+note "Les attributs et les multiplicités de chaque\npartie se trouvent dans les diagrammes 02 à 05." as N1
+
+@enduml

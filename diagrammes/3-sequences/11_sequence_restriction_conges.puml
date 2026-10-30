@@ -1,0 +1,51 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ArrowColor #683B77
+skinparam sequence {
+  LifeLineBorderColor #9C7BAA
+  ParticipantBorderColor #683B77
+  ParticipantBackgroundColor #F7F1FA
+  ActorBorderColor #683B77
+  ActorBackgroundColor #F7F1FA
+  GroupBorderColor #683B77
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+autonumber
+hide footbox
+
+title Diagramme de séquence — Définir une restriction de congés
+
+actor "Responsable RH" as RH
+boundary "Interface" as UI
+control "Serveur" as S
+database "Base de données" as DB
+actor "Employé" as E
+
+note over RH, E : Pré-condition : les acteurs sont authentifiés.
+
+== Définir la restriction ==
+RH -> UI : Ouvrir « Restrictions de congés »
+UI -> S : Charger ses collaborateurs\net les restrictions existantes
+S -> DB : Lire les données
+S --> UI : Données
+RH -> UI : Saisir un nom, choisir les collaborateurs\net cocher les jours obligatoires
+UI -> S : Créer la restriction
+S -> DB : Enregistrer une restriction\npar collaborateur
+S --> UI : Restriction créée
+UI --> RH : Afficher la liste mise à jour
+
+== Effet sur une demande de congé ==
+E -> UI : Choisir des dates de congé
+UI -> S : Charger mes jours obligatoires
+S --> UI : Jours bloqués
+alt Les dates touchent un jour obligatoire
+  UI --> E : Jour bloqué sur le mini-calendrier\n+ envoi de la demande impossible
+else Aucun conflit
+  UI --> E : La demande peut être envoyée
+end
+
+@enduml

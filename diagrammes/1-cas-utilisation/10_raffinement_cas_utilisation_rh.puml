@@ -1,0 +1,158 @@
+@startuml
+!pragma layout smetana
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+skinparam ArrowColor #683B77
+skinparam usecase {
+  BackgroundColor #F7F1FA
+  BorderColor #683B77
+}
+skinparam rectangle {
+  BorderColor #683B77
+}
+skinparam package {
+  BorderColor #683B77
+  FontColor #683B77
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+left to right direction
+
+title Raffinement du cas d'utilisation — Rôle Responsable RH
+
+actor "Responsable RH" as RH
+actor "Employé" as EMP
+
+RH -up-|> EMP
+
+rectangle "Gestion des ressources humaines" {
+
+  package "Gestion des employés" {
+    usecase "Ajouter un employé" as UC1
+    usecase "Vérifier les informations\nsaisies" as UC1a
+    usecase "Modifier une fiche employé" as UC2
+    usecase "Rechercher et consulter\nun employé" as UC3
+    usecase "Gérer les documents\nde l'employé" as UC4
+    usecase "Fixer le solde de congé\nde départ" as UC5
+    usecase "Archiver un employé" as UC6
+    usecase "Restaurer un employé archivé" as UC6a
+    usecase "Exporter la liste\ndes employés" as UC7
+    usecase "Consulter l'organigramme" as UC8
+    usecase "Gérer les départements" as UC9
+    usecase "Désigner le chef\nde département" as UC9a
+  }
+
+  package "Traitement des demandes" {
+    usecase "Consulter toutes\nles demandes" as UC10
+    usecase "Approuver une demande" as UC11
+    usecase "Refuser une demande" as UC12
+    usecase "Indiquer le motif du refus" as UC12a
+    usecase "Traiter plusieurs demandes\nen une fois" as UC13
+    usecase "Consulter le justificatif" as UC14
+    usecase "Traiter une demande\nde document" as UC15
+  }
+
+  package "Organisation du travail" {
+    usecase "Gérer les jours fériés\net jours spéciaux" as UC16
+    usecase "Gérer les horaires de travail" as UC17
+    usecase "Gérer les jours où les congés\nsont interdits" as UC18
+    usecase "Gérer les listes de valeurs\n(postes, types de contrat…)" as UC19
+    usecase "Régler les règles de congé\n(droit annuel, report…)" as UC20
+    usecase "Configurer l'envoi\ndes e-mails" as UC21
+  }
+
+  package "Suivi de la présence" {
+    usecase "Suivre la présence\nen temps réel" as UC22
+    usecase "Consulter l'historique\nde présence d'un employé" as UC23
+    usecase "Préparer un rapport\nd'inactivité" as UC24
+    usecase "Décider sur un rapport\n(retenir ou annuler)" as UC25
+  }
+
+  package "Tableau de bord RH" {
+    usecase "Consulter les indicateurs RH" as UC26
+    usecase "Recevoir les alertes\nde fin de contrat" as UC27
+  }
+}
+
+RH --> UC1
+RH --> UC2
+RH --> UC3
+RH --> UC4
+RH --> UC6
+RH --> UC7
+RH --> UC8
+RH --> UC9
+
+RH --> UC10
+RH --> UC11
+RH --> UC12
+RH --> UC13
+RH --> UC15
+
+RH --> UC16
+RH --> UC17
+RH --> UC18
+RH --> UC19
+RH --> UC20
+RH --> UC21
+
+RH --> UC22
+RH --> UC23
+RH --> UC24
+RH --> UC25
+
+RH --> UC26
+RH --> UC27
+
+UC1 ..> UC1a : <<include>>
+UC2 ..> UC1a : <<include>>
+UC5 .> UC1 : <<extend>>
+UC6a .> UC6 : <<extend>>
+UC9a .> UC9 : <<extend>>
+
+UC12 ..> UC12a : <<include>>
+UC14 .> UC10 : <<extend>>
+
+UC25 .> UC24 : <<extend>>
+
+note as N_UC1a
+  <b>Vérifier les informations saisies</b>
+  Si un champ est vide ou incorrect,
+  l'application affiche la liste des
+  champs à corriger.
+end note
+
+note as N_UC11
+  <b>Approuver une demande</b>
+  Seules les demandes « en attente »
+  peuvent être traitées. Un congé
+  approuvé est retiré du solde, et
+  l'employé est prévenu de la décision.
+end note
+
+note as N_UC24
+  <b>Préparer un rapport d'inactivité</b>
+  Par semaine ou par période : temps
+  d'inactivité, retards cumulés et
+  montant à retenir.
+end note
+
+note as N_UC27
+  <b>Recevoir les alertes de fin de contrat</b>
+  Chaque matin, l'application prévient
+  le RH des contrats qui arrivent à
+  leur fin.
+end note
+
+note as N1
+  <b>Toutes les actions demandent</b>
+  <b>d'être connecté à son compte.</b>
+  Le Responsable RH garde aussi tout
+  l'espace personnel de l'employé.
+end note
+
+@enduml

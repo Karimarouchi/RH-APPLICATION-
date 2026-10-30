@@ -1,0 +1,131 @@
+@startuml
+!pragma layout smetana
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ArrowColor #683B77
+skinparam class {
+  BackgroundColor #F7F1FA
+  BorderColor #683B77
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+hide circle
+
+title Diagramme de classes — Personnel et accès
+
+class Employe {
+  - id : Long
+  - matricule : String
+  - cin : String
+  - cnss : String
+  - nom : String
+  - prenom : String
+  - email : String
+  - telephone : String
+  - genre : String
+  - poste : String
+  - departement : String
+  - managerDepartement : Boolean
+  - typeContrat : String
+  - dateEmbauche : Date
+  - dateFinContrat : Date
+  - salaire : Double
+  - soldeConge : Double
+  - ribBancaire : String
+  - archived : Boolean
+  --
+  + calculerSoldeConge() : Double
+  + archiver() : void
+  + desarchiver() : void
+}
+
+class Compte {
+  - id : Long
+  - username : String
+  - passwordHash : String
+  - enabled : Boolean
+  - mustChangePassword : Boolean
+  - lastLogin : DateTime
+  - createdAt : DateTime
+  - resetToken : String
+  - resetTokenExpiry : DateTime
+  --
+  + seConnecter() : void
+  + changerMotDePasse() : void
+  + reinitialiserMotDePasse() : void
+  + permissionsEffectives() : String[]
+}
+
+class Role {
+  - id : Long
+  - nom : String
+  - accesTotal : Boolean
+}
+
+class Permission {
+  - id : Long
+  - permission : String
+}
+
+class AccessLog <<journal d'accès>> {
+  - id : Long
+  - dateAcces : DateTime
+  - adresseIp : String
+  - action : String
+}
+
+class DocumentEmploye {
+  - id : Long
+  - nom : String
+  - type : String
+  - fichierUrl : String
+  - dateExpiration : Date
+}
+
+class Competence {
+  - id : Long
+  - nom : String
+  - categorie : String
+  - niveau : Integer
+}
+
+class Notification {
+  - id : Long
+  - titre : String
+  - message : String
+  - lu : Boolean
+  - urgent : Boolean
+  - dateCreation : DateTime
+  --
+  + marquerCommeLue() : void
+}
+
+Employe "0..*" --> "0..1" Employe : manager
+Employe "1" -- "0..1" Compte : possède
+Compte "0..*" -- "1..*" Role : a
+Role "0..*" -- "0..*" Permission : regroupe
+Compte "0..*" -- "0..*" Permission : permissions ajoutées
+Compte "0..*" -- "0..*" Permission : permissions retirées
+Compte "1" *-- "0..*" AccessLog
+Employe "1" *-- "0..*" DocumentEmploye
+Employe "1" *-- "0..*" Competence
+Employe "1" -- "0..*" Notification : reçoit
+
+note bottom of Compte
+  Permissions effectives =
+  permissions des rôles
+  + permissions ajoutées
+  − permissions retirées.
+  Un rôle à « accès total »
+  donne toutes les permissions.
+end note
+
+note right of Employe
+  <b>managerDepartement</b> = vrai pour
+  le chef de son département : il reçoit
+  et valide les demandes de ce département.
+end note
+
+@enduml

@@ -1,0 +1,62 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ArrowColor #683B77
+skinparam sequence {
+  LifeLineBorderColor #9C7BAA
+  ParticipantBorderColor #683B77
+  ParticipantBackgroundColor #F7F1FA
+  ActorBorderColor #683B77
+  ActorBackgroundColor #F7F1FA
+  GroupBorderColor #683B77
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+autonumber
+hide footbox
+
+title Diagramme de séquence — Demander un document administratif
+
+actor "Employé" as E
+boundary "Interface" as UI
+control "Serveur" as S
+database "Base de données" as DB
+actor "Responsable RH" as RH
+
+note over E, RH : Pré-condition : les deux acteurs sont authentifiés.
+
+== Demande par l'employé ==
+E -> UI : Ouvrir « Demandes papiers »\net choisir le type de document
+UI -> S : Créer la demande (type, motif)
+S -> DB : Enregistrer la demande\n(type « Administration », statut « Brouillon »)
+S --> UI : Demande créée
+UI --> E : Afficher la demande « en attente »
+
+== Traitement par le Responsable RH ==
+RH -> UI : Ouvrir la liste des demandes papiers
+UI -> S : Charger les demandes
+S -> DB : Lire les demandes
+S --> UI : Demandes
+UI --> RH : Afficher les demandes
+
+alt Accepter
+  RH -> UI : Accepter la demande
+  UI -> S : Accepter
+  S -> DB : Statut → « Validée » + historique
+  S -->> E : Notification « Demande papier acceptée »
+else Refuser
+  RH -> UI : Refuser avec un motif
+  UI -> S : Refuser (motif)
+  S -> DB : Statut → « Annulée » + motif + historique
+  S -->> E : Notification « Demande papier refusée »
+end
+
+note right of E
+  Types : attestation de travail,
+  attestation de salaire, fiche de paie,
+  ordre de mission, autre.
+end note
+
+@enduml

@@ -1,0 +1,56 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ArrowColor #683B77
+skinparam sequence {
+  LifeLineBorderColor #9C7BAA
+  ParticipantBorderColor #683B77
+  ParticipantBackgroundColor #F7F1FA
+  ActorBorderColor #683B77
+  ActorBackgroundColor #F7F1FA
+  GroupBorderColor #683B77
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+autonumber
+hide footbox
+
+title Diagramme de séquence — Ajouter un employé et lui créer un compte
+
+actor "Responsable RH" as RH
+actor "Administrateur" as ADM
+boundary "Interface" as UI
+control "Serveur" as S
+database "Base de données" as DB
+participant "Service e-mail" as MAIL
+actor "Nouvel employé" as E
+
+note over RH, DB : Pré-condition : les acteurs sont authentifiés.
+
+== Création de la fiche employé ==
+RH -> UI : Remplir la fiche\n(identité, poste, département,\ncontrat, date d'embauche…)
+UI -> S : Créer l'employé
+S -> S : Vérifier l'unicité\n(matricule, CIN, e-mail)
+alt Doublon détecté
+  S --> UI : Erreur
+  UI --> RH : Afficher l'erreur
+else Données valides
+  S -> DB : Enregistrer l'employé
+  S --> UI : Employé créé
+  UI --> RH : Afficher la fiche
+end
+
+== Création du compte d'accès ==
+ADM -> UI : Créer un compte\n(employé, identifiant, rôle(s))
+UI -> S : Créer le compte
+S -> S : Vérifier que l'employé n'a pas déjà\nde compte et que le rôle existe
+S -> S : Générer un mot de passe provisoire
+S -> DB : Enregistrer le compte (actif,\nchangement de mot de passe obligatoire)
+S -> MAIL : Envoyer les identifiants
+MAIL -->> E : E-mail avec identifiant\net mot de passe provisoire
+S --> UI : Compte créé
+UI --> ADM : Confirmation
+
+@enduml

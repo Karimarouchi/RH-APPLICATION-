@@ -419,10 +419,11 @@ public class MediaPlanService {
     }
 
     /**
-     * Accepte une seule ligne : elle part chez le client avec les champs choisis.
+     * Accepte une seule ligne. Avec validationClient, elle part chez le client avec les
+     * champs choisis ; sinon le manager valide seul et la ligne est approuvée directement.
      * Un shooting part ensuite au manager du département Production pour la date exacte.
      */
-    public MediaPlanDTO accept(Long id, List<String> champs, Long approverId) {
+    public MediaPlanDTO accept(Long id, List<String> champs, boolean validationClient, Long approverId) {
         MediaPlan mp = mediaPlanRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("MediaPlan", id));
         boolean retour = mp.getStatut() == StatutMediaPlan.DESAPPROUVE && Boolean.TRUE.equals(mp.getRetourManager());
@@ -443,7 +444,7 @@ public class MediaPlanService {
         mp.setChampsVisiblesClient(String.join(",", chosen));
         mp.setRectifs(null);
         mp.setRetourManager(false);
-        mp.setStatut(StatutMediaPlan.EN_ATTENTE_CLIENT);
+        mp.setStatut(validationClient ? StatutMediaPlan.EN_ATTENTE_CLIENT : StatutMediaPlan.APPROUVE);
         mediaPlanRepository.save(mp);
 
         if (mp.isShooting()) {

@@ -672,6 +672,126 @@ button.mp-status:disabled {
   letter-spacing: 0.04em;
 }
 
+.mp-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px 4px;
+}
+
+.mp-summary-title {
+  margin-right: 4px;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text-1);
+}
+
+.mp-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.mp-next-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid #ffd8c4;
+  border-radius: 999px;
+  background: #fff4ee;
+  color: var(--brand);
+  font-size: 12.5px;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.mp-next-btn:hover { background: #ffe9dc; }
+
+.mp-next-btn.open {
+  border-color: #ececec;
+  background: #fff;
+  color: #6b7280;
+}
+
+.dark .mp-next-btn {
+  border-color: rgba(232, 106, 46, 0.35);
+  background: rgba(232, 106, 46, 0.12);
+}
+
+.dark .mp-next-btn.open {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: #9c968c;
+}
+
+.mp-refusal {
+  margin: 0 10px 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-left: 3px solid #ef4444;
+}
+
+.mp-refusal-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #b91c1c;
+}
+
+.mp-refusal p {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  color: #7f1d1d;
+  white-space: pre-wrap;
+}
+
+.dark .mp-refusal {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.25);
+  border-left-color: #ef4444;
+}
+
+.dark .mp-refusal-label { color: #f87171; }
+.dark .mp-refusal p { color: #fecaca; }
+
+.mp-drive-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.mp-drive-link a {
+  color: var(--brand);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.dark .mp-details,
+.dark .mp-shooting-panel {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.dark .mp-drive-link {
+  background: rgba(255, 255, 255, 0.05);
+  color: #9c968c;
+}
+
 @media (max-width: 900px) {
   .mp-details { grid-template-columns: 1fr 1fr; }
 }

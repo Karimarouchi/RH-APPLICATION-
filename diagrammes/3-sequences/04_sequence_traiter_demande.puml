@@ -1,0 +1,70 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ArrowColor #683B77
+skinparam sequence {
+  LifeLineBorderColor #9C7BAA
+  ParticipantBorderColor #683B77
+  ParticipantBackgroundColor #F7F1FA
+  ActorBorderColor #683B77
+  ActorBackgroundColor #F7F1FA
+  GroupBorderColor #683B77
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+autonumber
+hide footbox
+
+title Diagramme de séquence — Approuver ou refuser une demande
+
+actor "Responsable RH /\nChef de département" as V
+boundary "Page « Validation\ndes demandes »" as UI
+control "Serveur" as S
+database "Base de données" as DB
+actor "Employé" as E
+
+note over V, DB : Pré-condition : le validateur est authentifié.
+
+V -> UI : Ouvrir la liste des demandes
+UI -> S : Charger les demandes
+S -> DB : Lire les demandes
+DB --> S : Demandes
+S --> UI : Demandes
+UI --> V : Afficher les demandes (filtres, statistiques)
+
+V -> UI : Sélectionner une demande
+
+alt Approuver
+  V -> UI : Cliquer « Approuver »
+  UI -> S : Approuver la demande
+  S -> S : Vérifier : demande « en attente »,\ndroit de valider, pas sa propre demande
+  S -> DB : Statut → « Approuvée »
+  opt Congé payé
+    S -> DB : Déduire les jours du solde de l'employé
+  end
+  S -> DB : Enregistrer l'historique
+  S -> DB : Créer la notification
+  S -->> E : « Votre demande a été approuvée »
+else Refuser
+  V -> UI : Cliquer « Refuser » et saisir le motif
+  UI -> S : Refuser la demande (motif)
+  S -> S : Vérifier : demande « en attente »,\ndroit de valider
+  S -> DB : Statut → « Refusée » + motif
+  S -> DB : Enregistrer l'historique
+  S -> DB : Créer la notification
+  S -->> E : « Votre demande a été refusée » + motif
+end
+
+S --> UI : Demande mise à jour
+UI --> V : Rafraîchir la liste
+
+note right of S
+  Droit de valider :
+  - Responsable RH : toutes les demandes ;
+  - Chef de département : uniquement
+    celles de son département.
+end note
+
+@enduml

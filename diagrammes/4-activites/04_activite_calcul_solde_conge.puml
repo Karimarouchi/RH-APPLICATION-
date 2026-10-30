@@ -1,0 +1,57 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ArrowColor #683B77
+skinparam activity {
+  BackgroundColor #F7F1FA
+  BorderColor #683B77
+  DiamondBackgroundColor #FFFFFF
+  DiamondBorderColor #683B77
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+
+title Diagramme d'activité — Calcul du solde de congé d'un employé
+
+start
+:Lire la date d'embauche;
+
+if (Solde saisi manuellement par le RH ?) then (oui)
+  :Solde disponible = valeur saisie;
+else (non)
+  :Calculer l'ancienneté;
+  if (Ancienneté < 1 an ?) then (oui)
+    :Droit annuel = 18 jours
+    Taux = 1,5 jour / mois;
+  else (non)
+    :Droit annuel = 24 jours
+    Taux = 2 jours / mois;
+  endif
+  :Compter les mois travaillés depuis
+  le début de l'année de congé;
+  note right
+    L'année de congé commence à la date
+    anniversaire de l'embauche.
+    Un mois entamé de 15 jours ou plus
+    compte comme un mois complet.
+  end note
+  :Retirer les mois entièrement couverts
+  par un congé sans solde;
+  :Jours acquis = mois × taux
+  (plafonné au droit annuel);
+  if (Ancienneté ≥ 1 an ?) then (oui)
+    :Ajouter le reliquat de l'année
+    précédente (5 jours maximum);
+  else (non)
+  endif
+  :Jours consommés = congés payés approuvés;
+  :Solde disponible = acquis − consommés;
+endif
+
+:Solde prévisionnel = disponible
+− congés payés en attente;
+stop
+
+@enduml

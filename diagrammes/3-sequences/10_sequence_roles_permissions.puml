@@ -1,0 +1,58 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ArrowColor #683B77
+skinparam sequence {
+  LifeLineBorderColor #9C7BAA
+  ParticipantBorderColor #683B77
+  ParticipantBackgroundColor #F7F1FA
+  ActorBorderColor #683B77
+  ActorBackgroundColor #F7F1FA
+  GroupBorderColor #683B77
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+autonumber
+hide footbox
+
+title Diagramme de séquence — Gérer les rôles et les droits d'un compte
+
+actor "Administrateur" as ADM
+boundary "Interface" as UI
+control "Serveur" as S
+database "Base de données" as DB
+actor "Utilisateur\nconcerné" as U
+
+note over ADM, DB : Pré-condition : l'administrateur est authentifié.
+
+== Créer un rôle ==
+ADM -> UI : Ouvrir « Rôles » et créer un rôle\n(nom + permissions cochées)
+UI -> S : Créer le rôle
+alt Nom déjà utilisé
+  S --> UI : Erreur « Un rôle avec ce nom existe déjà »
+  UI --> ADM : Afficher l'erreur
+else Nom libre
+  S -> DB : Enregistrer le rôle et ses permissions
+  S --> UI : Rôle créé
+  UI --> ADM : Confirmation
+end
+
+== Attribuer le rôle à un compte ==
+ADM -> UI : Ouvrir « Comptes », choisir un compte\net cocher le(s) rôle(s)
+opt Exception pour ce compte
+  ADM -> UI : Ajouter ou retirer\ndes droits individuels
+end
+UI -> S : Mettre à jour le compte
+S -> DB : Enregistrer les rôles et les droits
+S --> UI : Compte mis à jour
+UI --> ADM : Confirmation
+
+== Effet pour l'utilisateur ==
+U -> S : Se connecter
+S -> DB : Lire les rôles et les droits du compte
+S -> S : Permissions = rôles + ajouts − retraits
+S --> U : Menu et pages selon ses permissions
+
+@enduml

@@ -1,0 +1,93 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ArrowColor #683B77
+skinparam activity {
+  BackgroundColor #F7F1FA
+  BorderColor #683B77
+  DiamondBackgroundColor #FFFFFF
+  DiamondBorderColor #683B77
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+
+title Diagramme d'activité — Contrôle des règles d'une demande de congé
+
+start
+:Recevoir la demande de congé;
+
+if (Dates valides ?\n(début ≥ aujourd'hui, fin ≥ début)) then (non)
+  #FFEBEE:Refuser : dates invalides;
+  stop
+endif
+
+if (Type de congé actif\ndans les référentiels ?) then (non)
+  #FFEBEE:Refuser : type désactivé;
+  stop
+endif
+
+if (Congé maternité ou règles\npour un homme ?) then (oui)
+  #FFEBEE:Refuser : réservé aux femmes;
+  stop
+endif
+
+if (Justificatif obligatoire et absent ?\n(maladie, maternité, décès)) then (oui)
+  #FFEBEE:Refuser : justificatif manquant;
+  stop
+endif
+
+:Calculer les jours ouvrables
+et les jours effectifs;
+note right
+  Les jours effectifs incluent les week-ends
+  et jours fériés qui suivent le congé
+  (ex. : un vendredi = 3 jours déduits).
+end note
+
+if (Au moins 1 jour ouvrable ?) then (non)
+  #FFEBEE:Refuser : aucun jour ouvrable;
+  stop
+endif
+
+if (Durée maximale dépassée ?\n(maladie > 2 j, règles > 1 j,\nmaternité > 90 j)) then (oui)
+  #FFEBEE:Refuser : durée maximale dépassée;
+  stop
+endif
+
+switch (Type de congé ?)
+case (décès d'un proche)
+  :Durée fixée à 5 jours;
+case (décès famille)
+  :Durée fixée à 1 jour;
+case (autre)
+  :Durée = jours effectifs calculés;
+endswitch
+
+if (Congé payé ?) then (oui)
+  if (Demandé au moins\n3 × nombre de jours à l'avance ?) then (non)
+    #FFEBEE:Refuser : délai de prévenance;
+    stop
+  endif
+  if (Uniquement des vendredis ?) then (oui)
+    #FFEBEE:Refuser : utiliser un congé sans solde;
+    stop
+  endif
+else (non)
+endif
+
+if (Chevauchement avec un autre congé ?) then (oui)
+  #FFEBEE:Refuser : congé déjà existant;
+  stop
+endif
+
+if (Congé payé et solde insuffisant ?) then (oui)
+  #FFEBEE:Refuser : solde insuffisant;
+  stop
+endif
+
+#E8F5E9:Enregistrer la demande « En attente »;
+stop
+
+@enduml

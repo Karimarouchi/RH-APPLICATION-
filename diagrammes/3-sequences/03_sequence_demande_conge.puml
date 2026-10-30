@@ -1,0 +1,69 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ArrowColor #683B77
+skinparam sequence {
+  LifeLineBorderColor #9C7BAA
+  ParticipantBorderColor #683B77
+  ParticipantBackgroundColor #F7F1FA
+  ActorBorderColor #683B77
+  ActorBackgroundColor #F7F1FA
+  GroupBorderColor #683B77
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+autonumber
+hide footbox
+
+title Diagramme de séquence — Soumettre une demande de congé
+
+actor "Employé" as E
+boundary "Formulaire\nde demande" as UI
+control "Serveur" as S
+database "Base de données" as DB
+actor "Chef de\ndépartement" as CHEF
+
+note over E, DB : Pré-condition : l'employé est authentifié.
+
+E -> UI : Ouvrir « Nouvelle demande »
+UI -> S : Charger les types de congé, le solde,\nles jours fériés et les restrictions
+S -> DB : Lire les données
+DB --> S : Données
+S --> UI : Données
+UI --> E : Afficher le formulaire\n(types filtrés selon le genre)
+
+E -> UI : Choisir le type et les dates
+UI -> S : Calculer les jours effectifs
+S --> UI : Jours ouvrables + jours déduits\n(week-ends et fériés compris)
+UI --> E : Afficher le nombre de jours\net le mini-calendrier
+
+opt Type nécessitant un justificatif
+  E -> UI : Joindre le justificatif
+end
+
+E -> UI : Envoyer la demande
+UI -> S : Créer la demande (+ fichier)
+S -> S : Vérifier les règles\n(dates, solde, chevauchement,\ndurée maximale, type actif…)
+
+alt Une règle n'est pas respectée
+  S --> UI : Message d'erreur précis
+  UI --> E : Afficher l'erreur
+else Demande valide
+  S -> DB : Enregistrer la demande « En attente »
+  opt L'employé a un chef de département
+    S -> DB : Créer l'étape de validation
+    S -> DB : Créer une notification
+    S -->> CHEF : « Demande à valider »
+  end
+  S --> UI : Demande créée
+  UI --> E : Confirmation + retour à « Mes demandes »
+end
+
+note right of S
+  Le solde n'est <b>pas</b> déduit à ce stade :
+  il le sera seulement à l'approbation.
+end note
+
+@enduml

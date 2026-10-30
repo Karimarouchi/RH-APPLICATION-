@@ -12,7 +12,9 @@ export const mediaPlanService = {
     delete: (id: number) => api.delete<ApiResponse<void>>(`/media-plans/${id}`),
     approve: (id: number, managerId: number) => api.patch<ApiResponse<MediaPlan>>(`/media-plans/${id}/approve?managerId=${managerId}`),
     disapprove: (id: number) => api.patch<ApiResponse<MediaPlan>>(`/media-plans/${id}/disapprove`),
-    accept: (id: number, champs: string[]) => api.patch<ApiResponse<MediaPlan>>(`/media-plans/${id}/accept`, { champs }),
+    /** validationClient=false: the manager validates alone and the line is approved directly. */
+    accept: (id: number, champs: string[], validationClient = true) =>
+        api.patch<ApiResponse<MediaPlan>>(`/media-plans/${id}/accept`, { champs, validationClient }),
     refuse: (id: number, rectifs: string) => api.patch<ApiResponse<MediaPlan>>(`/media-plans/${id}/refuse`, { rectifs }),
     renvoyerEmploye: (id: number) => api.patch<ApiResponse<MediaPlan>>(`/media-plans/${id}/renvoyer-employe`),
     shootingsADater: () => api.get<ApiResponse<MediaPlan[]>>('/media-plans/shootings/a-dater'),

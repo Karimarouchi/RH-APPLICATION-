@@ -1,0 +1,60 @@
+@startuml
+!pragma layout smetana
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+skinparam ArrowColor #683B77
+skinparam usecase {
+  BackgroundColor #F7F1FA
+  BorderColor #683B77
+}
+skinparam rectangle {
+  BorderColor #683B77
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+left to right direction
+
+title Cas d'utilisation — Authentification
+
+actor "Utilisateur\n(tout acteur)" as U
+actor "Service e-mail\n<<système>>" as MAIL
+
+rectangle "Authentification" {
+  usecase "Se connecter" as UC1
+  usecase "Changer son mot de passe" as UC2
+  usecase "Réinitialiser un mot de passe\noublié" as UC3
+  usecase "Se déconnecter" as UC4
+}
+
+U --> UC1
+U --> UC2
+U --> UC3
+U --> UC4
+
+UC2 .> UC1 : <<extend>>\n(1ère connexion)
+UC3 --> MAIL
+
+note as N_UC1
+  <b>Se connecter</b>
+  Le compte doit être <b>actif</b>.
+  Le menu affiché dépend des
+  <b>permissions</b> de l'utilisateur.
+end note
+
+note as N_UC2
+  <b>Changer son mot de passe</b>
+  Obligatoire à la première connexion
+  (mot de passe provisoire reçu par e-mail).
+end note
+
+note as N_UC3
+  <b>Réinitialiser un mot de passe oublié</b>
+  Un lien de réinitialisation à durée
+  limitée est envoyé par e-mail.
+end note
+
+@enduml

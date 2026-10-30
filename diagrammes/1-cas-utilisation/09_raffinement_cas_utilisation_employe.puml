@@ -1,0 +1,136 @@
+@startuml
+!pragma layout smetana
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+skinparam ArrowColor #683B77
+skinparam usecase {
+  BackgroundColor #F7F1FA
+  BorderColor #683B77
+}
+skinparam rectangle {
+  BorderColor #683B77
+}
+skinparam package {
+  BorderColor #683B77
+  FontColor #683B77
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+left to right direction
+
+title Raffinement du cas d'utilisation — Rôle Employé
+
+actor "Employé" as EMP
+actor "Logiciel de pointage\ninstallé sur le poste" as POINT
+
+rectangle "Espace personnel de l'employé" {
+
+  package "Accueil" {
+    usecase "Consulter son tableau de bord" as UC1
+    usecase "Voir son solde de congé" as UC1a
+    usecase "Voir ses dernières demandes" as UC1b
+    usecase "Consulter son calendrier\npersonnel" as UC2
+    usecase "Consulter ses notifications" as UC3
+  }
+
+  package "Mes demandes de congé" {
+    usecase "Faire une demande" as UC4
+    usecase "Demander un congé" as UC4a
+    usecase "Demander une autorisation\nde sortie" as UC4b
+    usecase "Demander un télétravail" as UC4c
+    usecase "Joindre un justificatif" as UC5
+    usecase "Suivre ses demandes" as UC6
+    usecase "Modifier une demande\nen attente" as UC6a
+    usecase "Annuler une demande\nen attente" as UC6b
+  }
+
+  package "Mes demandes de documents" {
+    usecase "Demander un document" as UC7
+    usecase "Suivre ses demandes\nde documents" as UC8
+    usecase "Annuler une demande\nde document" as UC8a
+  }
+
+  package "Mon profil" {
+    usecase "Consulter son profil" as UC9
+    usecase "Modifier sa photo\net ses informations" as UC9a
+    usecase "Changer son mot de passe" as UC10
+    usecase "Personnaliser l'affichage\n(thème, police, taille)" as UC11
+  }
+
+  package "Ma présence" {
+    usecase "Installer le logiciel\nde pointage" as UC12
+    usecase "Pointer son arrivée\net son départ" as UC13
+    usecase "Confirmer sa présence" as UC13a
+  }
+}
+
+EMP --> UC1
+EMP --> UC2
+EMP --> UC3
+EMP --> UC4
+EMP --> UC6
+EMP --> UC7
+EMP --> UC8
+EMP --> UC9
+EMP --> UC10
+EMP --> UC11
+EMP --> UC12
+EMP --> UC13
+
+UC1a .> UC1 : <<extend>>
+UC1b .> UC1 : <<extend>>
+
+UC4a -|> UC4
+UC4b -|> UC4
+UC4c -|> UC4
+UC5 .> UC4a : <<extend>>
+
+UC6a .> UC6 : <<extend>>
+UC6b .> UC6 : <<extend>>
+
+UC8a .> UC8 : <<extend>>
+
+UC9a .> UC9 : <<extend>>
+
+UC13a .> UC13 : <<extend>>
+UC13 <-- POINT
+
+note as N_UC5
+  <b>Joindre un justificatif</b>
+  Obligatoire pour un congé maladie,
+  maternité ou décès.
+end note
+
+note as N_UC4
+  <b>Faire une demande</b>
+  L'application vérifie le solde, les jours
+  fériés et les jours où l'employé ne peut
+  pas partir, puis prévient la personne
+  chargée de la validation.
+end note
+
+note as N_UC7
+  <b>Demander un document</b>
+  Attestation de travail, attestation
+  de salaire, fiche de paie,
+  ordre de mission ou autre.
+end note
+
+note as N_UC13
+  <b>Pointer son arrivée et son départ</b>
+  Fait automatiquement par le logiciel
+  installé sur le poste de l'employé.
+end note
+
+note as N1
+  <b>Toutes les actions demandent</b>
+  <b>d'être connecté à son compte.</b>
+  Seules les demandes « en attente »
+  peuvent être modifiées ou annulées.
+end note
+
+@enduml

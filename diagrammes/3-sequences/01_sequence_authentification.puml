@@ -1,0 +1,51 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ArrowColor #683B77
+skinparam sequence {
+  LifeLineBorderColor #9C7BAA
+  ParticipantBorderColor #683B77
+  ParticipantBackgroundColor #F7F1FA
+  ActorBorderColor #683B77
+  ActorBackgroundColor #F7F1FA
+  GroupBorderColor #683B77
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+autonumber
+hide footbox
+
+title Diagramme de séquence — S'authentifier
+
+actor "Utilisateur" as U
+boundary "Page de connexion" as UI
+control "Serveur" as S
+database "Base de données" as DB
+
+U -> UI : Saisir l'identifiant et le mot de passe
+UI -> S : Demande de connexion
+S -> DB : Rechercher le compte
+DB --> S : Compte trouvé (ou non)
+
+alt Identifiant ou mot de passe incorrect
+  S -> DB : Enregistrer « connexion échouée »\ndans le journal d'accès
+  S --> UI : Erreur « Identifiants invalides »
+  UI --> U : Afficher le message d'erreur
+else Compte désactivé
+  S --> UI : Erreur « Compte désactivé »
+  UI --> U : Afficher le message d'erreur
+else Identifiants valides
+  S -> DB : Enregistrer la date de connexion\net « connexion » dans le journal d'accès
+  S -> S : Calculer les permissions effectives
+  S -> S : Générer le jeton de session
+  S --> UI : Jeton + profil + permissions
+  alt Première connexion (mot de passe provisoire)
+    UI --> U : Rediriger vers « Changer le mot de passe »
+  else Connexion normale
+    UI --> U : Afficher le tableau de bord\n(menu adapté aux permissions)
+  end
+end
+
+@enduml

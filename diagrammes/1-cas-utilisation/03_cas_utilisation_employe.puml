@@ -1,0 +1,85 @@
+@startuml
+!pragma layout smetana
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+skinparam ArrowColor #683B77
+skinparam usecase {
+  BackgroundColor #F7F1FA
+  BorderColor #683B77
+}
+skinparam rectangle {
+  BorderColor #683B77
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C9A227
+}
+left to right direction
+
+title Cas d'utilisation — Espace personnel de l'Employé
+
+actor "Employé" as EMP
+actor "Agent Desktop\n<<système>>" as AGENT
+
+rectangle "Mon espace" {
+  usecase "Consulter son tableau de bord\n(solde, demandes, activité)" as UC1
+  usecase "Consulter son calendrier\npersonnel" as UC2
+  usecase "Consulter ses notifications" as UC3
+  usecase "Gérer son profil\n(photo, informations)" as UC4
+
+  usecase "Demander un congé" as UC5
+  usecase "Joindre un justificatif" as UC6
+  usecase "Demander une autorisation\nde sortie (en heures)" as UC7
+  usecase "Demander un télétravail" as UC8
+  usecase "Suivre ses demandes\net son solde de congé" as UC9
+  usecase "Modifier / annuler une\ndemande en attente" as UC10
+
+  usecase "Demander un document\nadministratif" as UC11
+
+  usecase "Pointer sa présence\n(arrivée / départ)" as UC12
+  usecase "Confirmer sa présence" as UC13
+}
+
+EMP --> UC1
+EMP --> UC2
+EMP --> UC3
+EMP --> UC4
+EMP --> UC5
+EMP --> UC7
+EMP --> UC8
+EMP --> UC9
+EMP --> UC10
+EMP --> UC11
+EMP --> UC12
+
+UC6 .> UC5 : <<extend>>
+UC13 .> UC12 : <<extend>>
+UC12 <-- AGENT
+
+note as N_UC6
+  <b>Joindre un justificatif</b>
+  Obligatoire pour : congé maladie,
+  maternité et décès.
+end note
+
+note as N_UC11
+  <b>Demander un document administratif</b>
+  Attestation de travail, attestation
+  de salaire, fiche de paie,
+  ordre de mission, autre.
+end note
+
+note as N_UC12
+  <b>Pointer sa présence (arrivée / départ)</b>
+  Automatique : l'agent installé sur le
+  poste pointe l'arrivée et le départ.
+end note
+
+note as N1
+  <b>Toutes les actions nécessitent</b>
+  <b>une authentification préalable.</b>
+end note
+
+@enduml
