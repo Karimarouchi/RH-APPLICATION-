@@ -71,6 +71,7 @@ const ProjetTachesPage: React.FC = () => {
     // Drag state
     const dragTacheId = useRef<number | null>(null);
     const [dragOverCol, setDragOverCol] = useState<string | null>(null);
+    const [dragError, setDragError] = useState<string | null>(null);
 
     // Create modal — supports multiple tasks queued
     const [showCreate, setShowCreate] = useState(false);
@@ -198,10 +199,15 @@ const ProjetTachesPage: React.FC = () => {
         dragTacheId.current = null;
         // Optimistic update
         setTaches(prev => prev.map(t => t.id === tache.id ? { ...t, statut: colStatut } : t));
+        setDragError(null);
         try {
             await tacheService.changeStatut(tache.id, colStatut);
-        } catch {
-            // Revert on failure
+        } catch (err: any) {
+            // Revert on failure and tell the user why (ex: aucun responsable assigné)
+            setDragError(err?.response?.data?.message
+                || (!tache.assigneeId && colStatut !== StatutTache.TODO
+                    ? `Assignez d'abord un responsable à la tâche "${tache.titre}" (bouton modifier).`
+                    : 'Impossible de changer le statut de la tâche.'));
             loadData();
         }
     };
@@ -426,6 +432,13 @@ const ProjetTachesPage: React.FC = () => {
             <p className="text-theme-xs text-gray-400 italic">
                 💡 Glissez-déposez les cartes pour changer leur statut
             </p>
+
+            {dragError && (
+                <div className="flex items-start justify-between gap-3 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-theme-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+                    <span>{dragError}</span>
+                    <button type="button" onClick={() => setDragError(null)} className="font-bold">×</button>
+                </div>
+            )}
 
             {/* Kanban */}
             {taches.length === 0 ? (
