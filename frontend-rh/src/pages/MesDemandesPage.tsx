@@ -222,6 +222,9 @@ const MesDemandesPage: React.FC = () => {
     return '—';
   };
 
+  /** Une fois validée par le chef (transmise au RH), la demande ne peut plus être modifiée ni annulée. */
+  const canChange = (item: DemandeResponse) => item.statut === 'EN_ATTENTE' && item.decisionChef !== 'APPROUVEE';
+
   const handleCancel = async (id: number) => {
     setActionLoading(true);
     try {
@@ -276,6 +279,17 @@ const MesDemandesPage: React.FC = () => {
       render: (item: DemandeResponse) => (
         <div>
           <Badge text={StatutDemandeLabels[item.statut] || item.statut} variant={statutBadgeMap[item.statut] || 'neutral'} />
+          {item.statut === 'EN_ATTENTE' && item.decisionChef === 'EN_ATTENTE' && (
+            <p className="text-theme-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              {item.chefEnConge ? 'Votre chef est en congé · chez le RH' : 'Chez votre chef'}
+            </p>
+          )}
+          {item.statut === 'EN_ATTENTE' && item.decisionChef === 'APPROUVEE' && (
+            <p className="text-theme-xs text-success-600 dark:text-success-400 mt-0.5">Validée par votre chef · chez le RH</p>
+          )}
+          {item.statut === 'REFUSEE' && item.decisionChef === 'REFUSEE' && (
+            <p className="text-theme-xs text-error-500 mt-0.5">Refusée par votre chef</p>
+          )}
           {item.statut === 'REFUSEE' && item.motifRefus && (
             <p className="text-theme-xs text-error-500 mt-0.5 max-w-[180px] truncate" title={item.motifRefus}>
               Motif : {item.motifRefus}
@@ -304,7 +318,7 @@ const MesDemandesPage: React.FC = () => {
           >
             <HiOutlineEye size={16} />
           </button>
-          {item.statut === 'EN_ATTENTE' && (
+          {canChange(item) && (
             <>
               <button
                 onClick={() => navigate(`/demandes/edit/${item.id}`)}
@@ -475,7 +489,12 @@ const MesDemandesPage: React.FC = () => {
             )}
 
             {/* Actions */}
-            {selectedDemande.statut === 'EN_ATTENTE' && (
+            {selectedDemande.statut === 'EN_ATTENTE' && selectedDemande.decisionChef === 'APPROUVEE' && (
+              <p className="text-theme-sm text-success-600 dark:text-success-400">
+                Validée par votre chef ({selectedDemande.chefValidateurNom}) : elle attend la validation du RH et ne peut plus être modifiée.
+              </p>
+            )}
+            {canChange(selectedDemande) && (
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <Button
                   variant="outline"

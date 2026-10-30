@@ -118,6 +118,14 @@ public class MediaPlanController {
                 mediaPlanService.confirmShootingDate(id, accepte, SecurityUtils.currentEmployeIdOrNull())));
     }
 
+    /** Après un refus du shooting : nouvelle date (au plus tard pour l'employé, exacte pour la Production). */
+    @PatchMapping("/{id}/shooting-replanifier")
+    public ResponseEntity<ApiResponse<MediaPlanDTO>> replanifierShooting(@PathVariable Long id,
+            @RequestBody java.util.Map<String, String> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Shooting replanifié",
+                mediaPlanService.replanifierShooting(id, body.get("date"), SecurityUtils.currentEmployeIdOrNull())));
+    }
+
     @PatchMapping("/{id}/resubmit")
     public ResponseEntity<ApiResponse<MediaPlanDTO>> resubmit(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok("Media plan renvoyé", mediaPlanService.resubmit(id)));

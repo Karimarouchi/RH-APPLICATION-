@@ -429,18 +429,24 @@ const CalendrierCore: React.FC<CoreProps> = ({
             {shootingsADater.map(mp => (
               <div key={mp.id} className="flex flex-wrap items-center gap-3 text-sm">
                 <span className="font-medium text-gray-800 dark:text-gray-100">{mp.titre}</span>
-                <span className="text-gray-500">au plus tard le {mp.shootingAuPlusTard || '-'}</span>
-                <input type="date" max={mp.shootingAuPlusTard || undefined} value={dateDrafts[mp.id] || ''} onChange={e => setDateDrafts(prev => ({ ...prev, [mp.id]: e.target.value }))} className="rounded border px-2 py-1 dark:bg-gray-900" />
+                {mp.shootingReplanifiable
+                  ? <span className="rounded bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600 dark:bg-red-500/10 dark:text-red-400">Date refusée</span>
+                  : <span className="text-gray-500">au plus tard le {mp.shootingAuPlusTard || '-'}</span>}
+                <input type="date" min={mp.shootingReplanifiable ? new Date().toISOString().slice(0, 10) : undefined} max={mp.shootingReplanifiable ? undefined : mp.shootingAuPlusTard || undefined} value={dateDrafts[mp.id] || ''} onChange={e => setDateDrafts(prev => ({ ...prev, [mp.id]: e.target.value }))} className="rounded border px-2 py-1 dark:bg-gray-900" />
                 <button type="button" className="px-3 py-1 rounded bg-brand-500 text-white" onClick={async () => {
                   if (!dateDrafts[mp.id]) return;
                   try {
-                    await mediaPlanService.placeShootingDate(mp.id, dateDrafts[mp.id]);
+                    if (mp.shootingReplanifiable) {
+                      await mediaPlanService.replanifierShooting(mp.id, dateDrafts[mp.id]);
+                    } else {
+                      await mediaPlanService.placeShootingDate(mp.id, dateDrafts[mp.id]);
+                    }
                     showToast('Date enregistrée', 'success');
                     loadShootingsADater();
                   } catch (e: any) {
                     showToast(e.response?.data?.message || 'Date refusée', 'error');
                   }
-                }}>Poser la date</button>
+                }}>{mp.shootingReplanifiable ? 'Planifier une autre date' : 'Poser la date'}</button>
               </div>
             ))}
           </div>

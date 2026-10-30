@@ -493,8 +493,18 @@ public class MediaPlanService {
         return toDTO(mp);
     }
 
+    public MediaPlanDTO replanifierShooting(Long id, String date, Long actorId) {
+        MediaPlan mp = mediaPlanRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("MediaPlan", id));
+        mediaPlanShootingWorkflowService.replanifierShooting(mp, parseLocalDateOrNull(date), actorId);
+        return toDTO(mp);
+    }
+
     public List<MediaPlanDTO> shootingsEnAttenteDate() {
-        return mediaPlanRepository.findByShootingStatus(com.antigone.rh.enums.StatutShooting.EN_ATTENTE_DATE).stream()
+        // Les shootings refusés y figurent aussi : la Production peut leur planifier une autre date.
+        return java.util.stream.Stream.concat(
+                mediaPlanRepository.findByShootingStatus(com.antigone.rh.enums.StatutShooting.EN_ATTENTE_DATE).stream(),
+                mediaPlanRepository.findByShootingStatus(com.antigone.rh.enums.StatutShooting.REJETE).stream())
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -879,6 +889,7 @@ public class MediaPlanService {
                         mp.getShootingTypeDeContenu() != null ? mp.getShootingTypeDeContenu().name() : null)
                 .shootingStatus(mp.getShootingStatus() != null ? mp.getShootingStatus().name() : null)
                 .shootingStatusReason(mp.getShootingStatusReason())
+                .shootingReplanifiable(mp.isShooting() && mp.getShootingStatus() == com.antigone.rh.enums.StatutShooting.REJETE)
                 .calendrierProjetId(mp.getCalendrierProjet() != null ? mp.getCalendrierProjet().getId() : null)
                 .statut(mp.getStatut().name())
                 .clientId(mp.getClient() != null ? mp.getClient().getId() : null)

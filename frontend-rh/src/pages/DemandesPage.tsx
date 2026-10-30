@@ -279,6 +279,27 @@ const DemandesPage: React.FC = () => {
     }
   };
 
+  /** Le chef du département décide d'abord ; la demande n'arrive au RH qu'après son accord. */
+  const renderChefWaiting = (item: DemandeResponse) => {
+    if (!item.chefValidateurNom || !item.decisionChef) return null;
+    if (item.decisionChef === 'REFUSEE') {
+      return <span className="text-theme-xs text-error-500">Refusée par le chef : {item.chefValidateurNom}</span>;
+    }
+    if (item.statut !== 'EN_ATTENTE') return null;
+    if (item.decisionChef === 'APPROUVEE') {
+      return <span className="text-theme-xs text-success-600 dark:text-success-400">Validée par le chef ({item.chefValidateurNom}) · à valider par le RH</span>;
+    }
+    if (item.chefEnConge) {
+      return <span className="text-theme-xs text-warning-600 dark:text-warning-400">Chef en congé ({item.chefValidateurNom}) · à valider par le RH</span>;
+    }
+    return <span className="text-theme-xs text-gray-500 dark:text-gray-400">En attente du chef : {item.chefValidateurNom}</span>;
+  };
+
+  /** Tant que le chef n'a pas décidé, seul lui peut approuver ou refuser (sauf s'il est en congé : le RH tranche). */
+  const canDecide = (item: DemandeResponse) =>
+    item.statut === 'EN_ATTENTE'
+    && (item.decisionChef !== 'EN_ATTENTE' || !!item.chefEnConge || item.chefValidateurId === user?.employeId);
+
   const handleApprove = async (id: number) => {
     if (!user) return;
     setActionLoading(true);
@@ -336,7 +357,7 @@ const DemandesPage: React.FC = () => {
   };
 
   const selectAll = () => {
-    const pendingIds = filtered.filter((d) => d.statut === 'EN_ATTENTE').map((d) => d.id);
+    const pendingIds = filtered.filter(canDecide).map((d) => d.id);
     setSelectedIds(new Set(pendingIds));
   };
 
@@ -402,13 +423,13 @@ const DemandesPage: React.FC = () => {
             label: (
               <input
                 type="checkbox"
-                checked={selectedIds.size > 0 && filtered.filter((d) => d.statut === 'EN_ATTENTE').every((d) => selectedIds.has(d.id))}
+                checked={selectedIds.size > 0 && filtered.filter(canDecide).every((d) => selectedIds.has(d.id))}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => (e.target.checked ? selectAll() : deselectAll())}
                 className="rounded border-gray-300 text-brand-500 focus:ring-brand-500"
               />
             ) as any,
             render: (item: DemandeResponse) =>
-              item.statut === 'EN_ATTENTE' ? (
+              canDecide(item) ? (
                 <input
                   type="checkbox"
                   checked={selectedIds.has(item.id)}
@@ -460,7 +481,10 @@ const DemandesPage: React.FC = () => {
       key: 'statut',
       label: 'Statut',
       render: (item: DemandeResponse) => (
-        <Badge text={StatutDemandeLabels[item.statut] || item.statut} variant={statutBadgeMap[item.statut] || 'neutral'} />
+        <div className="flex flex-col items-start gap-1">
+          <Badge text={StatutDemandeLabels[item.statut] || item.statut} variant={statutBadgeMap[item.statut] || 'neutral'} />
+          {renderChefWaiting(item)}
+        </div>
       ),
     },
     {
@@ -475,7 +499,7 @@ const DemandesPage: React.FC = () => {
           >
             <HiOutlineEye size={16} />
           </button>
-          {canViewDemandes && item.statut === 'EN_ATTENTE' && (
+          {canViewDemandes && canDecide(item) && (
             <>
               <button
                 onClick={() => handleApprove(item.id)}
@@ -617,6 +641,7 @@ const DemandesPage: React.FC = () => {
                   text={StatutDemandeLabels[selectedDemande.statut] || selectedDemande.statut}
                   variant={statutBadgeMap[selectedDemande.statut] || 'neutral'}
                 />
+                <div className="mt-1">{renderChefWaiting(selectedDemande)}</div>
               </div>
               <div>
                 <p className="text-theme-xs text-gray-500 dark:text-gray-400">Employé</p>
@@ -696,7 +721,7 @@ const DemandesPage: React.FC = () => {
             </div>
 
             {/* Admin actions in modal */}
-            {canViewDemandes && selectedDemande.statut === 'EN_ATTENTE' && (
+            {canViewDemandes && canDecide(selectedDemande) && (
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <Button
                   variant="outline"

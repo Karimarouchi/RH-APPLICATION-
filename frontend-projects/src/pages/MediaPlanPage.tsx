@@ -589,6 +589,8 @@ const MediaPlanPage: React.FC = () => {
     const [availableShootingDates, setAvailableShootingDates] = useState<string[]>([]);
     const [isAvailabilityRestricted, setIsAvailabilityRestricted] = useState(false);
     const [availabilityLoading, setAvailabilityLoading] = useState(false);
+    const [replanDates, setReplanDates] = useState<Record<number, string>>({});
+    const [replanningId, setReplanningId] = useState<number | null>(null);
 
     const shootingMonthRange = useMemo(() => {
         const { year, month } = parseMonthKey(selectedMonth);
@@ -1111,6 +1113,22 @@ const MediaPlanPage: React.FC = () => {
 
     const isReadOnly = (mp: MediaPlan) => mp.statut !== 'DESAPPROUVE' || !!mp.retourManager;
 
+    /** Shooting refusé par la Production : on redonne une date au plus tard, la Production est prévenue. */
+    const handleReplanifierShooting = async (mp: MediaPlan) => {
+        const date = replanDates[mp.id];
+        if (!date) return alert('Choisissez la nouvelle date du shooting.');
+        setReplanningId(mp.id);
+        try {
+            await mediaPlanService.replanifierShooting(mp.id, date);
+            setReplanDates(prev => { const next = { ...prev }; delete next[mp.id]; return next; });
+            await loadData();
+        } catch (e: any) {
+            alert(e.response?.data?.message || 'Impossible de replanifier le shooting');
+        } finally {
+            setReplanningId(null);
+        }
+    };
+
     const inputClass = (ro?: boolean) => `mp-field ${ro ? 'mp-field-ro' : ''}`;
     const selectClass = (ro?: boolean) => `mp-field ${ro ? 'mp-field-ro pointer-events-none' : ''}`;
 
@@ -1457,6 +1475,29 @@ const MediaPlanPage: React.FC = () => {
                                     {mp.shootingStatus === StatutShooting.REJETE && mp.shootingStatusReason && (
                                         <span className="text-xs text-red-600 dark:text-red-400">({mp.shootingStatusReason})</span>
                                     )}
+                                </div>
+                            )}
+                            {mp.shootingReplanifiable && (
+                                <div className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-500/30 dark:bg-red-500/10">
+                                    <div>
+                                        <label className="block text-[11px] font-semibold text-red-700 dark:text-red-300 mb-1">Nouvelle date au plus tard</label>
+                                        <input
+                                            type="date"
+                                            min={new Date().toISOString().slice(0, 10)}
+                                            value={replanDates[mp.id] || ''}
+                                            onChange={e => setReplanDates(prev => ({ ...prev, [mp.id]: e.target.value }))}
+                                            className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm text-gray-800 dark:text-gray-200"
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        disabled={replanningId === mp.id || !replanDates[mp.id]}
+                                        onClick={() => handleReplanifierShooting(mp)}
+                                        className="rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                                    >
+                                        {replanningId === mp.id ? 'Envoi…' : 'Planifier une autre date'}
+                                    </button>
+                                    <p className="w-full text-[11px] text-red-700/80 dark:text-red-300/80">La Production sera prévenue par une notification pour poser la nouvelle date.</p>
                                 </div>
                             )}
                             </div>

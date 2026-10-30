@@ -243,6 +243,7 @@ import DataTable from '../components/ui/DataTable';
 import Badge from '../components/ui/Badge';
 import { API_BASE } from '../api/axios';
 import { useConfirm } from '../hooks/useConfirm';
+import { formatGenreLabel, matchGenreOption, sameGenre } from '../utils/genre';
 
 
 
@@ -516,7 +517,7 @@ const EmployesPage: React.FC = () => {
       salaire: employe.salaire ?? '',
       dateEmbauche: employe.dateEmbauche || '',
       soldeConge: employe.soldeConge, poste: employe.poste || '',
-      typeContrat: employe.typeContrat || '', dateFinContrat: employe.dateFinContrat || '', genre: employe.genre || '',
+      typeContrat: employe.typeContrat || '', dateFinContrat: employe.dateFinContrat || '', genre: matchGenreOption(employe.genre, genres.map((g) => g.libelle)),
       departement: employe.departement || '', ribBancaire: employe.ribBancaire || '',
       managerId: employe.managerId, managerDepartement: !!employe.managerDepartement,
       useInitialSolde: employe.soldeCongeInitial != null, soldeCongeInitial: employe.soldeCongeInitial ?? '',
@@ -734,7 +735,7 @@ const EmployesPage: React.FC = () => {
 
       if (filters.departement && e.departement !== filters.departement) return false;
       if (filters.typeContrat && e.typeContrat !== filters.typeContrat) return false;
-      if (filters.genre && e.genre !== filters.genre) return false;
+      if (filters.genre && !sameGenre(e.genre, filters.genre)) return false;
       if (filters.poste && e.poste !== filters.poste) return false;
       if (filters.dateEmbaucheFrom && (!e.dateEmbauche || e.dateEmbauche < filters.dateEmbaucheFrom)) return false;
       if (filters.dateEmbaucheTo && (!e.dateEmbauche || e.dateEmbauche > filters.dateEmbaucheTo)) return false;
@@ -774,7 +775,7 @@ const EmployesPage: React.FC = () => {
           )}
           <div>
             <span className="font-medium">{item.prenom} {item.nom}</span>
-            {item.genre && <span className="text-theme-xs text-gray-400 ml-1">({item.genre})</span>}
+            {item.genre && <span className="text-theme-xs text-gray-400 ml-1">({formatGenreLabel(item.genre)})</span>}
           </div>
         </div>
       ),
@@ -952,7 +953,7 @@ const EmployesPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <DistributionCard title="Par département" data={stats.parDepartement} />
             <DistributionCard title="Par type de contrat" data={stats.parTypeContrat} />
-            <DistributionCard title="Par genre" data={stats.parGenre} />
+            <DistributionCard title="Par genre" data={Object.fromEntries(Object.entries(stats.parGenre).map(([g, n]) => [formatGenreLabel(g), n]))} />
           </div>
         </div>
       )}
@@ -1527,7 +1528,7 @@ const EmployesPage: React.FC = () => {
               <div>
                 <h3 className="text-lg font-bold text-gray-800 dark:text-white">{viewingEmploye.prenom} {viewingEmploye.nom}</h3>
                 <p className="text-theme-sm text-gray-500 dark:text-gray-400">{viewingEmploye.matricule}</p>
-                {viewingEmploye.genre && <p className="text-theme-xs text-gray-400 mt-0.5">{viewingEmploye.genre}</p>}
+                {viewingEmploye.genre && <p className="text-theme-xs text-gray-400 mt-0.5">{formatGenreLabel(viewingEmploye.genre)}</p>}
               </div>
             </div>
 
@@ -1550,6 +1551,7 @@ const EmployesPage: React.FC = () => {
                 <div className="col-span-2 mb-1">
                   <h4 className="text-theme-sm font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-1">Informations personnelles</h4>
                 </div>
+                <InfoRow label="Genre" value={viewingEmploye.genre ? formatGenreLabel(viewingEmploye.genre) : null} />
                 <InfoRow label="CIN" value={viewingEmploye.cin} />
                 <InfoRow label="CNSS" value={viewingEmploye.cnss} />
                 <InfoRow label="Email" value={viewingEmploye.email} />

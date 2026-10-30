@@ -72,4 +72,8 @@ public interface CongeRepository extends JpaRepository<Conge, Long> {
      */
     @Query("SELECT DISTINCT c.employe.id FROM Conge c WHERE c.statut = com.antigone.rh.enums.StatutDemande.APPROUVEE AND c.dateDebut <= :date AND c.dateFin >= :date")
     List<Long> findEmployeIdsOnLeave(@Param("date") LocalDate date);
+
+    /** L'employé a-t-il un congé approuvé qui couvre cette date ? */
+    @Query("SELECT COUNT(c) > 0 FROM Conge c WHERE c.employe.id = :employeId AND c.statut = com.antigone.rh.enums.StatutDemande.APPROUVEE AND c.dateDebut <= :date AND c.dateFin >= :date")
+    boolean isOnApprovedLeave(@Param("employeId") Long employeId, @Param("date") LocalDate date);
 }

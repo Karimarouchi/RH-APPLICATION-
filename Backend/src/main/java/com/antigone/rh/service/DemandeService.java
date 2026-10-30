@@ -38,6 +38,12 @@ public class DemandeService {
 
     private static final int DEFAULT_MAX_AUTORISATION_MINUTES = 120; // 2h par mois
 
+    /**
+     * Validation en deux temps : le chef du département décide d'abord (étape d'ordre 1).
+     * S'il approuve, la demande passe au RH qui donne la validation finale ; s'il refuse, elle est refusée.
+     */
+    private static final int ORDRE_CHEF = 1;
+
     // Mapping DayOfWeek → French day names used in HoraireTravail.joursTravail
     private static final Map<DayOfWeek, String> DOW_TO_FRENCH = Map.of(
             DayOfWeek.MONDAY, "LUNDI",
@@ -127,10 +133,24 @@ public class DemandeService {
         if (chef == null || chef.getId().equals(employe.getId())) {
             return;
         }
+        // Chef en congé : la demande part directement au RH.
+        if (isChefOnLeave(chef)) {
+            saveHistorique(saved, StatutDemande.EN_ATTENTE, StatutDemande.EN_ATTENTE, employe,
+                    "Chef de département (" + nomComplet(chef) + ") en congé : demande transmise directement au RH");
+            for (Employe rh : findRhValidators()) {
+                if (!rh.getId().equals(employe.getId())) {
+                    notificationService.create(rh, "Demande à finaliser",
+                            nomComplet(employe) + " a envoyé une demande. Son chef de département ("
+                                    + nomComplet(chef) + ") est en congé : la validation vous revient directement.",
+                            saved);
+                }
+            }
+            return;
+        }
         validationRepository.save(Validation.builder()
                 .demande(saved)
                 .validateur(chef)
-                .ordre(1)
+                .ordre(ORDRE_CHEF)
                 .decision(DecisionValidation.EN_ATTENTE)
                 .build());
         String nom = ((employe.getPrenom() != null ? employe.getPrenom() : "") + " "
@@ -150,6 +170,95 @@ public class DemandeService {
                 .filter(e -> e.getDepartement() != null && e.getDepartement().trim().toLowerCase().equals(key))
                 .findFirst()
                 .orElse(null);
+    }
+
+    /**
+     * Étape du chef encore ouverte. Si le chef a changé depuis l'envoi, l'étape passe au chef actuel
+     * (ou disparaît s'il n'y en a plus) pour ne jamais bloquer la demande.
+     */
+    private Validation pendingChefStep(Demande demande) {
+        Validation step = validationRepository.findByDemandeId(demande.getId()).stream()
+                .filter(v -> v.getOrdre() != null && v.getOrdre() == ORDRE_CHEF)
+                .filter(v -> v.getDecision() == DecisionValidation.EN_ATTENTE)
+                .findFirst()
+                .orElse(null);
+        if (step == null) {
+            return null;
+        }
+        Employe employe = demande.getEmploye();
+        Employe chef = findDepartmentHead(employe.getDepartement());
+        if (chef != null && chef.getId().equals(step.getValidateur().getId())) {
+            // Chef en congé : son étape reste ouverte (il la retrouve à son retour) mais le RH peut trancher.
+            return isChefOnLeave(chef) ? null : step;
+        }
+        if (chef == null || chef.getId().equals(employe.getId())) {
+            validationRepository.delete(step);
+            return null;
+        }
+        step.setValidateur(chef);
+        validationRepository.save(step);
+        return isChefOnLeave(chef) ? null : step;
+    }
+
+    /** Le chef a un congé approuvé aujourd'hui : ses demandes à valider reviennent au RH. */
+    private boolean isChefOnLeave(Employe chef) {
+        return congeRepository.isOnApprovedLeave(chef.getId(), LocalDate.now());
+    }
+
+    /** Le RH tranche à la place d'un chef absent : l'étape du chef n'a plus lieu d'être. */
+    private boolean dropAbsentChefStep(Demande demande) {
+        List<Validation> open = validationRepository.findByDemandeId(demande.getId()).stream()
+                .filter(v -> v.getOrdre() != null && v.getOrdre() == ORDRE_CHEF)
+                .filter(v -> v.getDecision() == DecisionValidation.EN_ATTENTE)
+                .collect(Collectors.toList());
+        validationRepository.deleteAll(open);
+        return !open.isEmpty();
+    }
+
+    /** Dernière décision du chef sur cette demande (en attente, approuvée ou refusée), null s'il n'y a pas de chef. */
+    private Validation chefStep(Demande demande) {
+        return validationRepository.findByDemandeId(demande.getId()).stream()
+                .filter(v -> v.getOrdre() != null && v.getOrdre() == ORDRE_CHEF)
+                .max(Comparator.comparing(Validation::getId))
+                .orElse(null);
+    }
+
+    private boolean isApprovedByChef(Demande demande) {
+        Validation step = chefStep(demande);
+        return step != null && step.getDecision() == DecisionValidation.APPROUVEE;
+    }
+
+    /** Une fois le chef passé, l'employé ne peut plus toucher à sa demande (le RH, lui, garde la main). */
+    private void assertEmployeeMayChange(Demande demande, String action) {
+        Long actorId = SecurityUtils.currentEmployeIdOrNull();
+        boolean byOwner = actorId != null && actorId.equals(demande.getEmploye().getId());
+        if (byOwner && isApprovedByChef(demande)) {
+            throw new RuntimeException("Votre chef de département a déjà validé cette demande : elle ne peut plus être "
+                    + action + ".");
+        }
+    }
+
+    private void decideChefStep(Validation step, DecisionValidation decision, String commentaire) {
+        step.setDecision(decision);
+        step.setDateValidation(LocalDateTime.now());
+        if (commentaire != null && !commentaire.isBlank()) {
+            step.setCommentaire(commentaire);
+        }
+        validationRepository.save(step);
+    }
+
+    /** Ceux qui donnent la validation finale : le RH (VIEW_DEMANDES) et l'administrateur. */
+    private static boolean isFinalValidator() {
+        return SecurityUtils.isAdmin() || SecurityUtils.hasAnyAuthority("VIEW_DEMANDES");
+    }
+
+    private List<Employe> findRhValidators() {
+        List<Employe> rh = employeRepository.findByPermissionExplicite("VIEW_DEMANDES");
+        return rh.isEmpty() ? employeRepository.findByPermission("VIEW_DEMANDES") : rh;
+    }
+
+    private static String nomComplet(Employe e) {
+        return ((e.getPrenom() != null ? e.getPrenom() : "") + " " + (e.getNom() != null ? e.getNom() : "")).trim();
     }
 
     /** Ceux qui traitent toutes les demandes (VIEW_DEMANDES) valident tout. Sinon, seul le chef du département de l'employé. */
@@ -408,6 +517,7 @@ public class DemandeService {
         if (demande.getStatut() != StatutDemande.EN_ATTENTE) {
             throw new RuntimeException("Seules les demandes en attente peuvent être modifiées");
         }
+        assertEmployeeMayChange(demande, "modifiée");
 
         demande.setRaison(request.getRaison());
 
@@ -531,6 +641,38 @@ public class DemandeService {
             throw new org.springframework.security.access.AccessDeniedException("Auto-approbation interdite");
         }
 
+        // 1re étape : le chef du département. Son accord transmet la demande au RH, sans la clôturer.
+        Validation pending = pendingChefStep(demande);
+        if (pending != null) {
+            Employe chef = pending.getValidateur();
+            if (!chef.getId().equals(adminEmployeId)) {
+                throw new RuntimeException("Le chef de département (" + nomComplet(chef)
+                        + ") doit d'abord valider cette demande");
+            }
+            decideChefStep(pending, DecisionValidation.APPROUVEE, null);
+            saveHistorique(demande, StatutDemande.EN_ATTENTE, StatutDemande.EN_ATTENTE, chef,
+                    "Validée par le chef de département (" + nomComplet(chef) + "), transmise au RH");
+            notificationService.create(demande.getEmploye(), "Demande transmise au RH",
+                    "Votre chef de département " + nomComplet(chef)
+                            + " a validé votre demande. Elle attend maintenant la validation du RH.",
+                    demande);
+            for (Employe rh : findRhValidators()) {
+                if (!rh.getId().equals(demande.getEmploye().getId())) {
+                    notificationService.create(rh, "Demande à finaliser",
+                            nomComplet(chef) + " (chef de département) a validé la demande de "
+                                    + nomComplet(demande.getEmploye()) + ". Elle attend votre validation finale.",
+                            demande);
+                }
+            }
+            return toResponse(demande);
+        }
+        // 2e étape (ou demande sans chef, ou chef en congé) : la validation finale revient au RH.
+        if (!isFinalValidator()) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "La validation finale de cette demande revient au RH");
+        }
+        boolean chefAbsent = dropAbsentChefStep(demande);
+
         StatutDemande ancien = demande.getStatut();
         demande.setStatut(StatutDemande.APPROUVEE);
         demandeRepository.save(demande);
@@ -544,7 +686,8 @@ public class DemandeService {
             employeRepository.save(employe);
         }
 
-        saveHistorique(demande, ancien, StatutDemande.APPROUVEE, admin);
+        saveHistorique(demande, ancien, StatutDemande.APPROUVEE, admin,
+                chefAbsent ? "Chef de département en congé : validée directement par le RH" : null);
 
         // Send notification to the employee
         String typeLabel = demande.getType().name();
@@ -572,12 +715,32 @@ public class DemandeService {
         }
         assertDepartmentValidator(demande.getEmploye());
 
+        // Tant que le chef n'a pas décidé, lui seul peut refuser ; son refus clôt la demande.
+        Validation pending = pendingChefStep(demande);
+        boolean refusParChef = pending != null;
+        if (pending != null) {
+            if (!pending.getValidateur().getId().equals(adminEmployeId)) {
+                throw new RuntimeException("Le chef de département (" + nomComplet(pending.getValidateur())
+                        + ") doit d'abord se prononcer sur cette demande");
+            }
+            decideChefStep(pending, DecisionValidation.REFUSEE, commentaire);
+        } else if (!isFinalValidator()) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "La décision finale sur cette demande revient au RH");
+        }
+        boolean chefAbsent = pending == null && dropAbsentChefStep(demande);
+
         StatutDemande ancien = demande.getStatut();
         demande.setStatut(StatutDemande.REFUSEE);
         demande.setMotifRefus(commentaire);
         demandeRepository.save(demande);
 
-        saveHistorique(demande, ancien, StatutDemande.REFUSEE, admin, commentaire);
+        String trace = refusParChef ? "Refusée par le chef de département"
+                : chefAbsent ? "Chef de département en congé : refusée directement par le RH" : null;
+        if (commentaire != null && !commentaire.isBlank()) {
+            trace = trace != null ? trace + " : " + commentaire : commentaire;
+        }
+        saveHistorique(demande, ancien, StatutDemande.REFUSEE, admin, trace);
 
         // Send notification to the employee with motif
         String typeLabel = demande.getType().name();
@@ -606,6 +769,11 @@ public class DemandeService {
         if (demande.getStatut() != StatutDemande.EN_ATTENTE) {
             throw new RuntimeException("Seules les demandes en attente peuvent être annulées");
         }
+        assertEmployeeMayChange(demande, "annulée");
+        // Le chef n'a plus rien à valider.
+        validationRepository.findByDemandeId(demande.getId()).stream()
+                .filter(v -> v.getDecision() == DecisionValidation.EN_ATTENTE)
+                .forEach(validationRepository::delete);
 
         StatutDemande ancien = demande.getStatut();
         demande.setStatut(StatutDemande.ANNULEE);
@@ -921,6 +1089,17 @@ public class DemandeService {
                 .motifRefus(demande.getMotifRefus())
                 .employeId(demande.getEmploye().getId())
                 .employeNom(demande.getEmploye().getNom() + " " + demande.getEmploye().getPrenom());
+
+        if (demande.getId() != null) {
+            Validation step = chefStep(demande);
+            if (step != null) {
+                builder.chefValidateurId(step.getValidateur().getId())
+                        .chefValidateurNom(nomComplet(step.getValidateur()))
+                        .decisionChef(step.getDecision().name())
+                        .chefEnConge(step.getDecision() == DecisionValidation.EN_ATTENTE
+                                && isChefOnLeave(step.getValidateur()));
+            }
+        }
 
         if (demande instanceof Conge conge) {
             builder.dateDebut(conge.getDateDebut());

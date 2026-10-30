@@ -194,7 +194,8 @@ public class SecurityConfig {
                                                 .hasAnyAuthority(ADMIN, "VALIDATE_SHOOTING", "VIEW_MEDIA_PLAN", "VIEW_TOUS_MEDIA_PLAN")
                                                 .requestMatchers(HttpMethod.PATCH, "/api/media-plans/*/shooting-date")
                                                 .hasAnyAuthority(ADMIN, "VALIDATE_SHOOTING")
-                                                .requestMatchers(HttpMethod.PATCH, "/api/media-plans/*/shooting-date-confirm")
+                                                .requestMatchers(HttpMethod.PATCH, "/api/media-plans/*/shooting-date-confirm",
+                                                                "/api/media-plans/*/shooting-replanifier")
                                                 .authenticated()
                                                 // --- Media plans : ecriture interne ---
                                                 .requestMatchers(HttpMethod.POST, "/api/media-plans", "/api/media-plans/**")

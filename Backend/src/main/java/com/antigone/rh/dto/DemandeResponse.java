@@ -25,6 +25,14 @@ public class DemandeResponse {
     private Long employeId;
     private String employeNom;
 
+    /** Chef de département qui valide en premier (null si la demande va directement au RH). */
+    private Long chefValidateurId;
+    private String chefValidateurNom;
+    /** Décision du chef : EN_ATTENTE, APPROUVEE (transmise au RH) ou REFUSEE. */
+    private String decisionChef;
+    /** Le chef attendu est en congé aujourd'hui : le RH peut décider à sa place. */
+    private Boolean chefEnConge;
+
     // For Conge
     private String typeConge;
     private String typeCongeLabel;

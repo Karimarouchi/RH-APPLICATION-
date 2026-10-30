@@ -106,7 +106,10 @@ public class CalendrierProjetService {
         // If this slot is linked to a MediaPlan shooting line, propagate status and trigger project creation.
         mediaPlanShootingWorkflowService.onCalendrierSlotStatusUpdated(slot);
 
-        if(slot.getSocialManager() != null) {
+        // Un shooting refusé a déjà sa propre notification (avec l'invitation à replanifier).
+        boolean shootingRefuse = slot.getMediaPlanLigne() != null
+                && slot.getStatut() == CalendrierProjet.SlotStatus.REJETE;
+        if(slot.getSocialManager() != null && !shootingRefuse) {
             String message = "La planification pour le projet '" + slot.getProjectName() + "' a été " + newStatus;
             notificationService.create(slot.getSocialManager(), "REPONSE_PLANIFICATION", message, null);
         }

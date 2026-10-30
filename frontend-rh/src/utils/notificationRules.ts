@@ -109,6 +109,14 @@ export const getNotificationTarget = (notif: NotificationResponse): Notification
   const mediaPlanTarget = getMediaPlanTarget(notif, text);
   if (mediaPlanTarget) return mediaPlanTarget;
 
+  // Circuit des demandes : le chef valide d'abord, puis le RH (titres envoyés par DemandeService).
+  const titre = normalizeText(notif.titre || '');
+  if (titre === 'demande a finaliser') return { kind: 'rh', path: '/demandes' };
+  if (titre === 'demande a valider') return { kind: 'rh', path: '/validations' };
+  if (titre === 'demande transmise au rh' || titre === 'demande approuvee' || titre === 'demande refusee') {
+    return { kind: 'rh', path: '/mes-demandes' };
+  }
+
   const isReunion =
     Boolean(notif.reunionId) ||
     text.includes('reunion') ||

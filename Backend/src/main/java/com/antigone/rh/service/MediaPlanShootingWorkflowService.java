@@ -178,18 +178,82 @@ public class MediaPlanShootingWorkflowService {
             mp.setShootingStatusReason(null);
             createShootingProjectIfMissing(mp, slot);
         } else if (slot.getStatut() == CalendrierProjet.SlotStatus.REJETE) {
+            boolean dejaRefuse = mp.getShootingStatus() == StatutShooting.REJETE;
             mp.setShootingStatus(StatutShooting.REJETE);
             mp.setShootingStatusReason("Date de shooting n'est pas validé");
 
             // Head Prod refusal should behave like a disapproval in manager views.
             // This mirrors the existing MediaPlan disapprove behavior.
+            if (mp.getStatut() != StatutMediaPlan.DESAPPROUVE) {
+                mp.setStatutAvantRefusShooting(mp.getStatut());
+            }
             mp.setStatut(StatutMediaPlan.DESAPPROUVE);
+            if (!dejaRefuse && mp.getCreateur() != null) {
+                notificationService.create(mp.getCreateur(), "MEDIA_PLAN_REFUS",
+                        "La date du shooting '" + nullToEmpty(mp.getTitre())
+                                + "' a été refusée par la Production. Planifiez une autre date depuis votre media plan.",
+                        null);
+            }
         } else if (slot.getStatut() == CalendrierProjet.SlotStatus.EN_ATTENTE) {
             mp.setShootingStatus(StatutShooting.EN_ATTENTE);
             mp.setShootingStatusReason(null);
         }
 
         mediaPlanRepository.save(mp);
+    }
+
+    /**
+     * Shooting refusé : l'employé (ou son manager) redonne une date au plus tard et la Production
+     * est prévenue ; la Production peut aussi poser directement la nouvelle date exacte.
+     */
+    public void replanifierShooting(MediaPlan mp, LocalDate date, Long actorId) {
+        if (mp == null || !mp.isShooting()) {
+            throw new RuntimeException("Cette ligne n'est pas un shooting");
+        }
+        if (mp.getShootingStatus() != StatutShooting.REJETE) {
+            throw new RuntimeException("Seul un shooting refusé peut être replanifié");
+        }
+        if (date == null) {
+            throw new RuntimeException("La nouvelle date est obligatoire");
+        }
+        if (date.isBefore(LocalDate.now())) {
+            throw new RuntimeException("La nouvelle date ne peut pas être dans le passé");
+        }
+        Employe createur = mp.getCreateur();
+        boolean owner = createur != null && actorId != null
+                && (actorId.equals(createur.getId())
+                        || (createur.getManager() != null && actorId.equals(createur.getManager().getId())));
+        boolean production = !owner && (com.antigone.rh.security.SecurityUtils.isAdmin()
+                || com.antigone.rh.security.SecurityUtils.hasAnyAuthority("VALIDATE_SHOOTING"));
+        if (!owner && !production) {
+            throw new RuntimeException("Seul l'employé du média plan, son manager ou la Production peut replanifier");
+        }
+
+        mp.setStatut(mp.getStatutAvantRefusShooting() != null ? mp.getStatutAvantRefusShooting() : StatutMediaPlan.APPROUVE);
+        mp.setStatutAvantRefusShooting(null);
+        mp.setShootingDate(null);
+        mp.setShootingStatus(StatutShooting.EN_ATTENTE_DATE);
+        mp.setShootingStatusReason(null);
+
+        if (production) {
+            if (mp.getShootingAuPlusTard() == null || date.isAfter(mp.getShootingAuPlusTard())) {
+                mp.setShootingAuPlusTard(date);
+            }
+            mediaPlanRepository.save(mp);
+            // Prévient l'employé (et le client si sa validation est demandée).
+            placeShootingDate(mp, date, actorId);
+            return;
+        }
+
+        mp.setShootingAuPlusTard(date);
+        mediaPlanRepository.save(mp);
+        Employe actor = employeRepository.findById(actorId).orElse(createur);
+        String actorName = (nullToEmpty(actor.getPrenom()) + " " + nullToEmpty(actor.getNom())).trim();
+        String message = actorName + " a replanifié le shooting '" + nullToEmpty(mp.getTitre())
+                + "' (date refusée) : nouvelle date au plus tard le " + date + ". Posez la date dans le calendrier.";
+        for (Employe validator : findShootingValidators()) {
+            notificationService.create(validator, "SHOOTING_DATE", message, null);
+        }
     }
 
     private static void requireShootingValidator() {

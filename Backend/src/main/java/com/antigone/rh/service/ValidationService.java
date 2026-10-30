@@ -14,7 +14,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -25,6 +24,7 @@ public class ValidationService {
     private final ValidationRepository validationRepository;
     private final DemandeRepository demandeRepository;
     private final EmployeRepository employeRepository;
+    private final DemandeService demandeService;
 
     public List<Validation> findByDemande(Long demandeId) {
         return validationRepository.findByDemandeIdOrderByOrdreAsc(demandeId);
@@ -59,64 +59,32 @@ public class ValidationService {
         return validationRepository.save(validation);
     }
 
+    /** Le chef décide via sa page : même traitement que le RH (solde, historique, notification). */
     public Validation approve(Long validationId, String commentaire) {
-        Validation validation = validationRepository.findById(validationId)
-                .orElseThrow(() -> new RuntimeException("Validation non trouvée"));
-        if (!SecurityUtils.isAdmin()
-                && !validation.getValidateur().getId().equals(SecurityUtils.currentEmployeIdOrNull())) {
-            throw new org.springframework.security.access.AccessDeniedException("Vous n'etes pas le validateur designe");
+        Validation validation = findOwnPendingStep(validationId);
+        demandeService.approve(validation.getDemande().getId(), validation.getValidateur().getId());
+        if (commentaire != null && !commentaire.isBlank()) {
+            validation.setCommentaire(commentaire);
         }
-
-        if (validation.getDecision() != DecisionValidation.EN_ATTENTE) {
-            throw new RuntimeException("Cette validation a déjà été traitée");
-        }
-
-        validation.setDecision(DecisionValidation.APPROUVEE);
-        validation.setDateValidation(LocalDateTime.now());
-        validation.setCommentaire(commentaire);
-        validationRepository.save(validation);
-
-        checkAndUpdateDemandeStatut(validation.getDemande().getId());
-
-        return validation;
+        return validationRepository.save(validation);
     }
 
     public Validation refuse(Long validationId, String commentaire) {
+        Validation validation = findOwnPendingStep(validationId);
+        demandeService.refuse(validation.getDemande().getId(), validation.getValidateur().getId(), commentaire);
+        return validation;
+    }
+
+    private Validation findOwnPendingStep(Long validationId) {
         Validation validation = validationRepository.findById(validationId)
                 .orElseThrow(() -> new RuntimeException("Validation non trouvée"));
         if (!SecurityUtils.isAdmin()
                 && !validation.getValidateur().getId().equals(SecurityUtils.currentEmployeIdOrNull())) {
             throw new org.springframework.security.access.AccessDeniedException("Vous n'etes pas le validateur designe");
         }
-
         if (validation.getDecision() != DecisionValidation.EN_ATTENTE) {
             throw new RuntimeException("Cette validation a déjà été traitée");
         }
-
-        validation.setDecision(DecisionValidation.REFUSEE);
-        validation.setDateValidation(LocalDateTime.now());
-        validation.setCommentaire(commentaire);
-        validationRepository.save(validation);
-
-        Demande demande = demandeRepository.findById(validation.getDemande().getId())
-                .orElseThrow(() -> new RuntimeException("Demande non trouvée"));
-        demande.setStatut(StatutDemande.REFUSEE);
-        demandeRepository.save(demande);
-
         return validation;
-    }
-
-    private void checkAndUpdateDemandeStatut(Long demandeId) {
-        List<Validation> validations = validationRepository.findByDemandeIdOrderByOrdreAsc(demandeId);
-
-        boolean allApproved = validations.stream()
-                .allMatch(v -> v.getDecision() == DecisionValidation.APPROUVEE);
-
-        if (allApproved && !validations.isEmpty()) {
-            Demande demande = demandeRepository.findById(demandeId)
-                    .orElseThrow(() -> new RuntimeException("Demande non trouvée"));
-            demande.setStatut(StatutDemande.APPROUVEE);
-            demandeRepository.save(demande);
-        }
     }
 }

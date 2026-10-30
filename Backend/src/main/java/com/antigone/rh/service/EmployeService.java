@@ -143,8 +143,9 @@ public class EmployeService {
             dto.setRibBancaire(null);
         if (dto.getGenre() != null && dto.getGenre().trim().isEmpty())
             dto.setGenre(null);
+        // Gardé tel que choisi dans la liste (ex. « Féminin ») pour que le formulaire le retrouve.
         if (dto.getGenre() != null)
-            dto.setGenre(dto.getGenre().trim().toUpperCase());
+            dto.setGenre(dto.getGenre().trim());
         if (dto.getPoste() != null && dto.getPoste().trim().isEmpty())
             dto.setPoste(null);
         if (dto.getTypeContrat() != null && dto.getTypeContrat().trim().isEmpty())
@@ -326,8 +327,13 @@ public class EmployeService {
         employe.setGenre(dto.getGenre());
         employe.setDepartement(dto.getDepartement());
         employe.setRibBancaire(dto.getRibBancaire());
-        employe.setImageUrl(dto.getImageUrl());
-        employe.setLienDrive(dto.getLienDrive());
+        // La photo et le lien Drive ont leurs propres envois : le formulaire ne les renvoie pas.
+        if (dto.getImageUrl() != null) {
+            employe.setImageUrl(dto.getImageUrl());
+        }
+        if (dto.getLienDrive() != null) {
+            employe.setLienDrive(dto.getLienDrive());
+        }
         Employe ancienManager = employe.getManager();
         if (dto.getManagerId() != null) {
             Employe manager = employeRepository.findById(dto.getManagerId())
@@ -913,7 +919,11 @@ public class EmployeService {
 
         Map<String, Long> parGenre = all.stream()
                 .filter(e -> e.getGenre() != null && !e.getGenre().isEmpty())
-                .collect(Collectors.groupingBy(Employe::getGenre, Collectors.counting()));
+                // « FÉMININ » (anciennes fiches) et « Féminin » comptent ensemble
+                .collect(Collectors.groupingBy(e -> {
+                    com.antigone.rh.enums.Genre g = com.antigone.rh.enums.Genre.from(e.getGenre());
+                    return g != null ? g.name() : e.getGenre().trim();
+                }, Collectors.counting()));
 
         Map<String, Long> parPoste = all.stream()
                 .filter(e -> e.getPoste() != null && !e.getPoste().isEmpty())

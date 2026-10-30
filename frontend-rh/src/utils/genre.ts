@@ -32,3 +32,17 @@ export function formatGenreChartLabel(genre: string): string {
   if (normalized === 'FEMME') return 'Femmes';
   return genre;
 }
+
+/** Retrouve l'option de la liste (ex. « Féminin ») qui correspond à une valeur enregistrée (ex. « FÉMININ », « F »). */
+export function matchGenreOption(genre: string | null | undefined, options: string[]): string {
+  if (!genre?.trim()) return '';
+  const normalized = normalizeGenre(genre);
+  const match = options.find((o) => o === genre)
+    ?? (normalized ? options.find((o) => normalizeGenre(o) === normalized) : undefined);
+  return match ?? genre.trim();
+}
+
+export function sameGenre(a?: string | null, b?: string | null): boolean {
+  const na = normalizeGenre(a);
+  return na !== null ? na === normalizeGenre(b) : (a ?? '').trim().toLowerCase() === (b ?? '').trim().toLowerCase();
+}

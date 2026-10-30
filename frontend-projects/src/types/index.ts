@@ -242,6 +242,13 @@ export interface DemandeResponse {
   motifRefus?: string;
   employeId: number;
   employeNom: string;
+  /** Chef de département qui valide en premier (absent si la demande va directement au RH). */
+  chefValidateurId?: number;
+  chefValidateurNom?: string;
+  /** Décision du chef : EN_ATTENTE, APPROUVEE (transmise au RH) ou REFUSEE. */
+  decisionChef?: 'EN_ATTENTE' | 'APPROUVEE' | 'REFUSEE';
+  /** Le chef attendu est en congé aujourd'hui : le RH peut décider à sa place. */
+  chefEnConge?: boolean;
   typeConge?: string;
   typeCongeLabel?: string;
   nombreJours?: number;
@@ -723,6 +730,8 @@ export interface MediaPlan {
   shootingTypeDeContenu: TypeContenuShooting | null;
   shootingStatus: StatutShooting | null;
   shootingStatusReason: string | null;
+  /** Shooting refusé : une autre date peut être planifiée. */
+  shootingReplanifiable?: boolean;
   calendrierProjetId: number | null;
   statut: string;
   clientId: number;

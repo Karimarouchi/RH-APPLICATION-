@@ -20,6 +20,8 @@ export const mediaPlanService = {
     shootingsADater: () => api.get<ApiResponse<MediaPlan[]>>('/media-plans/shootings/a-dater'),
     placeShootingDate: (id: number, date: string) => api.patch<ApiResponse<MediaPlan>>(`/media-plans/${id}/shooting-date`, { date }),
     confirmShootingDate: (id: number, accepte: boolean) => api.patch<ApiResponse<MediaPlan>>(`/media-plans/${id}/shooting-date-confirm`, { accepte }),
+    /** Shooting refusé : nouvelle date au plus tard (employé) ou date exacte (Production). */
+    replanifierShooting: (id: number, date: string) => api.patch<ApiResponse<MediaPlan>>(`/media-plans/${id}/shooting-replanifier`, { date }),
     resubmit: (id: number) => api.patch<ApiResponse<MediaPlan>>(`/media-plans/${id}/resubmit`),
     requestClientValidation: (id: number) => api.patch<ApiResponse<MediaPlan>>(`/media-plans/${id}/request-client-validation`),
     clientApprove: (id: number) => api.patch<ApiResponse<MediaPlan>>(`/media-plans/${id}/client-approve`),

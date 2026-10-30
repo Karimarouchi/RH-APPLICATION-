@@ -102,6 +102,10 @@ public class MediaPlan {
     @Column(columnDefinition = "TEXT")
     private String shootingStatusReason;
 
+    /** Statut de la ligne avant le refus de la date de shooting, rétabli quand on replanifie. */
+    @Enumerated(EnumType.STRING)
+    private StatutMediaPlan statutAvantRefusShooting;
+
     @OneToOne(mappedBy = "mediaPlanLigne", fetch = FetchType.LAZY)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
