@@ -501,10 +501,15 @@ public class MediaPlanService {
     }
 
     public List<MediaPlanDTO> shootingsEnAttenteDate() {
-        // Les shootings refusés y figurent aussi : la Production peut leur planifier une autre date.
-        return java.util.stream.Stream.concat(
+        // Y figurent aussi les shootings refusés et ceux déjà datés à venir : la Production peut changer leur date.
+        LocalDate today = LocalDate.now();
+        return java.util.stream.Stream.of(
                 mediaPlanRepository.findByShootingStatus(com.antigone.rh.enums.StatutShooting.EN_ATTENTE_DATE).stream(),
-                mediaPlanRepository.findByShootingStatus(com.antigone.rh.enums.StatutShooting.REJETE).stream())
+                mediaPlanRepository.findByShootingStatus(com.antigone.rh.enums.StatutShooting.REJETE).stream(),
+                mediaPlanRepository.findByShootingStatus(com.antigone.rh.enums.StatutShooting.EN_ATTENTE_CLIENT_DATE).stream(),
+                mediaPlanRepository.findByShootingStatus(com.antigone.rh.enums.StatutShooting.VALIDE).stream()
+                        .filter(mp -> mp.getShootingDate() == null || !mp.getShootingDate().isBefore(today)))
+                .flatMap(st -> st)
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -890,6 +895,7 @@ public class MediaPlanService {
                 .shootingStatus(mp.getShootingStatus() != null ? mp.getShootingStatus().name() : null)
                 .shootingStatusReason(mp.getShootingStatusReason())
                 .shootingReplanifiable(mp.isShooting() && mp.getShootingStatus() == com.antigone.rh.enums.StatutShooting.REJETE)
+                .shootingDateModifiable(MediaPlanShootingWorkflowService.isDateModifiable(mp))
                 .calendrierProjetId(mp.getCalendrierProjet() != null ? mp.getCalendrierProjet().getId() : null)
                 .statut(mp.getStatut().name())
                 .clientId(mp.getClient() != null ? mp.getClient().getId() : null)

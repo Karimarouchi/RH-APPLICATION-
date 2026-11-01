@@ -38,6 +38,8 @@ public class MediaPlanDTO {
     private String shootingStatusReason;
     /** Shooting refusé : une autre date peut être planifiée. */
     private Boolean shootingReplanifiable;
+    /** La date du shooting peut être changée (refusé, ou déjà posé dans le calendrier). */
+    private Boolean shootingDateModifiable;
     private Long calendrierProjetId;
 
     private String statut;

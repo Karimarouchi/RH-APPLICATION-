@@ -425,18 +425,20 @@ const CalendrierCore: React.FC<CoreProps> = ({
       <div className="max-w-6xl mx-auto space-y-5">
         {shootingsADater.length > 0 && (
           <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 space-y-3">
-            <p className="text-sm font-semibold text-gray-800 dark:text-white">Shootings à dater</p>
+            <p className="text-sm font-semibold text-gray-800 dark:text-white">Shootings à dater ou à re-dater</p>
             {shootingsADater.map(mp => (
               <div key={mp.id} className="flex flex-wrap items-center gap-3 text-sm">
                 <span className="font-medium text-gray-800 dark:text-gray-100">{mp.titre}</span>
                 {mp.shootingReplanifiable
                   ? <span className="rounded bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600 dark:bg-red-500/10 dark:text-red-400">Date refusée</span>
-                  : <span className="text-gray-500">au plus tard le {mp.shootingAuPlusTard || '-'}</span>}
-                <input type="date" min={mp.shootingReplanifiable ? new Date().toISOString().slice(0, 10) : undefined} max={mp.shootingReplanifiable ? undefined : mp.shootingAuPlusTard || undefined} value={dateDrafts[mp.id] || ''} onChange={e => setDateDrafts(prev => ({ ...prev, [mp.id]: e.target.value }))} className="rounded border px-2 py-1 dark:bg-gray-900" />
+                  : mp.shootingDateModifiable
+                    ? <span className="rounded bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-600 dark:bg-brand-500/10 dark:text-brand-300">Prévu le {mp.shootingDate || '-'}{mp.shootingStatus === 'EN_ATTENTE_CLIENT_DATE' ? ' · attend le client' : ''}</span>
+                    : <span className="text-gray-500">au plus tard le {mp.shootingAuPlusTard || '-'}</span>}
+                <input type="date" min={mp.shootingDateModifiable ? new Date().toISOString().slice(0, 10) : undefined} max={mp.shootingDateModifiable ? undefined : mp.shootingAuPlusTard || undefined} value={dateDrafts[mp.id] || ''} onChange={e => setDateDrafts(prev => ({ ...prev, [mp.id]: e.target.value }))} className="rounded border px-2 py-1 dark:bg-gray-900" />
                 <button type="button" className="px-3 py-1 rounded bg-brand-500 text-white" onClick={async () => {
                   if (!dateDrafts[mp.id]) return;
                   try {
-                    if (mp.shootingReplanifiable) {
+                    if (mp.shootingDateModifiable) {
                       await mediaPlanService.replanifierShooting(mp.id, dateDrafts[mp.id]);
                     } else {
                       await mediaPlanService.placeShootingDate(mp.id, dateDrafts[mp.id]);
@@ -446,7 +448,7 @@ const CalendrierCore: React.FC<CoreProps> = ({
                   } catch (e: any) {
                     showToast(e.response?.data?.message || 'Date refusée', 'error');
                   }
-                }}>{mp.shootingReplanifiable ? 'Planifier une autre date' : 'Poser la date'}</button>
+                }}>{mp.shootingReplanifiable ? 'Planifier une autre date' : mp.shootingDateModifiable ? 'Changer la date' : 'Poser la date'}</button>
               </div>
             ))}
           </div>

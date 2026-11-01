@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
     HiOutlineTrash,
     HiOutlineSearch,
@@ -23,6 +23,7 @@ import { useAuth } from '../context/AuthContext';
 import { mediaPlanService } from '../api/mediaPlanService';
 import { referentielService } from '../api/referentielService';
 import { mediaPlanAssignmentService } from '../api/mediaPlanAssignmentService';
+import { loadMediaPlanClients, MediaPlanClient } from '../utils/mediaPlanClients';
 import { mediaPlanCommentService, MediaPlanCommentDTO } from '../api/mediaPlanCommentService';
 import { employeService } from '../api/employeService';
 import { calendrierProjetService } from '../api/calendrierProjetService';
@@ -448,6 +449,7 @@ const hasRefusalMotif = (mp: MediaPlan) => mp.statut === 'DESAPPROUVE' && !mp.re
 const MediaPlanPage: React.FC = () => {
     const { user } = useAuth();
     const { clientId: clientIdParam } = useParams<{ clientId: string }>();
+    const navigate = useNavigate();
     const selectedClientId = clientIdParam ? Number(clientIdParam) : null;
     const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
 
@@ -723,9 +725,13 @@ const MediaPlanPage: React.FC = () => {
 
             if (selectedClientId) {
                 if (!isAdmin) {
-                    const assignRes = await mediaPlanAssignmentService.getByEmploye(user.employeId);
+                    const [assignRes, allowed] = await Promise.all([
+                        mediaPlanAssignmentService.getByEmploye(user.employeId),
+                        loadMediaPlanClients(user.employeId, user.permissions || []),
+                    ]);
                     setAssignments(assignRes.data.data || []);
-                    const hasAccess = (assignRes.data.data || []).some((a: MediaPlanAssignment) => a.clientId === selectedClientId);
+                    // Assigned clients and clients of the user's projects
+                    const hasAccess = allowed.some(c => c.id === selectedClientId);
                     if (!hasAccess) {
                         setIsForbidden(true);
                         setLoading(false);
@@ -748,6 +754,14 @@ const MediaPlanPage: React.FC = () => {
             setLoading(false);
         }
     };
+
+    // No client in the URL: list the clients the user may open
+    const [pickerClients, setPickerClients] = useState<MediaPlanClient[] | null>(null);
+    useEffect(() => {
+        if (selectedClientId || !user?.employeId) return;
+        setPickerClients(null);
+        loadMediaPlanClients(user.employeId, user.permissions || []).then(setPickerClients);
+    }, [selectedClientId, user?.employeId, user?.permissions]);
 
     const loadReferentiels = async () => {
         try {
@@ -1133,12 +1147,21 @@ const MediaPlanPage: React.FC = () => {
     const selectClass = (ro?: boolean) => `mp-field ${ro ? 'mp-field-ro pointer-events-none' : ''}`;
 
     // ── Text cell with formatting + right-click comment support ──
-    const TextCell: React.FC<{
+    type TextCellProps = {
         cellKey: string;
         value: string; readOnly?: boolean; placeholder?: string; className?: string;
         rowId: string; columnKey: string; mediaPlanId?: number; draftKey?: string;
         onSave: (v: string) => void;
-    }> = ({ cellKey, value, readOnly, placeholder, className = '', onSave, rowId, columnKey, mediaPlanId, draftKey }) => {
+    };
+    // The cell must keep the same component identity between renders: a component declared
+    // inline is a new type on every render, so React remounted the input on each click
+    // (focus lost, several clicks needed to type). The ref always holds the latest render.
+    const renderTextCellRef = useRef<(props: TextCellProps) => React.ReactElement | null>(() => null);
+    const TextCell = useMemo(() => {
+        const StableTextCell: React.FC<TextCellProps> = (props) => renderTextCellRef.current(props);
+        return StableTextCell;
+    }, []);
+    renderTextCellRef.current = ({ cellKey, value, readOnly, placeholder, className = '', onSave, rowId, columnKey, mediaPlanId, draftKey }) => {
         const cellValue = value || '';
         const hasLink = cellValue && /(https?:\/\/[^\s]+)/.test(cellValue);
         const fmt = cellFormats[cellKey] || {};
@@ -1477,10 +1500,14 @@ const MediaPlanPage: React.FC = () => {
                                     )}
                                 </div>
                             )}
-                            {mp.shootingReplanifiable && (
-                                <div className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-500/30 dark:bg-red-500/10">
+                            {mp.shootingDateModifiable && (
+                                <div className={`mt-3 flex flex-wrap items-end gap-2 rounded-lg border p-3 ${mp.shootingReplanifiable
+                                    ? 'border-red-200 bg-red-50 dark:border-red-500/30 dark:bg-red-500/10'
+                                    : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/60'}`}>
                                     <div>
-                                        <label className="block text-[11px] font-semibold text-red-700 dark:text-red-300 mb-1">Nouvelle date au plus tard</label>
+                                        <label className={`block text-[11px] font-semibold mb-1 ${mp.shootingReplanifiable ? 'text-red-700 dark:text-red-300' : 'text-gray-600 dark:text-gray-300'}`}>
+                                            {mp.shootingReplanifiable ? 'Nouvelle date au plus tard' : `Changer la date${mp.shootingDate ? ` (posée le ${mp.shootingDate})` : ''} — au plus tard le`}
+                                        </label>
                                         <input
                                             type="date"
                                             min={new Date().toISOString().slice(0, 10)}
@@ -1495,9 +1522,13 @@ const MediaPlanPage: React.FC = () => {
                                         onClick={() => handleReplanifierShooting(mp)}
                                         className="rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
                                     >
-                                        {replanningId === mp.id ? 'Envoi…' : 'Planifier une autre date'}
+                                        {replanningId === mp.id ? 'Envoi…' : mp.shootingReplanifiable ? 'Planifier une autre date' : 'Changer la date'}
                                     </button>
-                                    <p className="w-full text-[11px] text-red-700/80 dark:text-red-300/80">La Production sera prévenue par une notification pour poser la nouvelle date.</p>
+                                    <p className={`w-full text-[11px] ${mp.shootingReplanifiable ? 'text-red-700/80 dark:text-red-300/80' : 'text-gray-500 dark:text-gray-400'}`}>
+                                        {mp.shootingReplanifiable
+                                            ? 'La Production sera prévenue par une notification pour poser la nouvelle date.'
+                                            : 'La date posée est libérée ; la Production et votre manager sont prévenus pour poser la nouvelle date.'}
+                                    </p>
                                 </div>
                             )}
                             </div>
@@ -1735,10 +1766,42 @@ const MediaPlanPage: React.FC = () => {
 
     if (!selectedClientId) {
         return (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-400 dark:text-gray-500">
-                <HiOutlineSearch size={48} className="mb-4 opacity-50" />
-                <p className="text-lg font-medium">Sélectionnez un client</p>
-                <p className="text-sm mt-1">Choisissez un client dans le menu latéral sous "Media Plan"</p>
+            <div className="mp-page">
+                <div className="mp-hero">
+                    <h1>Media Plan</h1>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Choisissez le client dont vous voulez remplir le media plan.</p>
+                </div>
+                {pickerClients === null ? (
+                    <div className="flex items-center justify-center h-40">
+                        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-brand-500"></div>
+                    </div>
+                ) : pickerClients.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-64 text-gray-400 dark:text-gray-500">
+                        <HiOutlineSearch size={48} className="mb-4 opacity-50" />
+                        <p className="text-lg font-medium">Aucun client</p>
+                        <p className="text-sm mt-1">Vous n'êtes assigné à aucun client et n'avez aucun projet client.</p>
+                    </div>
+                ) : (
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {pickerClients.map(client => (
+                            <button
+                                key={client.id}
+                                type="button"
+                                onClick={() => navigate(`/media-plan/${client.id}`)}
+                                className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 text-left transition-colors hover:border-brand-400 hover:bg-brand-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-brand-500/10"
+                            >
+                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
+                                    {client.nom.slice(0, 2).toUpperCase()}
+                                </span>
+                                <span className="min-w-0">
+                                    <span className="block truncate font-semibold text-gray-800 dark:text-gray-100">{client.nom}</span>
+                                    <span className="block text-xs text-gray-500 dark:text-gray-400">Ouvrir le media plan</span>
+                                </span>
+                                <HiOutlineChevronRight className="ml-auto shrink-0 text-gray-400" size={16} />
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
         );
     }

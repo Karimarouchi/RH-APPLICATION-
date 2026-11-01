@@ -740,6 +740,8 @@ export interface MediaPlan {
   shootingStatusReason: string | null;
   /** Shooting refusé : une autre date peut être planifiée. */
   shootingReplanifiable?: boolean;
+  /** La date du shooting peut être changée (refusé, ou déjà posé dans le calendrier). */
+  shootingDateModifiable?: boolean;
   calendrierProjetId: number | null;
   statut: string;
   clientId: number;

@@ -202,16 +202,25 @@ public class MediaPlanShootingWorkflowService {
         mediaPlanRepository.save(mp);
     }
 
+    /** Shootings dont la date peut encore changer : refusé, ou date déjà posée (en attente du client ou validée). */
+    public static boolean isDateModifiable(MediaPlan mp) {
+        return mp != null && mp.isShooting() && (mp.getShootingStatus() == StatutShooting.REJETE
+                || mp.getShootingStatus() == StatutShooting.EN_ATTENTE_CLIENT_DATE
+                || mp.getShootingStatus() == StatutShooting.VALIDE);
+    }
+
     /**
-     * Shooting refusé : l'employé (ou son manager) redonne une date au plus tard et la Production
-     * est prévenue ; la Production peut aussi poser directement la nouvelle date exacte.
+     * Change la date d'un shooting refusé ou déjà posé dans le calendrier.
+     * L'employé (ou son manager) donne une nouvelle date au plus tard : le créneau est libéré et la
+     * Production est prévenue. La Production (ou l'admin) pose directement la nouvelle date exacte :
+     * l'employé, son manager et, si besoin, le client sont prévenus.
      */
     public void replanifierShooting(MediaPlan mp, LocalDate date, Long actorId) {
         if (mp == null || !mp.isShooting()) {
             throw new RuntimeException("Cette ligne n'est pas un shooting");
         }
-        if (mp.getShootingStatus() != StatutShooting.REJETE) {
-            throw new RuntimeException("Seul un shooting refusé peut être replanifié");
+        if (!isDateModifiable(mp)) {
+            throw new RuntimeException("La date de ce shooting ne peut pas être modifiée pour le moment");
         }
         if (date == null) {
             throw new RuntimeException("La nouvelle date est obligatoire");
@@ -226,11 +235,15 @@ public class MediaPlanShootingWorkflowService {
         boolean production = !owner && (com.antigone.rh.security.SecurityUtils.isAdmin()
                 || com.antigone.rh.security.SecurityUtils.hasAnyAuthority("VALIDATE_SHOOTING"));
         if (!owner && !production) {
-            throw new RuntimeException("Seul l'employé du média plan, son manager ou la Production peut replanifier");
+            throw new RuntimeException("Seul l'employé du média plan, son manager ou la Production peut changer la date");
         }
 
-        mp.setStatut(mp.getStatutAvantRefusShooting() != null ? mp.getStatutAvantRefusShooting() : StatutMediaPlan.APPROUVE);
-        mp.setStatutAvantRefusShooting(null);
+        boolean refuse = mp.getShootingStatus() == StatutShooting.REJETE;
+        LocalDate ancienneDate = mp.getShootingDate();
+        if (refuse) {
+            mp.setStatut(mp.getStatutAvantRefusShooting() != null ? mp.getStatutAvantRefusShooting() : StatutMediaPlan.APPROUVE);
+            mp.setStatutAvantRefusShooting(null);
+        }
         mp.setShootingDate(null);
         mp.setShootingStatus(StatutShooting.EN_ATTENTE_DATE);
         mp.setShootingStatusReason(null);
@@ -240,19 +253,35 @@ public class MediaPlanShootingWorkflowService {
                 mp.setShootingAuPlusTard(date);
             }
             mediaPlanRepository.save(mp);
-            // Prévient l'employé (et le client si sa validation est demandée).
+            // Réutilise le créneau existant ; prévient l'employé (et le client si sa validation est demandée).
             placeShootingDate(mp, date, actorId);
+            if (!refuse && ancienneDate != null && createur != null && createur.getManager() != null) {
+                notificationService.create(createur.getManager(), "SHOOTING_DATE",
+                        "La date du shooting '" + nullToEmpty(mp.getTitre()) + "' passe du " + ancienneDate
+                                + " au " + date + ".", null);
+            }
             return;
         }
 
+        // L'employé redemande une date : le créneau réservé est libéré pour la Production.
+        CalendrierProjet slot = calendrierProjetRepository.findByMediaPlanLigneId(mp.getId()).orElse(null);
+        if (slot != null) {
+            mp.setCalendrierProjet(null);
+            calendrierProjetRepository.delete(slot);
+        }
         mp.setShootingAuPlusTard(date);
         mediaPlanRepository.save(mp);
         Employe actor = employeRepository.findById(actorId).orElse(createur);
         String actorName = (nullToEmpty(actor.getPrenom()) + " " + nullToEmpty(actor.getNom())).trim();
-        String message = actorName + " a replanifié le shooting '" + nullToEmpty(mp.getTitre())
-                + "' (date refusée) : nouvelle date au plus tard le " + date + ". Posez la date dans le calendrier.";
+        String raison = refuse ? "(date refusée)"
+                : ancienneDate != null ? "(date posée : " + ancienneDate + ")" : "";
+        String message = actorName + " a changé la date du shooting '" + nullToEmpty(mp.getTitre()) + "' " + raison
+                + " : nouvelle date au plus tard le " + date + ". Posez la date dans le calendrier.";
         for (Employe validator : findShootingValidators()) {
             notificationService.create(validator, "SHOOTING_DATE", message, null);
+        }
+        if (createur != null && createur.getManager() != null && !actorId.equals(createur.getManager().getId())) {
+            notificationService.create(createur.getManager(), "SHOOTING_DATE", message, null);
         }
     }
 
@@ -322,6 +351,11 @@ public class MediaPlanShootingWorkflowService {
 
         Optional<Projet> existing = projetRepository.findFirstByMediaPlanLigneId(mp.getId());
         if (existing.isPresent()) {
+            // Date de shooting changée après coup : le projet suit la nouvelle date.
+            if (slot.getDateSlot() != null && !slot.getDateSlot().equals(existing.get().getDateDebut())) {
+                existing.get().setDateDebut(slot.getDateSlot());
+                projetRepository.save(existing.get());
+            }
             return;
         }
 
